@@ -7,11 +7,11 @@ import { formatNaira } from '@/data/mockData';
 
 export function Logo() {
   return (
-    <Link to="/" className="flex items-center gap-2 font-display">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm">
-        <Camera className="h-5 w-5" />
+    <Link to="/" className="flex items-center gap-2">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-900 text-white">
+        <Camera className="h-4 w-4" />
       </div>
-      <span className="text-xl font-bold tracking-tight text-ink-900">Servicely</span>
+      <span className="text-lg font-bold tracking-tight text-ink-900">Servicely</span>
     </Link>
   );
 }
@@ -30,15 +30,15 @@ export function PublicNavbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-ink-100 bg-white/80 backdrop-blur-lg">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 w-full border-b border-ink-100 bg-white/80 backdrop-blur-md">
+      <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Logo />
-        <div className="hidden items-center gap-1 lg:flex">
+        <div className="hidden items-center gap-0.5 lg:flex">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-ink-600 transition-colors hover:bg-ink-50 hover:text-ink-900"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
             >
               {link.label}
             </Link>
@@ -70,10 +70,10 @@ export function PublicNavbar() {
         </div>
         <button
           onClick={() => setOpen(!open)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-700 lg:hidden"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-700 lg:hidden"
           aria-label="Toggle menu"
         >
-          {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </nav>
       <AnimatePresence>
@@ -85,13 +85,13 @@ export function PublicNavbar() {
             transition={{ duration: 0.2 }}
             className="overflow-hidden border-t border-ink-100 bg-white lg:hidden"
           >
-            <div className="space-y-1 px-4 py-4">
+            <div className="space-y-1 px-4 py-3">
               {navLinks.map((link) => (
                 <Link
                   key={link.to}
                   to={link.to}
                   onClick={() => setOpen(false)}
-                  className="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-700 hover:bg-ink-50"
+                  className="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-600 hover:bg-ink-50"
                 >
                   {link.label}
                 </Link>
@@ -148,11 +148,11 @@ export function Footer() {
 
   return (
     <footer className="border-t border-ink-100 bg-white">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
           <div className="col-span-2 lg:col-span-2">
             <Logo />
-            <p className="mt-4 max-w-xs text-sm text-ink-500">
+            <p className="mt-3 max-w-xs text-sm text-ink-500">
               The trusted marketplace for student service providers. Find, book, and pay for professional services with confidence.
             </p>
           </div>
@@ -162,7 +162,7 @@ export function Footer() {
               <ul className="mt-3 space-y-2">
                 {links.map((link) => (
                   <li key={link}>
-                    <a href="#" className="text-sm text-ink-500 hover:text-primary-600">
+                    <a href="#" className="text-sm text-ink-500 transition-colors hover:text-ink-900">
                       {link}
                     </a>
                   </li>
@@ -171,7 +171,7 @@ export function Footer() {
             </div>
           ))}
         </div>
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-ink-100 pt-6 sm:flex-row">
+        <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-ink-100 pt-6 sm:flex-row">
           <p className="text-sm text-ink-400">© 2025 Servicely. All rights reserved.</p>
           <p className="text-sm text-ink-400">Built for ABUAD students</p>
         </div>
@@ -226,7 +226,7 @@ export function StarRating({ rating, size = 14 }: { rating: number; size?: numbe
           width={size}
           height={size}
           viewBox="0 0 24 24"
-          fill={star <= Math.round(rating) ? '#f59e0b' : '#e2e8f0'}
+          fill={star <= Math.round(rating) ? '#f59e0b' : '#e4e4e7'}
         >
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
         </svg>
@@ -238,9 +238,9 @@ export function StarRating({ rating, size = 14 }: { rating: number; size?: numbe
 export function ProviderCard({ provider }: { provider: import('@/data/mockData').Provider }) {
   return (
     <motion.div
-      whileHover={{ y: -4 }}
+      whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
-      className="card group overflow-hidden"
+      className="card-hover group overflow-hidden"
     >
       <div className="relative h-40 overflow-hidden">
         <img
@@ -250,7 +250,7 @@ export function ProviderCard({ provider }: { provider: import('@/data/mockData')
         />
         <div className="absolute inset-0 bg-gradient-to-t from-ink-900/60 to-transparent" />
         <div className="absolute bottom-3 left-3 flex items-center gap-2">
-          <img src={provider.avatar} alt={provider.name} className="h-10 w-10 rounded-full border-2 border-white object-cover" />
+          <img src={provider.avatar} alt={provider.name} className="h-9 w-9 rounded-full border-2 border-white object-cover" />
           <div className="text-white">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-semibold">{provider.name}</span>

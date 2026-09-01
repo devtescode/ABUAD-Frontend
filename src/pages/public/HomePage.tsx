@@ -1,74 +1,82 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Search, ArrowRight, ShieldCheck, Star, Camera, Video, Palette, Sparkles, Heart, Users, Calendar, CheckCircle2, Quote } from 'lucide-react';
+import { motion, useScroll, useTransform } from 'framer-motion';
+import { Search, ArrowRight, ShieldCheck, Star, Camera, Sparkles, Heart, Users, Calendar, CheckCircle2, Quote, Zap } from 'lucide-react';
 import { PublicNavbar, Footer, ProviderCard, StarRating } from '@/components/shared';
-import { categories, providers, formatNaira } from '@/data/mockData';
+import { categories, providers } from '@/data/mockData';
 
 const container = {
   hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
+  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
 };
 const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
 };
+
+function SectionHeader({ title, subtitle, align = 'left' }: { title: string; subtitle?: string; align?: 'left' | 'center' }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.4 }}
+      className={align === 'center' ? 'text-center' : ''}
+    >
+      <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">{title}</h2>
+      {subtitle && <p className="mt-1.5 text-ink-500">{subtitle}</p>}
+    </motion.div>
+  );
+}
 
 export function HomePage() {
   const [search, setSearch] = useState('');
   const featured = providers.filter((p) => p.featured && p.verified);
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, 60]);
 
   return (
     <div className="min-h-screen bg-ink-50">
       <PublicNavbar />
 
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-white to-accent-50" />
-        <motion.div
-          className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-primary-200/40 blur-3xl"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute -left-32 top-40 h-72 w-72 rounded-full bg-accent-200/30 blur-3xl"
-          animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 10, repeat: Infinity, delay: 1 }}
-        />
-        <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 lg:py-28">
+      <section ref={heroRef} className="relative overflow-hidden border-b border-ink-100 bg-white">
+        <div className="absolute inset-0 bg-ink-50/30" />
+        <motion.div style={{ y: heroY }} className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-32">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            transition={{ duration: 0.5 }}
             className="mx-auto max-w-3xl text-center"
           >
             <motion.span
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="badge bg-primary-100 text-primary-700 mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+              className="badge bg-ink-100 text-ink-600 mb-6"
             >
               <ShieldCheck className="h-3.5 w-3.5" /> Trusted by ABUAD students
             </motion.span>
-            <h1 className="font-display text-4xl font-bold leading-tight tracking-tight text-ink-900 sm:text-5xl lg:text-6xl">
+            <h1 className="text-4xl font-bold leading-tight tracking-tight text-ink-900 text-balance sm:text-5xl lg:text-6xl">
               Find trusted service providers for your{' '}
-              <span className="gradient-text">next project</span>
+              <span className="text-primary-600">next project</span>
             </h1>
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="mx-auto mt-6 max-w-2xl text-lg text-ink-600"
+              transition={{ delay: 0.2 }}
+              className="mx-auto mt-6 max-w-2xl text-lg text-ink-500"
             >
               Book verified photographers, videographers, designers, and makeup artists. Compare portfolios, read reviews, and pay securely — all in one place.
             </motion.p>
 
             {/* Search bar */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="mx-auto mt-8 flex max-w-2xl items-center gap-2 rounded-2xl border border-ink-200 bg-white p-2 shadow-xl shadow-primary-900/5"
+              transition={{ delay: 0.3 }}
+              className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-xl border border-ink-200 bg-white p-2"
             >
               <Search className="ml-3 h-5 w-5 text-ink-400" />
               <input
@@ -85,8 +93,8 @@ export function HomePage() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-500"
+              transition={{ delay: 0.4 }}
+              className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-400"
             >
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-primary-500" /> Verified providers
@@ -101,10 +109,10 @@ export function HomePage() {
 
             {/* Stats strip */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-              className="mx-auto mt-12 grid max-w-lg grid-cols-3 gap-4"
+              transition={{ delay: 0.5 }}
+              className="mx-auto mt-16 grid max-w-md grid-cols-3 gap-4 border-t border-ink-100 pt-8"
             >
               {[
                 { value: '72+', label: 'Verified Providers' },
@@ -112,46 +120,38 @@ export function HomePage() {
                 { value: '4.9★', label: 'Average Rating' },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
-                  <p className="font-display text-2xl font-bold text-ink-900">{stat.value}</p>
-                  <p className="text-xs text-ink-500">{stat.label}</p>
+                  <p className="text-2xl font-bold text-ink-900">{stat.value}</p>
+                  <p className="text-xs text-ink-400">{stat.label}</p>
                 </div>
               ))}
             </motion.div>
           </motion.div>
-        </div>
+        </motion.div>
       </section>
 
       {/* Categories */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-8 flex items-end justify-between"
-        >
-          <div>
-            <h2 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">Browse by category</h2>
-            <p className="mt-1 text-ink-500">Find the right professional for any occasion</p>
-          </div>
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <div className="mb-8 flex items-end justify-between">
+          <SectionHeader title="Browse by category" subtitle="Find the right professional for any occasion" />
           <Link to="/services" className="hidden text-sm font-semibold text-primary-600 hover:text-primary-700 sm:block">
             View all →
           </Link>
-        </motion.div>
-        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        </div>
+        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {categories.map((cat) => (
-            <motion.div key={cat.id} variants={item} whileHover={{ y: -6 }} className="card-glow">
-              <Link to={`/services?category=${cat.slug}`} className="group relative block overflow-hidden rounded-2xl">
-                <div className="relative h-48 overflow-hidden">
-                  <img src={cat.image} alt={cat.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${cat.color} opacity-80 mix-blend-multiply`} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-ink-900/70 to-transparent" />
+            <motion.div key={cat.id} variants={item} whileHover={{ y: -4, transition: { duration: 0.2 } }}>
+              <Link to={`/services?category=${cat.slug}`} className="group relative block overflow-hidden rounded-xl border border-ink-100">
+                <div className="relative h-44 overflow-hidden">
+                  <img src={cat.image} alt={cat.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                  <div className={`absolute inset-0 bg-gradient-to-t ${cat.color} opacity-70 mix-blend-multiply`} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink-900/60 to-transparent" />
                 </div>
-                <div className="absolute inset-0 flex flex-col justify-end p-5">
-                  <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-                    <cat.icon className="h-5 w-5 text-white" />
+                <div className="absolute inset-0 flex flex-col justify-end p-4">
+                  <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
+                    <cat.icon className="h-4 w-4 text-white" />
                   </div>
-                  <h3 className="text-lg font-bold text-white">{cat.name}</h3>
-                  <p className="mt-1 text-xs text-white/80 line-clamp-2">{cat.description}</p>
+                  <h3 className="text-base font-bold text-white">{cat.name}</h3>
+                  <p className="mt-0.5 text-xs text-white/70 line-clamp-2">{cat.description}</p>
                 </div>
               </Link>
             </motion.div>
@@ -160,23 +160,15 @@ export function HomePage() {
       </section>
 
       {/* Featured Providers */}
-      <section className="bg-white py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mb-8 flex items-end justify-between"
-          >
-            <div>
-              <h2 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">Featured providers</h2>
-              <p className="mt-1 text-ink-500">Top-rated professionals, ready to book</p>
-            </div>
+      <section className="border-y border-ink-100 bg-white py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="mb-8 flex items-end justify-between">
+            <SectionHeader title="Featured providers" subtitle="Top-rated professionals, ready to book" />
             <Link to="/providers" className="hidden text-sm font-semibold text-primary-600 hover:text-primary-700 sm:block">
               View all →
             </Link>
-          </motion.div>
-          <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true }} className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          </div>
+          <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {featured.map((provider) => (
               <motion.div key={provider.id} variants={item}>
                 <ProviderCard provider={provider} />
@@ -187,11 +179,8 @@ export function HomePage() {
       </section>
 
       {/* How It Works */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-        <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center">
-          <h2 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">How it works</h2>
-          <p className="mt-1 text-ink-500">Book a service in four simple steps</p>
-        </motion.div>
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <SectionHeader title="How it works" subtitle="Book a service in four simple steps" align="center" />
         <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {[
             { icon: Search, title: 'Find a Service', desc: 'Search for the service you need from our categories.' },
@@ -201,20 +190,19 @@ export function HomePage() {
           ].map((step, i) => (
             <motion.div
               key={step.title}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              viewport={{ once: true, margin: '-40px' }}
+              transition={{ delay: i * 0.08, duration: 0.4 }}
               className="relative text-center"
             >
-              <motion.div
-                whileHover={{ scale: 1.1 }}
-                className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-600"
-              >
-                <step.icon className="h-7 w-7" />
-              </motion.div>
-              <div className="absolute left-1/2 top-7 hidden h-0.5 w-full -translate-x-0 bg-ink-200 lg:block" style={{ zIndex: -1 }} />
-              <h3 className="mt-4 text-lg font-semibold text-ink-900">{i + 1}. {step.title}</h3>
+              <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-ink-100 text-ink-700">
+                <step.icon className="h-6 w-6" />
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-ink-900 text-[10px] font-bold text-white">
+                  {i + 1}
+                </span>
+              </div>
+              <h3 className="mt-4 text-base font-semibold text-ink-900">{step.title}</h3>
               <p className="mt-1 text-sm text-ink-500">{step.desc}</p>
             </motion.div>
           ))}
@@ -222,36 +210,36 @@ export function HomePage() {
       </section>
 
       {/* Testimonials */}
-      <section className="bg-white py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center">
-            <h2 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">What students say</h2>
-            <p className="mt-1 text-ink-500">Real experiences from the ABUAD community</p>
-          </motion.div>
-          <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-3">
+      <section className="border-y border-ink-100 bg-white py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <SectionHeader title="What students say" subtitle="Real experiences from the ABUAD community" align="center" />
+          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
             {[
-              { name: 'Chioma O.', text: 'Found an amazing photographer for my birthday in minutes. The whole process was so smooth!', rating: 5 },
-              { name: 'Tunde A.', text: 'Servicely made it easy to compare providers and pick the best one. Highly recommend.', rating: 5 },
-              { name: 'Fatima I.', text: 'The makeup artist I booked was professional and talented. Will definitely use again.', rating: 5 },
+              { name: 'Chioma O.', text: 'Found an amazing photographer for my birthday in minutes. The whole process was so smooth!', rating: 5, role: 'Student' },
+              { name: 'Tunde A.', text: 'Servicely made it easy to compare providers and pick the best one. Highly recommend.', rating: 5, role: 'Student' },
+              { name: 'Fatima I.', text: 'The makeup artist I booked was professional and talented. Will definitely use again.', rating: 5, role: 'Student' },
             ].map((t, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ delay: i * 0.08, duration: 0.4 }}
                 className="card p-6"
               >
-                <Quote className="h-8 w-8 text-primary-200" />
-                <p className="mt-3 text-sm text-ink-600">{t.text}</p>
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
-                      {t.name[0]}
-                    </div>
-                    <span className="text-sm font-semibold text-ink-900">{t.name}</span>
-                  </div>
+                <div className="flex items-center justify-between">
+                  <Quote className="h-7 w-7 text-ink-200" />
                   <StarRating rating={t.rating} />
+                </div>
+                <p className="mt-3 text-sm leading-relaxed text-ink-600">{t.text}</p>
+                <div className="mt-5 flex items-center gap-3 border-t border-ink-100 pt-4">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-100 text-sm font-semibold text-ink-700">
+                    {t.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-ink-900">{t.name}</p>
+                    <p className="text-xs text-ink-400">{t.role}</p>
+                  </div>
                 </div>
               </motion.div>
             ))}
@@ -260,66 +248,50 @@ export function HomePage() {
       </section>
 
       {/* Trust & Safety */}
-      <section className="bg-ink-900 py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <motion.div initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} className="text-center">
-            <span className="badge bg-primary-500/20 text-primary-300 mb-4">
-              <ShieldCheck className="h-3.5 w-3.5" /> Trust & Safety
-            </span>
-            <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">Book with confidence</h2>
-            <p className="mx-auto mt-2 max-w-2xl text-ink-400">
-              Every provider on Servicely goes through a verification process. We prioritize your safety at every step.
-            </p>
-          </motion.div>
-          <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true }} className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              { icon: ShieldCheck, title: 'Verified Providers', desc: 'Every provider is reviewed and approved by our team before they can receive bookings.' },
-              { icon: Star, title: 'Ratings & Reviews', desc: 'Read genuine reviews from students who have booked and completed services.' },
-              { icon: Camera, title: 'Portfolio Verification', desc: 'Browse real work samples to ensure quality before you book.' },
-              { icon: CheckCircle2, title: 'Completed Booking Count', desc: 'See how many successful bookings each provider has completed.' },
-              { icon: Heart, title: 'Transparent Pricing', desc: 'Know the price upfront. No hidden fees, no surprises.' },
-              { icon: Users, title: 'Admin Oversight', desc: 'Our team monitors the platform to resolve disputes and maintain quality.' },
-            ].map((it) => (
-              <motion.div key={it.title} variants={item} whileHover={{ y: -4 }} className="rounded-2xl border border-ink-800 bg-ink-800/50 p-6 transition-colors hover:border-primary-500/30">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-500/20 text-primary-400">
-                  <it.icon className="h-5 w-5" />
-                </div>
-                <h3 className="mt-4 font-semibold text-white">{it.title}</h3>
-                <p className="mt-1 text-sm text-ink-400">{it.desc}</p>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <SectionHeader title="Book with confidence" subtitle="Every provider on Servicely goes through a verification process. We prioritize your safety at every step." align="center" />
+        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[
+            { icon: ShieldCheck, title: 'Verified Providers', desc: 'Every provider is reviewed and approved by our team before they can receive bookings.' },
+            { icon: Star, title: 'Ratings & Reviews', desc: 'Read genuine reviews from students who have booked and completed services.' },
+            { icon: Camera, title: 'Portfolio Verification', desc: 'Browse real work samples to ensure quality before you book.' },
+            { icon: CheckCircle2, title: 'Completed Booking Count', desc: 'See how many successful bookings each provider has completed.' },
+            { icon: Heart, title: 'Transparent Pricing', desc: 'Know the price upfront. No hidden fees, no surprises.' },
+            { icon: Users, title: 'Admin Oversight', desc: 'Our team monitors the platform to resolve disputes and maintain quality.' },
+          ].map((it) => (
+            <motion.div key={it.title} variants={item} className="card p-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ink-100 text-ink-700">
+                <it.icon className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 font-semibold text-ink-900">{it.title}</h3>
+              <p className="mt-1 text-sm text-ink-500">{it.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-600 to-primary-800 px-6 py-12 text-center sm:px-12 sm:py-16"
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-40px' }}
+          transition={{ duration: 0.4 }}
+          className="relative overflow-hidden rounded-2xl border border-ink-100 bg-ink-900 px-6 py-12 text-center sm:px-12 sm:py-16"
         >
-          <motion.div
-            className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl"
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 6, repeat: Infinity }}
-          />
-          <motion.div
-            className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-accent-400/20 blur-2xl"
-            animate={{ scale: [1, 1.3, 1] }}
-            transition={{ duration: 8, repeat: Infinity, delay: 1 }}
-          />
           <div className="relative">
-            <h2 className="font-display text-2xl font-bold text-white sm:text-4xl">Ready to book your next service?</h2>
-            <p className="mx-auto mt-3 max-w-xl text-primary-100">
+            <span className="badge bg-white/10 text-white mb-4">
+              <Zap className="h-3.5 w-3.5" /> Get started today
+            </span>
+            <h2 className="text-2xl font-bold text-white text-balance sm:text-4xl">Ready to book your next service?</h2>
+            <p className="mx-auto mt-3 max-w-xl text-ink-400">
               Join hundreds of ABUAD students who trust Servicely for their professional service needs.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link to="/services" className="btn-accent btn-lg">
                 Book a Service <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link to="/signup" className="btn-lg btn border border-white/30 bg-white/10 text-white hover:bg-white/20">
+              <Link to="/signup" className="btn-lg btn border border-ink-700 bg-ink-800 text-white hover:bg-ink-700">
                 Become a Provider
               </Link>
             </div>

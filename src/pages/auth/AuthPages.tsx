@@ -15,7 +15,6 @@ type RoleConfig = {
   title: string;
   subtitle: string;
   icon: typeof User;
-  gradient: string;
   accent: string;
   benefits: { icon: typeof Star; text: string }[];
   cta: string;
@@ -28,7 +27,6 @@ const roleConfigs: Record<'customer' | 'provider' | 'admin', RoleConfig> = {
     title: 'Customer Login',
     subtitle: 'Book trusted service providers in minutes',
     icon: User,
-    gradient: 'from-primary-500 via-primary-600 to-primary-800',
     accent: 'primary',
     benefits: [
       { icon: ShoppingBag, text: 'Browse and book verified providers' },
@@ -43,7 +41,6 @@ const roleConfigs: Record<'customer' | 'provider' | 'admin', RoleConfig> = {
     title: 'Provider Login',
     subtitle: 'Manage your services and grow your business',
     icon: Briefcase,
-    gradient: 'from-sky-500 via-sky-600 to-blue-800',
     accent: 'sky',
     benefits: [
       { icon: Calendar, text: 'Receive and manage booking requests' },
@@ -58,7 +55,6 @@ const roleConfigs: Record<'customer' | 'provider' | 'admin', RoleConfig> = {
     title: 'Admin Portal',
     subtitle: 'Manage and monitor the marketplace',
     icon: Shield,
-    gradient: 'from-ink-700 via-ink-800 to-ink-950',
     accent: 'ink',
     benefits: [
       { icon: ShieldCheck, text: 'Verify and approve providers' },
@@ -74,61 +70,42 @@ function AuthShell({
   title,
   subtitle,
   children,
-  gradient,
   benefits,
   footer,
 }: {
   title: string;
   subtitle: string;
   children: React.ReactNode;
-  gradient: string;
   benefits: { icon: typeof Star; text: string }[];
   footer?: React.ReactNode;
 }) {
   return (
     <div className="flex min-h-screen flex-col bg-ink-50 lg:flex-row">
       {/* Left brand panel */}
-      <div className={`relative hidden flex-1 overflow-hidden bg-gradient-to-br ${gradient} lg:flex lg:flex-col lg:justify-between lg:p-12`}>
-        {/* Animated background orbs */}
-        <motion.div
-          className="absolute -right-20 -top-20 h-72 w-72 rounded-full bg-white/10 blur-2xl"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-accent-400/20 blur-2xl"
-          animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.4, 0.2] }}
-          transition={{ duration: 10, repeat: Infinity, delay: 1 }}
-        />
-        <motion.div
-          className="absolute right-1/3 top-1/3 h-40 w-40 rounded-full bg-white/5 blur-xl"
-          animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
-          transition={{ duration: 6, repeat: Infinity, delay: 2 }}
-        />
-
+      <div className="relative hidden flex-1 overflow-hidden bg-ink-900 lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-              <ShieldCheck className="h-5 w-5 text-white" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
+              <ShieldCheck className="h-4 w-4 text-white" />
             </div>
-            <span className="text-xl font-bold text-white">Servicely</span>
+            <span className="text-lg font-bold text-white">Servicely</span>
           </Link>
         </div>
 
         <div className="relative z-10">
           <motion.h2
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
-            className="font-display text-3xl font-bold leading-tight text-white"
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="text-3xl font-bold leading-tight text-white"
           >
             Trusted by ABUAD students
           </motion.h2>
           <motion.p
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.6 }}
-            className="mt-3 max-w-md text-white/80"
+            transition={{ delay: 0.15, duration: 0.4 }}
+            className="mt-3 max-w-md text-ink-400"
           >
             Join the marketplace where students find, book, and pay for professional services with confidence.
           </motion.p>
@@ -136,12 +113,12 @@ function AuthShell({
             {benefits.map((benefit, i) => (
               <motion.div
                 key={i}
-                initial={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0, x: -12 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 + i * 0.1, duration: 0.5 }}
-                className="flex items-center gap-3 text-white/90"
+                transition={{ delay: 0.2 + i * 0.08, duration: 0.4 }}
+                className="flex items-center gap-3 text-ink-300"
               >
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5">
                   <benefit.icon className="h-4 w-4" />
                 </div>
                 <span className="text-sm">{benefit.text}</span>
@@ -150,22 +127,22 @@ function AuthShell({
           </div>
         </div>
 
-        <p className="relative z-10 text-sm text-white/50">© 2025 Servicely. All rights reserved.</p>
+        <p className="relative z-10 text-sm text-ink-600">© 2025 Servicely. All rights reserved.</p>
       </div>
 
       {/* Right form panel */}
       <div className="flex flex-1 items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-sm">
           <div className="lg:hidden">
             <Logo />
           </div>
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.3 }}
             className="mt-8 lg:mt-0"
           >
-            <h1 className="font-display text-2xl font-bold text-ink-900 sm:text-3xl">{title}</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">{title}</h1>
             <p className="mt-2 text-ink-500">{subtitle}</p>
             <div className="mt-8">{children}</div>
             {footer && <div className="mt-6">{footer}</div>}
@@ -208,40 +185,6 @@ function PasswordInput({
   );
 }
 
-function RoleSelector({
-  roles,
-  active,
-  onSelect,
-}: {
-  roles: { id: UserRole; label: string; icon: typeof User }[];
-  active: UserRole;
-  onSelect: (r: UserRole) => void;
-}) {
-  return (
-    <div className="grid grid-cols-3 gap-2 rounded-2xl bg-ink-100 p-1.5">
-      {roles.map((r) => (
-        <button
-          key={r.id}
-          onClick={() => onSelect(r.id)}
-          className={`relative flex flex-col items-center gap-1.5 rounded-xl py-3 text-xs font-medium transition-colors ${
-            active === r.id ? 'text-white' : 'text-ink-500 hover:text-ink-700'
-          }`}
-        >
-          {active === r.id && (
-            <motion.div
-              layoutId="role-selector-pill"
-              className="absolute inset-0 rounded-xl bg-primary-600 shadow-sm"
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            />
-          )}
-          <r.icon className="relative z-10 h-5 w-5" />
-          <span className="relative z-10 capitalize">{r.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ─── Signup Role Selection ───────────────────────────────────────────────────
 
 export function SignupRolePage() {
@@ -254,7 +197,7 @@ export function SignupRolePage() {
       title: 'Customer',
       desc: 'Find and book trusted service providers for your events and projects.',
       icon: User,
-      bg: 'hover:border-primary-400 hover:bg-primary-50',
+      bg: 'hover:border-primary-300 hover:bg-primary-50/50',
       iconBg: 'bg-primary-100 text-primary-600',
     },
     {
@@ -262,7 +205,7 @@ export function SignupRolePage() {
       title: 'Service Provider',
       desc: 'Offer your services, receive bookings, and grow your client base.',
       icon: Briefcase,
-      bg: 'hover:border-sky-400 hover:bg-sky-50',
+      bg: 'hover:border-sky-300 hover:bg-sky-50/50',
       iconBg: 'bg-sky-100 text-sky-600',
     },
   ];
@@ -271,34 +214,33 @@ export function SignupRolePage() {
     <AuthShell
       title="Create your account"
       subtitle="How do you want to use the platform?"
-      gradient="from-primary-500 via-primary-600 to-primary-800"
       benefits={[
         { icon: ShoppingBag, text: 'Browse and book verified providers' },
         { icon: Wallet, text: 'Pay securely through the platform' },
         { icon: Star, text: 'Read real reviews from students' },
       ]}
     >
-      <div className="space-y-4">
+      <div className="space-y-3">
         {roles.map((role, i) => (
           <motion.button
             key={role.id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
+            transition={{ delay: i * 0.08 }}
             onHoverStart={() => setHovered(role.id)}
             onHoverEnd={() => setHovered(null)}
             onClick={() => navigate(`/signup/${role.id}`)}
-            className={`group flex w-full items-center gap-4 rounded-2xl border-2 border-ink-200 p-5 text-left transition-all ${role.bg}`}
+            className={`group flex w-full items-center gap-4 rounded-xl border border-ink-200 p-4 text-left transition-all ${role.bg}`}
           >
-            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${role.iconBg} transition-transform group-hover:scale-110`}>
-              <role.icon className="h-6 w-6" />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${role.iconBg} transition-transform group-hover:scale-105`}>
+              <role.icon className="h-5 w-5" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-ink-900">{role.title}</h3>
               <p className="text-sm text-ink-500">{role.desc}</p>
             </div>
             <motion.div animate={{ x: hovered === role.id ? 4 : 0 }}>
-              <ArrowRight className="h-5 w-5 text-ink-400" />
+              <ArrowRight className="h-4 w-4 text-ink-400" />
             </motion.div>
           </motion.button>
         ))}
@@ -306,7 +248,7 @@ export function SignupRolePage() {
 
       <p className="mt-6 text-center text-sm text-ink-500">
         Already have an account?{' '}
-        <Link to="/login" className="font-semibold text-primary-600 hover:text-primary-700">
+        <Link to="/login" className="font-semibold text-ink-900 hover:text-primary-600">
           Login
         </Link>
       </p>
@@ -336,7 +278,6 @@ export function SignupPage() {
     <AuthShell
       title={isProvider ? 'Become a Provider' : 'Create your account'}
       subtitle={isProvider ? 'Start offering your services on Servicely' : 'Join Servicely as a customer'}
-      gradient={isProvider ? 'from-sky-500 via-sky-600 to-blue-800' : 'from-primary-500 via-primary-600 to-primary-800'}
       benefits={
         isProvider
           ? [
@@ -352,21 +293,21 @@ export function SignupPage() {
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
+        <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.05 }}>
           <label className="label">Full Name</label>
           <div className="relative">
             <UserCircle className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
             <input className="input pl-10" placeholder="Enter your name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
         </motion.div>
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
+        <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
           <label className="label">Email Address</label>
           <div className="relative">
             <Mail className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
             <input type="email" className="input pl-10" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
           </div>
         </motion.div>
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+        <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
           <label className="label">Password</label>
           <PasswordInput value={password} onChange={setPassword} placeholder="Create a password" />
         </motion.div>
@@ -374,8 +315,8 @@ export function SignupPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="flex items-start gap-2 rounded-xl bg-accent-50 p-3 text-xs text-accent-700"
+            transition={{ delay: 0.2 }}
+            className="flex items-start gap-2 rounded-lg bg-accent-50 p-3 text-xs text-accent-700"
           >
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
             <span>After signup, you will complete your profile and submit it for verification before becoming bookable.</span>
@@ -383,19 +324,19 @@ export function SignupPage() {
         )}
         <motion.button
           type="submit"
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
+          transition={{ delay: 0.25 }}
           className="btn-primary btn-lg w-full"
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
         >
           {isProvider ? 'Continue to Onboarding' : 'Create Account'} <ArrowRight className="h-4 w-4" />
         </motion.button>
       </form>
       <p className="mt-6 text-center text-sm text-ink-500">
         Already have an account?{' '}
-        <Link to={isProvider ? '/login/provider' : '/login/customer'} className="font-semibold text-primary-600 hover:text-primary-700">
+        <Link to={isProvider ? '/login/provider' : '/login/customer'} className="font-semibold text-ink-900 hover:text-primary-600">
           Login
         </Link>
       </p>
@@ -409,13 +350,12 @@ export function LoginPage() {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState<UserRole | null>(null);
 
-  const roles: { id: UserRole; title: string; desc: string; icon: typeof User; gradient: string; iconBg: string; path: string }[] = [
+  const roles: { id: UserRole; title: string; desc: string; icon: typeof User; iconBg: string; path: string }[] = [
     {
       id: 'customer',
       title: 'Customer',
       desc: 'Find and book trusted service providers.',
       icon: User,
-      gradient: 'from-primary-500 to-primary-700',
       iconBg: 'bg-primary-100 text-primary-600',
       path: '/login/customer',
     },
@@ -424,7 +364,6 @@ export function LoginPage() {
       title: 'Service Provider',
       desc: 'Offer services and receive bookings.',
       icon: Briefcase,
-      gradient: 'from-sky-500 to-blue-700',
       iconBg: 'bg-sky-100 text-sky-600',
       path: '/login/provider',
     },
@@ -433,7 +372,6 @@ export function LoginPage() {
       title: 'Admin',
       desc: 'Manage and monitor the marketplace.',
       icon: Shield,
-      gradient: 'from-ink-700 to-ink-900',
       iconBg: 'bg-ink-100 text-ink-700',
       path: '/login/admin',
     },
@@ -443,7 +381,6 @@ export function LoginPage() {
     <AuthShell
       title="Welcome back"
       subtitle="Choose your account type to continue"
-      gradient="from-primary-500 via-primary-600 to-primary-800"
       benefits={[
         { icon: ShieldCheck, text: 'Verified providers only' },
         { icon: Wallet, text: 'Secure in-platform payments' },
@@ -454,30 +391,30 @@ export function LoginPage() {
         {roles.map((role, i) => (
           <motion.button
             key={role.id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
+            transition={{ delay: i * 0.08 }}
             onHoverStart={() => setHovered(role.id)}
             onHoverEnd={() => setHovered(null)}
             onClick={() => navigate(role.path)}
-            className="group flex w-full items-center gap-4 rounded-2xl border-2 border-ink-200 p-5 text-left transition-all hover:border-ink-300 hover:shadow-md"
+            className="group flex w-full items-center gap-4 rounded-xl border border-ink-200 p-4 text-left transition-all hover:border-ink-300 hover:bg-ink-50"
           >
-            <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${role.iconBg} transition-transform group-hover:scale-110`}>
-              <role.icon className="h-6 w-6" />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${role.iconBg} transition-transform group-hover:scale-105`}>
+              <role.icon className="h-5 w-5" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-ink-900">{role.title}</h3>
               <p className="text-sm text-ink-500">{role.desc}</p>
             </div>
             <motion.div animate={{ x: hovered === role.id ? 4 : 0 }}>
-              <ArrowRight className="h-5 w-5 text-ink-400" />
+              <ArrowRight className="h-4 w-4 text-ink-400" />
             </motion.div>
           </motion.button>
         ))}
       </div>
       <p className="mt-6 text-center text-sm text-ink-500">
         Don't have an account?{' '}
-        <Link to="/signup" className="font-semibold text-primary-600 hover:text-primary-700">
+        <Link to="/signup" className="font-semibold text-ink-900 hover:text-primary-600">
           Sign up
         </Link>
       </p>
@@ -510,15 +447,14 @@ export function RoleLoginPage() {
     <AuthShell
       title={config.title}
       subtitle={config.subtitle}
-      gradient={config.gradient}
       benefits={config.benefits}
       footer={
         <div className="flex items-center justify-center gap-4 text-sm">
-          <Link to="/login" className="flex items-center gap-1 font-medium text-ink-500 hover:text-ink-700">
+          <Link to="/login" className="flex items-center gap-1 font-medium text-ink-500 hover:text-ink-900">
             <ArrowLeft className="h-4 w-4" /> All logins
           </Link>
           {role !== 'admin' && (
-            <Link to={`/signup/${role}`} className="font-semibold text-primary-600 hover:text-primary-700">
+            <Link to={`/signup/${role}`} className="font-semibold text-ink-900 hover:text-primary-600">
               Create {role} account
             </Link>
           )}
@@ -528,12 +464,12 @@ export function RoleLoginPage() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Role badge */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          className="mb-6 flex items-center gap-3 rounded-2xl border border-ink-100 bg-ink-50 p-4"
+          transition={{ delay: 0.05 }}
+          className="mb-6 flex items-center gap-3 rounded-xl border border-ink-100 bg-ink-50 p-4"
         >
-          <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${config.gradient} text-white shadow-sm`}>
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ink-900 text-white">
             <config.icon className="h-5 w-5" />
           </div>
           <div>
@@ -542,7 +478,7 @@ export function RoleLoginPage() {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
+        <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
           <label className="label">Email Address</label>
           <div className="relative">
             <Mail className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
@@ -557,7 +493,7 @@ export function RoleLoginPage() {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
+        <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }}>
           <div className="flex items-center justify-between">
             <label className="label">Password</label>
             <Link to="/forgot-password" className="text-xs font-medium text-primary-600 hover:text-primary-700">
@@ -571,7 +507,7 @@ export function RoleLoginPage() {
           <motion.label
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.25 }}
+            transition={{ delay: 0.2 }}
             className="flex items-center gap-2 text-sm text-ink-600"
           >
             <input type="checkbox" className="h-4 w-4 rounded accent-primary-600" />
@@ -581,13 +517,13 @@ export function RoleLoginPage() {
 
         <motion.button
           type="submit"
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.25 }}
           disabled={loading}
           className="btn-primary btn-lg w-full"
-          whileHover={{ scale: loading ? 1 : 1.02 }}
-          whileTap={{ scale: loading ? 1 : 0.98 }}
+          whileHover={{ scale: loading ? 1 : 1.01 }}
+          whileTap={{ scale: loading ? 1 : 0.99 }}
         >
           <AnimatePresence mode="wait">
             {loading ? (
@@ -626,7 +562,6 @@ export function ForgotPasswordPage() {
     <AuthShell
       title="Reset password"
       subtitle="Enter your email to receive a reset link"
-      gradient="from-primary-500 via-primary-600 to-primary-800"
       benefits={[
         { icon: ShieldCheck, text: 'Verified providers only' },
         { icon: Wallet, text: 'Secure in-platform payments' },
@@ -634,9 +569,9 @@ export function ForgotPasswordPage() {
       ]}
     >
       {sent ? (
-        <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
-            <CheckCircle2 className="h-8 w-8 text-primary-600" />
+        <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-100">
+            <CheckCircle2 className="h-7 w-7 text-primary-600" />
           </div>
           <h3 className="mt-4 text-lg font-semibold text-ink-900">Check your email</h3>
           <p className="mt-1 text-sm text-ink-500">We've sent a password reset link to your email address.</p>
@@ -653,12 +588,12 @@ export function ForgotPasswordPage() {
               <input type="email" className="input pl-10" placeholder="you@example.com" required />
             </div>
           </div>
-          <motion.button type="submit" className="btn-primary btn-lg w-full" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <motion.button type="submit" className="btn-primary btn-lg w-full" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
             Send Reset Link <ArrowRight className="h-4 w-4" />
           </motion.button>
         </form>
       )}
-      <Link to="/login" className="mt-6 flex items-center justify-center gap-1 text-sm font-medium text-ink-500 hover:text-ink-700">
+      <Link to="/login" className="mt-6 flex items-center justify-center gap-1 text-sm font-medium text-ink-500 hover:text-ink-900">
         <ArrowLeft className="h-4 w-4" /> Back to login
       </Link>
     </AuthShell>
