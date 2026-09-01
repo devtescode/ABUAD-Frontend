@@ -40,7 +40,7 @@ export function ServicesPage() {
 
       <div className="border-b border-ink-100 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <h1 className="font-display text-3xl font-bold text-ink-900">Browse Services</h1>
+          <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-ink-50">Browse Services</h1>
           <p className="mt-1 text-ink-500">Discover verified providers for your next project</p>
           <div className="mt-6 flex items-center gap-2 rounded-xl border border-ink-200 bg-ink-50 px-4 py-2.5">
             <Search className="h-5 w-5 text-ink-400" />
@@ -59,7 +59,7 @@ export function ServicesPage() {
           {/* Desktop filters */}
           <aside className="hidden w-64 shrink-0 lg:block">
             <div className="sticky top-20 card p-5">
-              <h3 className="mb-4 font-semibold text-ink-900">Filters</h3>
+              <h3 className="mb-4 font-semibold text-ink-900 dark:text-ink-50">Filters</h3>
               <FilterSection
                 title="Category"
                 options={categories.map((c) => ({ label: c.name, value: c.slug }))}
@@ -121,7 +121,7 @@ export function ServicesPage() {
             {filtered.length === 0 ? (
               <div className="card flex flex-col items-center justify-center py-20 text-center">
                 <Search className="h-12 w-12 text-ink-300" />
-                <h3 className="mt-4 text-lg font-semibold text-ink-900">No providers found</h3>
+                <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No providers found</h3>
                 <p className="mt-1 text-sm text-ink-500">Try adjusting your filters or search query.</p>
               </div>
             ) : (

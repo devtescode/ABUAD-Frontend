@@ -44,7 +44,7 @@ export function CustomerDashboard() {
       {/* Upcoming bookings */}
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-ink-900">Upcoming Bookings</h2>
+          <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-50">Upcoming Bookings</h2>
           <Link to="/customer/bookings" className="text-sm font-semibold text-primary-600">View all →</Link>
         </div>
         {upcoming.length === 0 ? (
@@ -63,7 +63,7 @@ export function CustomerDashboard() {
                   <p className="text-sm text-ink-500">{booking.providerName} • {booking.date} at {booking.time}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-ink-900">{formatNaira(booking.price)}</p>
+                  <p className="font-bold text-ink-900 dark:text-ink-50">{formatNaira(booking.price)}</p>
                   <StatusBadge status={booking.status} />
                 </div>
               </motion.div>
@@ -75,7 +75,7 @@ export function CustomerDashboard() {
       {/* Recommended */}
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-lg font-bold text-ink-900">Recommended for you</h2>
+          <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-50">Recommended for you</h2>
           <Link to="/customer/browse" className="text-sm font-semibold text-primary-600">View all →</Link>
         </div>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -113,7 +113,7 @@ export function CustomerSaved() {
       {saved.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-20 text-center">
           <Heart className="h-12 w-12 text-ink-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900">No saved providers yet</h3>
+          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No saved providers yet</h3>
           <p className="mt-1 text-sm text-ink-500">Tap the heart icon on a provider to save them here.</p>
           <Link to="/customer/browse" className="btn-primary mt-4">Browse Providers</Link>
         </div>
@@ -151,7 +151,7 @@ export function CustomerBookings() {
       {filtered.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-20 text-center">
           <Calendar className="h-12 w-12 text-ink-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900">No bookings found</h3>
+          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No bookings found</h3>
           <p className="mt-1 text-sm text-ink-500">Book a service to see it here.</p>
         </div>
       ) : (
@@ -196,7 +196,7 @@ export function CustomerReviews() {
       {reviewed.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-20 text-center">
           <Star className="h-12 w-12 text-ink-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900">No reviews yet</h3>
+          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No reviews yet</h3>
           <p className="mt-1 text-sm text-ink-500">Complete a booking to leave a review.</p>
         </div>
       ) : (

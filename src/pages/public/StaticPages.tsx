@@ -11,7 +11,7 @@ export function ProvidersPage() {
       <PublicNavbar />
       <div className="border-b border-ink-100 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <h1 className="font-display text-3xl font-bold text-ink-900">All Providers</h1>
+          <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-ink-50">All Providers</h1>
           <p className="mt-1 text-ink-500">Browse all verified service providers on the platform</p>
         </div>
       </div>
@@ -49,7 +49,7 @@ export function HowItWorksPage() {
         <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-primary-100/50 blur-3xl" />
         <div className="relative mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:py-24">
           <span className="badge bg-primary-100 text-primary-700 mb-4">Simple Process</span>
-          <h1 className="font-display text-3xl font-bold text-ink-900 sm:text-5xl">How Servicely Works</h1>
+          <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-ink-50 sm:text-5xl">How Servicely Works</h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-ink-600">
             From discovery to delivery, we make booking professional services effortless for ABUAD students.
           </p>
@@ -74,7 +74,7 @@ export function HowItWorksPage() {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-primary-600">Step {i + 1}</span>
                 </div>
-                <h3 className="mt-1 text-xl font-bold text-ink-900">{step.title}</h3>
+                <h3 className="mt-1 text-xl font-bold text-ink-900 dark:text-ink-50">{step.title}</h3>
                 <p className="mt-2 text-ink-600">{step.desc}</p>
               </div>
             </motion.div>
@@ -104,7 +104,7 @@ export function AboutPage() {
         <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-accent-100/50 blur-3xl" />
         <div className="relative mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:py-24">
           <span className="badge bg-accent-100 text-accent-700 mb-4">Our Story</span>
-          <h1 className="font-display text-3xl font-bold text-ink-900 sm:text-5xl">About Servicely</h1>
+          <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-ink-50 sm:text-5xl">About Servicely</h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-ink-600">
             We are building Nigeria's most trusted student service marketplace — starting at ABUAD and expanding nationwide.
           </p>
@@ -113,7 +113,7 @@ export function AboutPage() {
 
       <section className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="prose prose-lg max-w-none">
-          <h2 className="font-display text-2xl font-bold text-ink-900">Our Mission</h2>
+          <h2 className="font-display text-2xl font-bold text-ink-900 dark:text-ink-50">Our Mission</h2>
           <p className="mt-3 text-ink-600">
             Servicely connects students who need professional services with verified service providers who offer them. We believe finding a photographer, videographer, designer, or makeup artist should be as simple as ordering food online — transparent, secure, and reliable.
           </p>

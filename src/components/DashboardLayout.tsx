@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useState } from 'react';
 import { useAuth } from '@/context/AppContext';
 import { Logo } from '@/components/shared';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { LogOut, Menu, X } from 'lucide-react';
 import type { UserRole } from '@/data/mockData';
 import type { LucideIcon } from 'lucide-react';
@@ -27,10 +28,10 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
   const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 
   return (
-    <div className="min-h-screen bg-ink-50">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-ink-100 bg-white lg:flex lg:flex-col">
-        <div className="flex h-14 items-center border-b border-ink-100 px-5">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 lg:flex lg:flex-col">
+        <div className="flex h-14 items-center border-b border-ink-100 dark:border-ink-800 px-5">
           <Logo />
         </div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
@@ -41,44 +42,48 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
                 key={item.path}
                 to={item.path}
                 className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active ? 'bg-ink-100 text-ink-900' : 'text-ink-500 hover:bg-ink-50 hover:text-ink-900'
+                  active ? 'bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-50' : 'text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800 hover:text-ink-900 dark:hover:text-ink-50'
                 }`}
               >
                 {active && (
                   <motion.div
                     layoutId="sidebar-active"
-                    className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-ink-900"
+                    className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-ink-900 dark:bg-ink-50"
                     transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                   />
                 )}
-                <item.icon className={`h-4 w-4 ${active ? 'text-ink-900' : 'text-ink-400'}`} />
+                <item.icon className={`h-4 w-4 ${active ? 'text-ink-900 dark:text-ink-50' : 'text-ink-400 dark:text-ink-500'}`} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
-        <div className="border-t border-ink-100 p-3">
+        <div className="border-t border-ink-100 dark:border-ink-800 p-3 space-y-2">
+          <ThemeToggle />
           <div className="mb-2 flex items-center gap-3 rounded-lg px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 text-xs font-semibold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 dark:bg-ink-100 text-xs font-semibold text-white dark:text-ink-900">
               {user?.name?.[0] || 'U'}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-ink-900">{user?.name}</p>
-              <p className="truncate text-xs text-ink-400">{roleLabel} account</p>
+              <p className="truncate text-sm font-medium text-ink-900 dark:text-ink-50">{user?.name}</p>
+              <p className="truncate text-xs text-ink-400 dark:text-ink-500">{roleLabel} account</p>
             </div>
           </div>
-          <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-50 hover:text-ink-900">
+          <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-500 dark:text-ink-400 transition-colors hover:bg-ink-50 dark:hover:bg-ink-800 hover:text-ink-900 dark:hover:text-ink-50">
             <LogOut className="h-4 w-4" /> Logout
           </button>
         </div>
       </aside>
 
       {/* Mobile header */}
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-ink-100 bg-white px-4 lg:hidden">
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 px-4 lg:hidden">
         <Logo />
-        <button onClick={() => setMobileOpen(true)} className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-700">
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button onClick={() => setMobileOpen(true)} className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-700 dark:text-ink-300">
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Mobile drawer */}
@@ -90,18 +95,18 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 z-40 bg-ink-900/30 lg:hidden"
+              className="fixed inset-0 z-40 bg-ink-900/30 dark:bg-ink-950/50 lg:hidden"
             />
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              className="fixed inset-y-0 left-0 z-50 w-64 overflow-y-auto bg-white lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 w-64 overflow-y-auto bg-white dark:bg-ink-900 lg:hidden"
             >
-              <div className="flex h-14 items-center justify-between border-b border-ink-100 px-5">
+              <div className="flex h-14 items-center justify-between border-b border-ink-100 dark:border-ink-800 px-5">
                 <Logo />
-                <button onClick={() => setMobileOpen(false)} className="text-ink-400 hover:text-ink-600">
+                <button onClick={() => setMobileOpen(false)} className="text-ink-400 dark:text-ink-600 hover:text-ink-600 dark:hover:text-ink-400">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -114,7 +119,7 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
                       to={item.path}
                       onClick={() => setMobileOpen(false)}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                        active ? 'bg-ink-100 text-ink-900' : 'text-ink-500 hover:bg-ink-50'
+                        active ? 'bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-50' : 'text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800'
                       }`}
                     >
                       <item.icon className="h-4 w-4" />
@@ -123,8 +128,8 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
                   );
                 })}
               </nav>
-              <div className="border-t border-ink-100 p-3">
-                <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-500 hover:bg-ink-50">
+              <div className="border-t border-ink-100 dark:border-ink-800 p-3">
+                <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800">
                   <LogOut className="h-4 w-4" /> Logout
                 </button>
               </div>

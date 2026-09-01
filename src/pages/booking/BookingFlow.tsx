@@ -27,7 +27,7 @@ export function BookingFlow() {
       <div className="min-h-screen bg-ink-50">
         <PublicNavbar />
         <div className="mx-auto max-w-3xl px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold text-ink-900">Provider not found</h1>
+          <h1 className="text-2xl font-bold text-ink-900 dark:text-ink-50">Provider not found</h1>
           <Link to="/services" className="btn-primary mt-4">Browse Services</Link>
         </div>
       </div>
@@ -63,7 +63,7 @@ export function BookingFlow() {
       <PublicNavbar />
 
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="font-display text-2xl font-bold text-ink-900">Book {provider.name}</h1>
+        <h1 className="font-display text-2xl font-bold text-ink-900 dark:text-ink-50">Book {provider.name}</h1>
         <p className="mt-1 text-sm text-ink-500">Complete your booking in a few simple steps</p>
 
         {/* Stepper */}
@@ -83,7 +83,7 @@ export function BookingFlow() {
           <AnimatePresence mode="wait">
             {step === 0 && (
               <motion.div key="service" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h3 className="mb-4 font-semibold text-ink-900">Select a Service</h3>
+                <h3 className="mb-4 font-semibold text-ink-900 dark:text-ink-50">Select a Service</h3>
                 <div className="space-y-3">
                   {provider.services.filter((s) => s.active).map((service) => (
                     <button
@@ -93,10 +93,10 @@ export function BookingFlow() {
                     >
                       <img src={service.image} alt="" className="h-14 w-14 rounded-lg object-cover" />
                       <div className="flex-1">
-                        <h4 className="font-semibold text-ink-900">{service.title}</h4>
+                        <h4 className="font-semibold text-ink-900 dark:text-ink-50">{service.title}</h4>
                         <p className="text-xs text-ink-500">{service.duration}</p>
                       </div>
-                      <span className="font-bold text-ink-900">{formatNaira(service.price)}</span>
+                      <span className="font-bold text-ink-900 dark:text-ink-50">{formatNaira(service.price)}</span>
                     </button>
                   ))}
                 </div>
@@ -104,13 +104,13 @@ export function BookingFlow() {
             )}
             {step === 1 && (
               <motion.div key="date" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900"><Calendar className="h-5 w-5 text-primary-600" /> Select a Date</h3>
+                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900 dark:text-ink-50"><Calendar className="h-5 w-5 text-primary-600" /> Select a Date</h3>
                 <input type="date" className="input" value={data.date} onChange={(e) => setData({ ...data, date: e.target.value })} min={new Date().toISOString().split('T')[0]} />
               </motion.div>
             )}
             {step === 2 && (
               <motion.div key="time" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900"><Clock className="h-5 w-5 text-primary-600" /> Select a Time</h3>
+                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900 dark:text-ink-50"><Clock className="h-5 w-5 text-primary-600" /> Select a Time</h3>
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'].map((time) => (
                     <button
@@ -126,27 +126,27 @@ export function BookingFlow() {
             )}
             {step === 3 && (
               <motion.div key="location" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900"><MapPin className="h-5 w-5 text-primary-600" /> Service Location</h3>
+                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900 dark:text-ink-50"><MapPin className="h-5 w-5 text-primary-600" /> Service Location</h3>
                 <input className="input" placeholder="e.g. ABUAD Cafeteria, Hall B" value={data.location} onChange={(e) => setData({ ...data, location: e.target.value })} />
               </motion.div>
             )}
             {step === 4 && (
               <motion.div key="details" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900"><FileText className="h-5 w-5 text-primary-600" /> Additional Information</h3>
+                <h3 className="mb-4 flex items-center gap-2 font-semibold text-ink-900 dark:text-ink-50"><FileText className="h-5 w-5 text-primary-600" /> Additional Information</h3>
                 <textarea className="input min-h-[120px]" placeholder="Any special requests or instructions for the provider..." value={data.notes} onChange={(e) => setData({ ...data, notes: e.target.value })} />
               </motion.div>
             )}
             {step === 5 && (
               <motion.div key="review" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-                <h3 className="mb-4 font-semibold text-ink-900">Review Your Booking</h3>
+                <h3 className="mb-4 font-semibold text-ink-900 dark:text-ink-50">Review Your Booking</h3>
                 <div className="space-y-3 rounded-xl bg-ink-50 p-4">
-                  <div className="flex justify-between"><span className="text-sm text-ink-500">Service</span><span className="text-sm font-medium text-ink-900">{selectedService.title}</span></div>
-                  <div className="flex justify-between"><span className="text-sm text-ink-500">Provider</span><span className="text-sm font-medium text-ink-900">{provider.name}</span></div>
-                  <div className="flex justify-between"><span className="text-sm text-ink-500">Date</span><span className="text-sm font-medium text-ink-900">{data.date || 'Not set'}</span></div>
-                  <div className="flex justify-between"><span className="text-sm text-ink-500">Time</span><span className="text-sm font-medium text-ink-900">{data.time || 'Not set'}</span></div>
-                  <div className="flex justify-between"><span className="text-sm text-ink-500">Location</span><span className="text-sm font-medium text-ink-900">{data.location || 'Not set'}</span></div>
-                  {data.notes && <div className="flex justify-between"><span className="text-sm text-ink-500">Notes</span><span className="text-sm font-medium text-ink-900">{data.notes}</span></div>}
-                  <div className="border-t border-ink-200 pt-3 flex justify-between"><span className="font-semibold text-ink-900">Total</span><span className="font-bold text-primary-600">{formatNaira(selectedService.price)}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-ink-500 dark:text-ink-400">Service</span><span className="text-sm font-medium text-ink-900 dark:text-ink-50">{selectedService.title}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-ink-500 dark:text-ink-400">Provider</span><span className="text-sm font-medium text-ink-900 dark:text-ink-50">{provider.name}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-ink-500 dark:text-ink-400">Date</span><span className="text-sm font-medium text-ink-900 dark:text-ink-50">{data.date || 'Not set'}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-ink-500 dark:text-ink-400">Time</span><span className="text-sm font-medium text-ink-900 dark:text-ink-50">{data.time || 'Not set'}</span></div>
+                  <div className="flex justify-between"><span className="text-sm text-ink-500 dark:text-ink-400">Location</span><span className="text-sm font-medium text-ink-900 dark:text-ink-50">{data.location || 'Not set'}</span></div>
+                  {data.notes && <div className="flex justify-between"><span className="text-sm text-ink-500 dark:text-ink-400">Notes</span><span className="text-sm font-medium text-ink-900 dark:text-ink-50">{data.notes}</span></div>}
+                  <div className="border-t border-ink-200 pt-3 flex justify-between"><span className="font-semibold text-ink-900 dark:text-ink-50">Total</span><span className="font-bold text-primary-600">{formatNaira(selectedService.price)}</span></div>
                 </div>
               </motion.div>
             )}
@@ -181,7 +181,7 @@ export function BookingConfirmed() {
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring' }} className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary-100">
           <CheckCircle2 className="h-10 w-10 text-primary-600" />
         </motion.div>
-        <h1 className="mt-6 text-2xl font-bold text-ink-900">Booking Submitted!</h1>
+        <h1 className="mt-6 text-2xl font-bold text-ink-900 dark:text-ink-50">Booking Submitted!</h1>
         <p className="mt-2 text-sm text-ink-500">
           Your booking request has been sent to the provider. You'll be notified once they respond. Your booking ID is #{id?.slice(-6)}.
         </p>
@@ -228,19 +228,19 @@ export function PaymentPage() {
     <div className="min-h-screen bg-ink-50">
       <PublicNavbar />
       <div className="mx-auto max-w-lg px-4 py-8 sm:px-6">
-        <h1 className="font-display text-2xl font-bold text-ink-900">Complete Payment</h1>
+        <h1 className="font-display text-2xl font-bold text-ink-900 dark:text-ink-50">Complete Payment</h1>
         <p className="mt-1 text-sm text-ink-500">Secure payment for your booking</p>
 
         <div className="mt-6 card p-6">
           <div className="flex items-center gap-3 border-b border-ink-100 pb-4">
             <img src={booking.providerAvatar} alt="" className="h-12 w-12 rounded-xl object-cover" />
             <div>
-              <h3 className="font-semibold text-ink-900">{booking.serviceName}</h3>
+              <h3 className="font-semibold text-ink-900 dark:text-ink-50">{booking.serviceName}</h3>
               <p className="text-sm text-ink-500">{booking.providerName}</p>
             </div>
           </div>
           <div className="space-y-2 py-4">
-            <div className="flex justify-between text-sm"><span className="text-ink-500">Service Price</span><span className="font-medium text-ink-900">{formatNaira(booking.price)}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-ink-500 dark:text-ink-400">Service Price</span><span className="font-medium text-ink-900 dark:text-ink-50">{formatNaira(booking.price)}</span></div>
             <div className="flex justify-between text-sm"><span className="text-ink-500">Platform Fee</span><span className="font-medium text-ink-900">{formatNaira(commission)}</span></div>
             <div className="flex justify-between text-sm"><span className="text-ink-500">Provider Receives</span><span className="font-medium text-ink-900">{formatNaira(providerEarning)}</span></div>
             <div className="border-t border-ink-100 pt-2 flex justify-between"><span className="font-semibold text-ink-900">Total</span><span className="font-bold text-primary-600">{formatNaira(booking.price)}</span></div>

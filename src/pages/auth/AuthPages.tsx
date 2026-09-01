@@ -80,9 +80,9 @@ function AuthShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-ink-50 lg:flex-row">
+    <div className="flex min-h-screen flex-col bg-ink-50 dark:bg-ink-950 lg:flex-row">
       {/* Left brand panel */}
-      <div className="relative hidden flex-1 overflow-hidden bg-ink-900 lg:flex lg:flex-col lg:justify-between lg:p-12">
+      <div className="relative hidden flex-1 overflow-hidden bg-ink-900 dark:bg-ink-900 lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="relative z-10">
           <Link to="/" className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
@@ -142,8 +142,8 @@ function AuthShell({
             transition={{ duration: 0.3 }}
             className="mt-8 lg:mt-0"
           >
-            <h1 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">{title}</h1>
-            <p className="mt-2 text-ink-500">{subtitle}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-ink-900 dark:text-ink-50 sm:text-3xl">{title}</h1>
+            <p className="mt-2 text-ink-500 dark:text-ink-400">{subtitle}</p>
             <div className="mt-8">{children}</div>
             {footer && <div className="mt-6">{footer}</div>}
           </motion.div>
@@ -230,25 +230,25 @@ export function SignupRolePage() {
             onHoverStart={() => setHovered(role.id)}
             onHoverEnd={() => setHovered(null)}
             onClick={() => navigate(`/signup/${role.id}`)}
-            className={`group flex w-full items-center gap-4 rounded-xl border border-ink-200 p-4 text-left transition-all ${role.bg}`}
+            className={`group flex w-full items-center gap-4 rounded-xl border border-ink-200 dark:border-ink-700 p-4 text-left transition-all ${role.bg}`}
           >
             <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${role.iconBg} transition-transform group-hover:scale-105`}>
               <role.icon className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-ink-900">{role.title}</h3>
-              <p className="text-sm text-ink-500">{role.desc}</p>
+              <h3 className="font-semibold text-ink-900 dark:text-ink-50">{role.title}</h3>
+              <p className="text-sm text-ink-500 dark:text-ink-400">{role.desc}</p>
             </div>
             <motion.div animate={{ x: hovered === role.id ? 4 : 0 }}>
-              <ArrowRight className="h-4 w-4 text-ink-400" />
+              <ArrowRight className="h-4 w-4 text-ink-400 dark:text-ink-600" />
             </motion.div>
           </motion.button>
         ))}
       </div>
 
-      <p className="mt-6 text-center text-sm text-ink-500">
+      <p className="mt-6 text-center text-sm text-ink-500 dark:text-ink-400">
         Already have an account?{' '}
-        <Link to="/login" className="font-semibold text-ink-900 hover:text-primary-600">
+        <Link to="/login" className="font-semibold text-ink-900 dark:text-ink-50 hover:text-primary-600">
           Login
         </Link>
       </p>
@@ -334,9 +334,9 @@ export function SignupPage() {
           {isProvider ? 'Continue to Onboarding' : 'Create Account'} <ArrowRight className="h-4 w-4" />
         </motion.button>
       </form>
-      <p className="mt-6 text-center text-sm text-ink-500">
+      <p className="mt-6 text-center text-sm text-ink-500 dark:text-ink-400">
         Already have an account?{' '}
-        <Link to={isProvider ? '/login/provider' : '/login/customer'} className="font-semibold text-ink-900 hover:text-primary-600">
+        <Link to={isProvider ? '/login/provider' : '/login/customer'} className="font-semibold text-ink-900 dark:text-ink-50 hover:text-primary-600">
           Login
         </Link>
       </p>
@@ -397,24 +397,24 @@ export function LoginPage() {
             onHoverStart={() => setHovered(role.id)}
             onHoverEnd={() => setHovered(null)}
             onClick={() => navigate(role.path)}
-            className="group flex w-full items-center gap-4 rounded-xl border border-ink-200 p-4 text-left transition-all hover:border-ink-300 hover:bg-ink-50"
+            className="group flex w-full items-center gap-4 rounded-xl border border-ink-200 dark:border-ink-700 p-4 text-left transition-all hover:border-ink-300 dark:hover:border-ink-600 hover:bg-ink-50 dark:hover:bg-ink-800"
           >
             <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${role.iconBg} transition-transform group-hover:scale-105`}>
               <role.icon className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-ink-900">{role.title}</h3>
-              <p className="text-sm text-ink-500">{role.desc}</p>
+              <h3 className="font-semibold text-ink-900 dark:text-ink-50">{role.title}</h3>
+              <p className="text-sm text-ink-500 dark:text-ink-400">{role.desc}</p>
             </div>
             <motion.div animate={{ x: hovered === role.id ? 4 : 0 }}>
-              <ArrowRight className="h-4 w-4 text-ink-400" />
+              <ArrowRight className="h-4 w-4 text-ink-400 dark:text-ink-600" />
             </motion.div>
           </motion.button>
         ))}
       </div>
-      <p className="mt-6 text-center text-sm text-ink-500">
+      <p className="mt-6 text-center text-sm text-ink-500 dark:text-ink-400">
         Don't have an account?{' '}
-        <Link to="/signup" className="font-semibold text-ink-900 hover:text-primary-600">
+        <Link to="/signup" className="font-semibold text-ink-900 dark:text-ink-50 hover:text-primary-600">
           Sign up
         </Link>
       </p>
@@ -450,11 +450,11 @@ export function RoleLoginPage() {
       benefits={config.benefits}
       footer={
         <div className="flex items-center justify-center gap-4 text-sm">
-          <Link to="/login" className="flex items-center gap-1 font-medium text-ink-500 hover:text-ink-900">
+          <Link to="/login" className="flex items-center gap-1 font-medium text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-50">
             <ArrowLeft className="h-4 w-4" /> All logins
           </Link>
           {role !== 'admin' && (
-            <Link to={`/signup/${role}`} className="font-semibold text-ink-900 hover:text-primary-600">
+            <Link to={`/signup/${role}`} className="font-semibold text-ink-900 dark:text-ink-50 hover:text-primary-600">
               Create {role} account
             </Link>
           )}
@@ -467,14 +467,14 @@ export function RoleLoginPage() {
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.05 }}
-          className="mb-6 flex items-center gap-3 rounded-xl border border-ink-100 bg-ink-50 p-4"
+          className="mb-6 flex items-center gap-3 rounded-xl border border-ink-100 dark:border-ink-800 bg-ink-50 dark:bg-ink-900 p-4"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ink-900 text-white">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ink-900 dark:bg-ink-50 text-white dark:text-ink-900">
             <config.icon className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold capitalize text-ink-900">{role} Portal</p>
-            <p className="text-xs text-ink-500">{config.cta}</p>
+            <p className="text-sm font-semibold capitalize text-ink-900 dark:text-ink-50">{role} Portal</p>
+            <p className="text-xs text-ink-500 dark:text-ink-400">{config.cta}</p>
           </div>
         </motion.div>
 
@@ -570,11 +570,11 @@ export function ForgotPasswordPage() {
     >
       {sent ? (
         <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-100">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900">
             <CheckCircle2 className="h-7 w-7 text-primary-600" />
           </div>
-          <h3 className="mt-4 text-lg font-semibold text-ink-900">Check your email</h3>
-          <p className="mt-1 text-sm text-ink-500">We've sent a password reset link to your email address.</p>
+          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">Check your email</h3>
+          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">We've sent a password reset link to your email address.</p>
           <Link to="/login" className="btn-primary mt-6 w-full">
             Back to Login
           </Link>
@@ -593,7 +593,7 @@ export function ForgotPasswordPage() {
           </motion.button>
         </form>
       )}
-      <Link to="/login" className="mt-6 flex items-center justify-center gap-1 text-sm font-medium text-ink-500 hover:text-ink-900">
+      <Link to="/login" className="mt-6 flex items-center justify-center gap-1 text-sm font-medium text-ink-500 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-50">
         <ArrowLeft className="h-4 w-4" /> Back to login
       </Link>
     </AuthShell>

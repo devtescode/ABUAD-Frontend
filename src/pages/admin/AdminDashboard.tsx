@@ -40,7 +40,7 @@ export function AdminDashboard() {
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card p-6">
-          <h3 className="font-semibold text-ink-900">Platform Commission</h3>
+          <h3 className="font-semibold text-ink-900 dark:text-ink-50">Platform Commission</h3>
           <div className="mt-4 flex items-end gap-1">
             {[40, 55, 35, 70, 60, 85, 75, 90, 80, 95].map((h, i) => (
               <motion.div key={i} initial={{ height: 0 }} animate={{ height: `${h}%` }} transition={{ delay: i * 0.05 }} className="flex-1 rounded-t bg-primary-500" style={{ height: `${h}%` }} />
@@ -49,7 +49,7 @@ export function AdminDashboard() {
           <p className="mt-3 text-xs text-ink-400">Last 10 months • Total: ₦240,000</p>
         </div>
         <div className="card p-6">
-          <h3 className="font-semibold text-ink-900">Recent Activity</h3>
+          <h3 className="font-semibold text-ink-900 dark:text-ink-50">Recent Activity</h3>
           <div className="mt-4 space-y-3">
             {[
               { text: 'New provider registration', time: '2 mins ago' },
@@ -88,7 +88,7 @@ export function AdminUsers() {
               { name: 'Blessing Adebayo', role: 'Provider', status: 'Pending', joined: '2025-02-01' },
             ].map((user, i) => (
               <tr key={i} className="hover:bg-ink-50">
-                <td className="p-4 font-medium text-ink-900">{user.name}</td>
+                <td className="p-4 font-medium text-ink-900 dark:text-ink-50">{user.name}</td>
                 <td className="p-4 text-ink-600">{user.role}</td>
                 <td className="p-4"><span className={`badge ${user.status === 'Active' ? 'bg-primary-100 text-primary-700' : 'bg-accent-100 text-accent-700'}`}>{user.status}</span></td>
                 <td className="p-4 text-ink-400">{user.joined}</td>
@@ -149,7 +149,7 @@ export function AdminVerification() {
       {pending.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-20 text-center">
           <CheckCircle2 className="h-12 w-12 text-primary-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900">No pending requests</h3>
+          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No pending requests</h3>
           <p className="mt-1 text-sm text-ink-500">All provider applications have been reviewed.</p>
         </div>
       ) : (
@@ -253,7 +253,7 @@ export function AdminPayments() {
         <StatCard label="Failed Payments" value="3" icon={XCircle} color="rose" />
       </div>
       <div className="mt-6 card overflow-hidden">
-        <h3 className="p-5 font-semibold text-ink-900">Recent Transactions</h3>
+        <h3 className="p-5 font-semibold text-ink-900 dark:text-ink-50">Recent Transactions</h3>
         <table className="w-full text-left text-sm">
           <thead className="border-y border-ink-100 bg-ink-50 text-xs uppercase text-ink-500">
             <tr><th className="p-4">Booking</th><th className="p-4">Amount</th><th className="p-4">Commission</th><th className="p-4">Provider</th><th className="p-4">Status</th></tr>
@@ -315,7 +315,7 @@ export function AdminDisputes() {
       <DashboardHeader title="Dispute Management" subtitle="Review and resolve booking disputes" />
       <div className="card flex flex-col items-center justify-center py-20 text-center">
         <AlertTriangle className="h-12 w-12 text-ink-300" />
-        <h3 className="mt-4 text-lg font-semibold text-ink-900">No active disputes</h3>
+          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No active disputes</h3>
         <p className="mt-1 text-sm text-ink-500">When customers or providers report issues, they will appear here.</p>
       </div>
     </DashboardLayout>
@@ -328,7 +328,7 @@ export function AdminFeatured() {
   return (
     <DashboardLayout role="admin" navItems={navItems}>
       <DashboardHeader title="Featured Providers" subtitle="Promote top providers on the homepage" />
-      <h3 className="mb-3 font-semibold text-ink-900">Currently Featured</h3>
+      <h3 className="mb-3 font-semibold text-ink-900 dark:text-ink-50">Currently Featured</h3>
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {featured.map((p) => (
           <div key={p.id} className="card flex items-center justify-between p-4">

@@ -17,7 +17,7 @@ export function ProviderProfilePage() {
       <div className="min-h-screen bg-ink-50">
         <PublicNavbar />
         <div className="mx-auto max-w-3xl px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold text-ink-900">Provider not found</h1>
+          <h1 className="text-2xl font-bold text-ink-900 dark:text-ink-50">Provider not found</h1>
           <Link to="/providers" className="btn-primary mt-4">Back to providers</Link>
         </div>
         <Footer />
@@ -46,7 +46,7 @@ export function ProviderProfilePage() {
               <img src={provider.avatar} alt={provider.name} className="h-20 w-20 rounded-2xl border-4 border-white object-cover shadow-md sm:h-24 sm:w-24" />
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-ink-900 sm:text-2xl">{provider.name}</h1>
+                  <h1 className="text-xl font-bold text-ink-900 dark:text-ink-50 sm:text-2xl">{provider.name}</h1>
                   {provider.verified && <VerifiedBadge size="md" />}
                 </div>
                 <p className="mt-1 text-sm text-ink-500">{provider.categories.join(' • ')}</p>
@@ -83,7 +83,7 @@ export function ProviderProfilePage() {
 
         {/* About */}
         <div className="mt-6 card p-6">
-          <h2 className="font-semibold text-ink-900">About</h2>
+          <h2 className="font-semibold text-ink-900 dark:text-ink-50">About</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-600">{provider.about}</p>
         </div>
 
@@ -108,11 +108,11 @@ export function ProviderProfilePage() {
                 <div key={service.id} className="card overflow-hidden">
                   <img src={service.image} alt={service.title} className="h-40 w-full object-cover" />
                   <div className="p-4">
-                    <h3 className="font-semibold text-ink-900">{service.title}</h3>
+                    <h3 className="font-semibold text-ink-900 dark:text-ink-50">{service.title}</h3>
                     <p className="mt-1 text-xs text-ink-500 line-clamp-2">{service.description}</p>
                     <div className="mt-3 flex items-center justify-between">
                       <div>
-                        <span className="text-lg font-bold text-ink-900">{formatNaira(service.price)}</span>
+                        <span className="text-lg font-bold text-ink-900 dark:text-ink-50">{formatNaira(service.price)}</span>
                         <span className="ml-1 text-xs text-ink-400">/ {service.duration}</span>
                       </div>
                     </div>
@@ -148,7 +148,7 @@ export function ProviderProfilePage() {
             <div className="space-y-4">
               <div className="card flex items-center gap-6 p-6">
                 <div className="text-center">
-                  <p className="text-4xl font-bold text-ink-900">{provider.rating}</p>
+                  <p className="text-4xl font-bold text-ink-900 dark:text-ink-50">{provider.rating}</p>
                   <StarRating rating={provider.rating} size={18} />
                   <p className="mt-1 text-xs text-ink-500">{provider.reviewCount} reviews</p>
                 </div>

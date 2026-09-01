@@ -35,7 +35,7 @@ export function ProviderOnboarding() {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent-100 text-accent-600">
             <Clock className="h-8 w-8" />
           </div>
-          <h1 className="mt-4 text-xl font-bold text-ink-900">Verification Pending</h1>
+          <h1 className="mt-4 text-xl font-bold text-ink-900 dark:text-ink-50">Verification Pending</h1>
           <p className="mt-2 text-sm text-ink-500">
             Your profile has been submitted for review. Our team will verify your information and approve your account shortly. You'll receive a notification once approved.
           </p>
@@ -54,7 +54,7 @@ export function ProviderOnboarding() {
   return (
     <div className="min-h-screen bg-ink-50">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-        <h1 className="font-display text-2xl font-bold text-ink-900">Provider Onboarding</h1>
+        <h1 className="font-display text-2xl font-bold text-ink-900 dark:text-ink-50">Provider Onboarding</h1>
         <p className="mt-1 text-sm text-ink-500">Complete your profile to start receiving bookings</p>
 
         {/* Stepper */}
@@ -192,7 +192,7 @@ export function ProviderDashboard() {
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <h2 className="mb-4 font-display text-lg font-bold text-ink-900">Recent Booking Requests</h2>
+          <h2 className="mb-4 font-display text-lg font-bold text-ink-900 dark:text-ink-50">Recent Booking Requests</h2>
           <div className="space-y-3">
             {sampleBookings.slice(0, 3).map((booking) => (
               <div key={booking.id} className="card flex items-center gap-4 p-4">
@@ -209,7 +209,7 @@ export function ProviderDashboard() {
           </div>
         </div>
         <div>
-          <h2 className="mb-4 font-display text-lg font-bold text-ink-900">Active Services</h2>
+          <h2 className="mb-4 font-display text-lg font-bold text-ink-900 dark:text-ink-50">Active Services</h2>
           <div className="space-y-3">
             {currentProvider.services.slice(0, 3).map((service) => (
               <div key={service.id} className="card p-3">
@@ -383,7 +383,7 @@ export function ProviderRequests() {
       {demoRequests.length === 0 && requests.length === 0 ? (
         <div className="card flex flex-col items-center justify-center py-20 text-center">
           <Inbox className="h-12 w-12 text-ink-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900">No new requests</h3>
+          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No new requests</h3>
           <p className="mt-1 text-sm text-ink-500">New booking requests will appear here.</p>
         </div>
       ) : (
@@ -474,7 +474,7 @@ export function ProviderEarnings() {
         <StatCard label="Commission Paid" value="₦84,500" icon={Money} color="rose" />
       </div>
       <div className="mt-6 card p-6">
-        <h3 className="font-semibold text-ink-900">Recent Transactions</h3>
+        <h3 className="font-semibold text-ink-900 dark:text-ink-50">Recent Transactions</h3>
         <div className="mt-4 space-y-3">
           {sampleBookings.filter((b) => ['paid', 'completed', 'reviewed'].includes(b.status)).map((b) => (
             <div key={b.id} className="flex items-center justify-between border-b border-ink-100 pb-3 last:border-0">

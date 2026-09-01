@@ -11,7 +11,7 @@ export function Logo() {
       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-900 text-white">
         <Camera className="h-4 w-4" />
       </div>
-      <span className="text-lg font-bold tracking-tight text-ink-900">Servicely</span>
+      <span className="text-lg font-bold tracking-tight text-ink-900 dark:text-ink-50">Servicely</span>
     </Link>
   );
 }
@@ -30,7 +30,7 @@ export function PublicNavbar() {
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-ink-100 bg-white/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900/80 backdrop-blur-md">
       <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Logo />
         <div className="hidden items-center gap-0.5 lg:flex">
@@ -38,7 +38,7 @@ export function PublicNavbar() {
             <Link
               key={link.to}
               to={link.to}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-ink-500 transition-colors hover:text-ink-900"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-ink-500 dark:text-ink-400 transition-colors hover:text-ink-900 dark:hover:text-ink-50"
             >
               {link.label}
             </Link>
@@ -83,7 +83,7 @@ export function PublicNavbar() {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-ink-100 bg-white lg:hidden"
+            className="overflow-hidden border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900 lg:hidden"
           >
             <div className="space-y-1 px-4 py-3">
               {navLinks.map((link) => (
@@ -91,12 +91,12 @@ export function PublicNavbar() {
                   key={link.to}
                   to={link.to}
                   onClick={() => setOpen(false)}
-                  className="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-600 hover:bg-ink-50"
+                  className="block rounded-lg px-3 py-2.5 text-sm font-medium text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800"
                 >
                   {link.label}
                 </Link>
               ))}
-              <div className="border-t border-ink-100 pt-3">
+              <div className="border-t border-ink-100 dark:border-ink-800 pt-3">
                 {user ? (
                   <div className="space-y-2">
                     <Link
@@ -147,7 +147,7 @@ export function Footer() {
   };
 
   return (
-    <footer className="border-t border-ink-100 bg-white">
+    <footer className="border-t border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900">
       <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4 lg:grid-cols-5">
           <div className="col-span-2 lg:col-span-2">
@@ -158,11 +158,11 @@ export function Footer() {
           </div>
           {Object.entries(footerLinks).map(([title, links]) => (
             <div key={title}>
-              <h4 className="text-sm font-semibold text-ink-900">{title}</h4>
+              <h4 className="text-sm font-semibold text-ink-900 dark:text-ink-50">{title}</h4>
               <ul className="mt-3 space-y-2">
                 {links.map((link) => (
                   <li key={link}>
-                    <a href="#" className="text-sm text-ink-500 transition-colors hover:text-ink-900">
+                    <a href="#" className="text-sm text-ink-500 dark:text-ink-400 transition-colors hover:text-ink-900 dark:hover:text-ink-50">
                       {link}
                     </a>
                   </li>
@@ -171,9 +171,9 @@ export function Footer() {
             </div>
           ))}
         </div>
-        <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-ink-100 pt-6 sm:flex-row">
-          <p className="text-sm text-ink-400">© 2025 Servicely. All rights reserved.</p>
-          <p className="text-sm text-ink-400">Built for ABUAD students</p>
+        <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-ink-100 dark:border-ink-800 pt-6 sm:flex-row">
+          <p className="text-sm text-ink-400 dark:text-ink-500">© 2025 Servicely. All rights reserved.</p>
+          <p className="text-sm text-ink-400 dark:text-ink-500">Built for ABUAD students</p>
         </div>
       </div>
     </footer>

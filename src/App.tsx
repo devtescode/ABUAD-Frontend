@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, BookingProvider, useAuth } from '@/context/AppContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { HomePage } from '@/pages/public/HomePage';
 import { ServicesPage } from '@/pages/public/ServicesPage';
 import { ProviderProfilePage } from '@/pages/public/ProviderProfilePage';
@@ -119,12 +120,14 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BookingProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </BookingProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <BookingProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </BookingProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

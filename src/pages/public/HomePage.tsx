@@ -23,8 +23,8 @@ function SectionHeader({ title, subtitle, align = 'left' }: { title: string; sub
       transition={{ duration: 0.4 }}
       className={align === 'center' ? 'text-center' : ''}
     >
-      <h2 className="text-2xl font-bold tracking-tight text-ink-900 sm:text-3xl">{title}</h2>
-      {subtitle && <p className="mt-1.5 text-ink-500">{subtitle}</p>}
+      <h2 className="text-2xl font-bold tracking-tight text-ink-900 dark:text-ink-50 sm:text-3xl">{title}</h2>
+      {subtitle && <p className="mt-1.5 text-ink-500 dark:text-ink-400">{subtitle}</p>}
     </motion.div>
   );
 }
@@ -37,11 +37,11 @@ export function HomePage() {
   const heroY = useTransform(scrollYProgress, [0, 1], [0, 60]);
 
   return (
-    <div className="min-h-screen bg-ink-50">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
       <PublicNavbar />
 
       {/* Hero */}
-      <section ref={heroRef} className="relative overflow-hidden border-b border-ink-100 bg-white">
+      <section ref={heroRef} className="relative overflow-hidden border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900">
         <div className="absolute inset-0 bg-ink-50/30" />
         <motion.div style={{ y: heroY }} className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-32">
           <motion.div
@@ -58,7 +58,7 @@ export function HomePage() {
             >
               <ShieldCheck className="h-3.5 w-3.5" /> Trusted by ABUAD students
             </motion.span>
-            <h1 className="text-4xl font-bold leading-tight tracking-tight text-ink-900 text-balance sm:text-5xl lg:text-6xl">
+            <h1 className="text-4xl font-bold leading-tight tracking-tight text-ink-900 dark:text-ink-50 text-balance sm:text-5xl lg:text-6xl">
               Find trusted service providers for your{' '}
               <span className="text-primary-600">next project</span>
             </h1>
@@ -66,7 +66,7 @@ export function HomePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="mx-auto mt-6 max-w-2xl text-lg text-ink-500"
+              className="mx-auto mt-6 max-w-2xl text-lg text-ink-500 dark:text-ink-400"
             >
               Book verified photographers, videographers, designers, and makeup artists. Compare portfolios, read reviews, and pay securely — all in one place.
             </motion.p>
@@ -76,14 +76,14 @@ export function HomePage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-xl border border-ink-200 bg-white p-2"
+              className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-800 p-2"
             >
               <Search className="ml-3 h-5 w-5 text-ink-400" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search for photography, makeup, design..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder-ink-400"
+                className="flex-1 bg-transparent text-sm outline-none placeholder-ink-400 dark:placeholder-ink-500 text-ink-900 dark:text-ink-50"
               />
               <Link to={`/services?q=${encodeURIComponent(search)}`} className="btn-primary">
                 Search
@@ -94,7 +94,7 @@ export function HomePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-400"
+              className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-400 dark:text-ink-500"
             >
               <span className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-primary-500" /> Verified providers
@@ -120,7 +120,7 @@ export function HomePage() {
                 { value: '4.9★', label: 'Average Rating' },
               ].map((stat) => (
                 <div key={stat.label} className="text-center">
-                  <p className="text-2xl font-bold text-ink-900">{stat.value}</p>
+                  <p className="text-2xl font-bold text-ink-900 dark:text-ink-50">{stat.value}</p>
                   <p className="text-xs text-ink-400">{stat.label}</p>
                 </div>
               ))}
@@ -202,7 +202,7 @@ export function HomePage() {
                   {i + 1}
                 </span>
               </div>
-              <h3 className="mt-4 text-base font-semibold text-ink-900">{step.title}</h3>
+              <h3 className="mt-4 text-base font-semibold text-ink-900 dark:text-ink-50">{step.title}</h3>
               <p className="mt-1 text-sm text-ink-500">{step.desc}</p>
             </motion.div>
           ))}
