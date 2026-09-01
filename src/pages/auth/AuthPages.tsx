@@ -367,14 +367,14 @@ export function LoginPage() {
       iconBg: 'bg-sky-100 text-sky-600',
       path: '/login/provider',
     },
-    {
-      id: 'admin',
-      title: 'Admin',
-      desc: 'Manage and monitor the marketplace.',
-      icon: Shield,
-      iconBg: 'bg-ink-100 text-ink-700',
-      path: '/login/admin',
-    },
+    // {
+    //   id: 'admin',
+    //   title: 'Admin',
+    //   desc: 'Manage and monitor the marketplace.',
+    //   icon: Shield,
+    //   iconBg: 'bg-ink-100 text-ink-700',
+    //   path: '/login/admin',
+    // },
   ];
 
   return (

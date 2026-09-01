@@ -56,8 +56,8 @@ export function PublicNavbar() {
             </>
           ) : (
             <>
-              <Link to="/login" className="btn-ghost">
-                Login
+              <Link to="/login/admin" className="btn-ghost">
+                Admin
               </Link>
               <Link to="/signup" className="btn-primary">
                 Sign Up

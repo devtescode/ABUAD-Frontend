@@ -41,92 +41,151 @@ export function HomePage() {
       <PublicNavbar />
 
       {/* Hero */}
-      <section ref={heroRef} className="relative overflow-hidden border-b border-ink-100 dark:border-ink-800 bg-white dark:bg-ink-900">
-        <div className="absolute inset-0 bg-ink-50/30" />
-        <motion.div style={{ y: heroY }} className="relative mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:py-32">
+      <section
+        ref={heroRef}
+        className="relative isolate min-h-[720px] overflow-hidden border-b border-ink-800"
+      >
+        {/* Background photograph */}
+        <div
+          className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
+          style={{
+            backgroundImage:
+              "url('https://images.unsplash.com/photo-1605076896228-086cda8868c9?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8cGVyc29uJTIwbG9va2luZyUyMGF0JTIwY2FtZXJhfGVufDB8fDB8fHww')",
+          }}
+        />
+
+        {/* Dark overlay for readability */}
+        <div className="absolute inset-0 -z-10 bg-black/60" />
+
+        {/* Subtle primary-color gradient */}
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary-950/80 via-black/40 to-black/70" />
+
+        {/* Decorative glow */}
+        <div className="absolute left-1/2 top-0 -z-10 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl" />
+
+        <motion.div
+          style={{ y: heroY }}
+          className="relative mx-auto flex min-h-[720px] max-w-7xl items-center px-4 py-20 sm:px-6 lg:px-8"
+        >
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="mx-auto max-w-3xl text-center"
+            transition={{ duration: 0.6 }}
+            className="mx-auto w-full max-w-4xl text-center"
           >
-            <motion.span
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+            {/* Trust badge */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="badge bg-ink-100 text-ink-600 mb-6"
+              className="mb-7 flex justify-center"
             >
-              <ShieldCheck className="h-3.5 w-3.5" /> Trusted by ABUAD students
-            </motion.span>
-            <h1 className="text-4xl font-bold leading-tight tracking-tight text-ink-900 dark:text-ink-50 text-balance sm:text-5xl lg:text-6xl">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md">
+                <ShieldCheck className="h-4 w-4 text-primary-300" />
+                Trusted by ABUAD students
+              </span>
+            </motion.div>
+
+            {/* Heading */}
+            <h1 className="text-balance text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-7xl">
               Find trusted service providers for your{' '}
-              <span className="text-primary-600">next project</span>
+              <span className="text-primary-300">next project</span>
             </h1>
+
+            {/* Description */}
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="mx-auto mt-6 max-w-2xl text-lg text-ink-500 dark:text-ink-400"
+              className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/75 sm:text-lg"
             >
-              Book verified photographers, videographers, designers, and makeup artists. Compare portfolios, read reviews, and pay securely — all in one place.
+              Book verified photographers, videographers, designers, and makeup
+              artists. Compare portfolios, read reviews, and pay securely — all in
+              one place.
             </motion.p>
 
-            {/* Search bar */}
+            {/* Search */}
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="mx-auto mt-8 flex max-w-xl items-center gap-2 rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-800 p-2"
+              className="mx-auto mt-9 max-w-2xl"
             >
-              <Search className="ml-3 h-5 w-5 text-ink-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search for photography, makeup, design..."
-                className="flex-1 bg-transparent text-sm outline-none placeholder-ink-400 dark:placeholder-ink-500 text-ink-900 dark:text-ink-50"
-              />
-              <Link to={`/services?q=${encodeURIComponent(search)}`} className="btn-primary">
-                Search
-              </Link>
+              <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/95 p-2 shadow-2xl backdrop-blur-xl dark:bg-ink-900/95">
+                <Search className="ml-3 h-5 w-5 shrink-0 text-ink-400" />
+
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search photography, makeup, design..."
+                  className="min-w-0 flex-1 bg-transparent px-1 py-3 text-sm text-ink-900 outline-none placeholder:text-ink-400 dark:text-white"
+                />
+
+                <Link
+                  to={`/services?q=${encodeURIComponent(search)}`}
+                  className="shrink-0 rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-primary-700 hover:shadow-primary-600/30"
+                >
+                  Search
+                </Link>
+              </div>
             </motion.div>
 
+            {/* Benefits */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-ink-400 dark:text-ink-500"
+              className="mt-7 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-sm text-white/75"
             >
-              <span className="flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-primary-500" /> Verified providers
+              <span className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-500/20">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary-300" />
+                </span>
+                Verified providers
               </span>
-              <span className="flex items-center gap-1.5">
-                <Star className="h-4 w-4 text-accent-500" /> Real reviews
+
+              <span className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-500/20">
+                  <Star className="h-3.5 w-3.5 text-accent-300" />
+                </span>
+                Real reviews
               </span>
-              <span className="flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-primary-500" /> Secure payments
+
+              <span className="flex items-center gap-2">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-500/20">
+                  <ShieldCheck className="h-3.5 w-3.5 text-primary-300" />
+                </span>
+                Secure payments
               </span>
             </motion.div>
 
-            {/* Stats strip */}
+            {/* Stats */}
             <motion.div
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
-              className="mx-auto mt-16 grid max-w-md grid-cols-3 gap-4 border-t border-ink-100 pt-8"
+              className="mx-auto mt-14 grid max-w-2xl grid-cols-3 divide-x divide-white/15 border-t border-white/15 pt-8"
             >
               {[
                 { value: '72+', label: 'Verified Providers' },
                 { value: '1,200+', label: 'Happy Students' },
                 { value: '4.9★', label: 'Average Rating' },
               ].map((stat) => (
-                <div key={stat.label} className="text-center">
-                  <p className="text-2xl font-bold text-ink-900 dark:text-ink-50">{stat.value}</p>
-                  <p className="text-xs text-ink-400">{stat.label}</p>
+                <div key={stat.label} className="px-3 text-center">
+                  <p className="text-2xl font-bold text-white sm:text-3xl">
+                    {stat.value}
+                  </p>
+                  <p className="mt-1 text-[11px] text-white/55 sm:text-xs">
+                    {stat.label}
+                  </p>
                 </div>
               ))}
             </motion.div>
           </motion.div>
         </motion.div>
+
+        {/* Bottom fade into the next section */}
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/10 to-transparent dark:from-ink-900/30" />
       </section>
 
       {/* Categories */}
