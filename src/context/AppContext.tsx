@@ -103,6 +103,10 @@ export function AuthProvider({
   // SIGNUP
   // ───────────────────────────────────────────────────────────────────────────
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // SIGNUP
+  // ───────────────────────────────────────────────────────────────────────────
+
   const signup = async (
     name: string,
     matricNo: string,
@@ -131,10 +135,7 @@ export function AuthProvider({
           }),
         }
       );
-      console.log(response, "signup response");
-      
 
-      // Try to parse the backend response
       const data = await response.json();
 
       // Backend returned an error
@@ -144,29 +145,10 @@ export function AuthProvider({
         );
       }
 
-      // Make sure backend actually returned user information
-      if (!data?.user) {
-        throw new Error(
-          'Account was created, but user information was not returned.'
-        );
-      }
-
-      // Save token
-      if (data.token) {
-        sessionStorage.setItem(
-          'servicely_token',
-          data.token
-        );
-      }
-
-      // Save user
-      sessionStorage.setItem(
-        'servicely_user',
-        JSON.stringify(data.user)
-      );
-
-      // Update React state
-      setUser(data.user);
+      // Signup should NOT automatically log the user in.
+      // Do NOT save token.
+      // Do NOT save user.
+      // Do NOT call setUser().
 
       return data;
     } catch (error: any) {
@@ -174,10 +156,13 @@ export function AuthProvider({
 
       throw new Error(
         error?.message ||
-          'Unable to create your account. Please try again.'
+        'Unable to create your account. Please try again.'
       );
     }
   };
+  // ───────────────────────────────────────────────────────────────────────────
+  // LOGIN
+  // ───────────────────────────────────────────────────────────────────────────
 
   // ───────────────────────────────────────────────────────────────────────────
   // LOGIN
@@ -190,7 +175,7 @@ export function AuthProvider({
   ) => {
     try {
       const response = await fetch(
-        `${API_URL}/auth/login`,
+        `${API_URL}/usercreative/login`,
         {
           method: 'POST',
           headers: {
@@ -210,7 +195,7 @@ export function AuthProvider({
       if (!response.ok) {
         throw new Error(
           data?.message ||
-            'Invalid email or password.'
+          'Invalid email or password.'
         );
       }
 
@@ -220,7 +205,7 @@ export function AuthProvider({
         );
       }
 
-      // Save JWT token
+      // Save JWT token ONLY after successful login
       if (data.token) {
         sessionStorage.setItem(
           'servicely_token',
@@ -228,13 +213,13 @@ export function AuthProvider({
         );
       }
 
-      // Save user
+      // Save logged-in user
       sessionStorage.setItem(
         'servicely_user',
         JSON.stringify(data.user)
       );
 
-      // Update React state
+      // Now the user is actually authenticated
       setUser(data.user);
 
       return data;
@@ -243,11 +228,10 @@ export function AuthProvider({
 
       throw new Error(
         error?.message ||
-          'Unable to login. Please check your details.'
+        'Unable to login. Please check your details.'
       );
     }
   };
-
   // ───────────────────────────────────────────────────────────────────────────
   // LOGOUT
   // ───────────────────────────────────────────────────────────────────────────
@@ -394,9 +378,9 @@ export function BookingProvider({
       const next = prev.map((booking) =>
         booking.id === id
           ? {
-              ...booking,
-              status,
-            }
+            ...booking,
+            status,
+          }
           : booking
       );
 

@@ -313,25 +313,25 @@ export function SignupRolePage() {
     bg: string;
     iconBg: string;
   }[] = [
-    {
-      id: 'customer',
-      title: 'Customer',
-      desc: 'Find and book trusted service providers for your events and projects.',
-      icon: User,
-      bg: 'hover:border-primary-300 hover:bg-primary-50/50 dark:hover:border-primary-700 dark:hover:bg-primary-950/30',
-      iconBg:
-        'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400',
-    },
-    {
-      id: 'provider',
-      title: 'Service Provider',
-      desc: 'Offer your services, receive bookings, and grow your client base.',
-      icon: Briefcase,
-      bg: 'hover:border-sky-300 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/30',
-      iconBg:
-        'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400',
-    },
-  ];
+      {
+        id: 'customer',
+        title: 'Customer',
+        desc: 'Find and book trusted service providers for your events and projects.',
+        icon: User,
+        bg: 'hover:border-primary-300 hover:bg-primary-50/50 dark:hover:border-primary-700 dark:hover:bg-primary-950/30',
+        iconBg:
+          'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400',
+      },
+      {
+        id: 'provider',
+        title: 'Service Provider',
+        desc: 'Offer your services, receive bookings, and grow your client base.',
+        icon: Briefcase,
+        bg: 'hover:border-sky-300 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/30',
+        iconBg:
+          'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400',
+      },
+    ];
 
   return (
     <AuthShell
@@ -430,56 +430,67 @@ export function SignupPage() {
   const isProvider = role === 'provider';
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    setError('');
+  setError('');
 
-    if (!gender) {
-      setError('Please select your gender.');
+  if (!gender) {
+    setError('Please select your gender.');
+    return;
+  }
+
+  if (phoneNumber.length !== 10) {
+    setError(
+      'Please enter a valid 10-digit Nigerian phone number.'
+    );
+    return;
+  }
+
+  if (password.length < 6) {
+    setError(
+      'Password must be at least 6 characters.'
+    );
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    // Create the account
+    await signup(
+      name.trim(),
+      matricNo.trim(),
+      email.trim(),
+      phoneNumber.trim(),
+      gender,
+      password,
+      role
+    );
+
+    // IMPORTANT:
+    // Signup does NOT log the user in.
+    // Redirect to the correct login page based on role.
+
+    if (role === 'customer') {
+      navigate('/login/customer');
+      
       return;
     }
 
-    if (phoneNumber.length !== 10) {
-      setError(
-        'Please enter a valid 10-digit Nigerian phone number.'
-      );
+    if (role === 'provider') {
+      navigate('/provider/login');
       return;
     }
 
-    if (password.length < 6) {
-      setError(
-        'Password must be at least 6 characters.'
-      );
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      await signup(
-        name.trim(),
-        matricNo.trim(),
-        email.trim(),
-        phoneNumber.trim(),
-        gender,
-        password,
-        role
-      );
-
-      if (isProvider) {
-        navigate('/provider/onboarding');
-      } else {
-        navigate('/customer');
-      }
-    } catch (error: any) {
-      setError(
-        error?.message ||
-          'Unable to create your account. Please try again.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error: any) {
+    setError(
+      error?.message ||
+        'Unable to create your account. Please try again.'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <AuthShell
@@ -496,33 +507,33 @@ export function SignupPage() {
       benefits={
         isProvider
           ? [
-              {
-                icon: Calendar,
-                text: 'Receive and manage booking requests',
-              },
-              {
-                icon: Wallet,
-                text: 'Track earnings and request payouts',
-              },
-              {
-                icon: TrendingUp,
-                text: 'Build your reputation with reviews',
-              },
-            ]
+            {
+              icon: Calendar,
+              text: 'Receive and manage booking requests',
+            },
+            {
+              icon: Wallet,
+              text: 'Track earnings and request payouts',
+            },
+            {
+              icon: TrendingUp,
+              text: 'Build your reputation with reviews',
+            },
+          ]
           : [
-              {
-                icon: ShoppingBag,
-                text: 'Browse and book verified providers',
-              },
-              {
-                icon: Wallet,
-                text: 'Pay securely through the platform',
-              },
-              {
-                icon: Star,
-                text: 'Read real reviews from students',
-              },
-            ]
+            {
+              icon: ShoppingBag,
+              text: 'Browse and book verified providers',
+            },
+            {
+              icon: Wallet,
+              text: 'Pay securely through the platform',
+            },
+            {
+              icon: Star,
+              text: 'Read real reviews from students',
+            },
+          ]
       }
     >
       <form
@@ -533,18 +544,16 @@ export function SignupPage() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`flex items-center gap-3 rounded-xl border p-3 ${
-            isProvider
+          className={`flex items-center gap-3 rounded-xl border p-3 ${isProvider
               ? 'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30'
               : 'border-primary-200 bg-primary-50 dark:border-primary-900 dark:bg-primary-950/30'
-          }`}
+            }`}
         >
           <div
-            className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-              isProvider
+            className={`flex h-9 w-9 items-center justify-center rounded-lg ${isProvider
                 ? 'bg-sky-100 text-sky-600 dark:bg-sky-900/50 dark:text-sky-400'
                 : 'bg-primary-100 text-primary-600 dark:bg-primary-900/50 dark:text-primary-400'
-            }`}
+              }`}
           >
             {isProvider ? (
               <Briefcase className="h-4 w-4" />
@@ -668,9 +677,9 @@ export function SignupPage() {
                 onChange={(e) =>
                   setGender(
                     e.target.value as
-                      | 'male'
-                      | 'female'
-                      | ''
+                    | 'male'
+                    | 'female'
+                    | ''
                   )
                 }
                 required
@@ -870,25 +879,25 @@ export function LoginPage() {
     iconBg: string;
     path: string;
   }[] = [
-    {
-      id: 'customer',
-      title: 'Customer',
-      desc: 'Find and book trusted service providers.',
-      icon: User,
-      iconBg:
-        'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400',
-      path: '/login/customer',
-    },
-    {
-      id: 'provider',
-      title: 'Service Provider',
-      desc: 'Offer services and receive bookings.',
-      icon: Briefcase,
-      iconBg:
-        'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400',
-      path: '/login/provider',
-    },
-  ];
+      {
+        id: 'customer',
+        title: 'Customer',
+        desc: 'Find and book trusted service providers.',
+        icon: User,
+        iconBg:
+          'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400',
+        path: '/login/customer',
+      },
+      {
+        id: 'provider',
+        title: 'Service Provider',
+        desc: 'Offer services and receive bookings.',
+        icon: Briefcase,
+        iconBg:
+          'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400',
+        path: '/login/provider',
+      },
+    ];
 
   return (
     <AuthShell
@@ -1026,7 +1035,7 @@ export function RoleLoginPage() {
     } catch (error: any) {
       setError(
         error?.message ||
-          'Invalid email or password. Please try again.'
+        'Invalid email or password. Please try again.'
       );
     } finally {
       setLoading(false);
