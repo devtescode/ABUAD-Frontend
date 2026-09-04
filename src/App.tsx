@@ -68,7 +68,7 @@ function ProtectedRoute({
     if (!adminToken) {
       return (
         <Navigate
-          to="/admin"
+          to="/login/admin"
           replace
         />
       );
