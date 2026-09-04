@@ -20,10 +20,24 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
+
   const handleLogout = () => {
+    if (role === 'admin') {
+      sessionStorage.removeItem('servicely_admin_token');
+      sessionStorage.removeItem('servicely_admin');
+
+      navigate('/login/admin', { replace: true });
+      return;
+    }
+
+    // Customer / Provider
     logout();
-    navigate('/');
+    navigate('/', { replace: true });
   };
+
+
+
+
 
   const roleLabel = role.charAt(0).toUpperCase() + role.slice(1);
 
@@ -41,9 +55,8 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
               <Link
                 key={item.path}
                 to={item.path}
-                className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active ? 'bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-50' : 'text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800 hover:text-ink-900 dark:hover:text-ink-50'
-                }`}
+                className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${active ? 'bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-50' : 'text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800 hover:text-ink-900 dark:hover:text-ink-50'
+                  }`}
               >
                 {active && (
                   <motion.div
@@ -118,9 +131,8 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
                       key={item.path}
                       to={item.path}
                       onClick={() => setMobileOpen(false)}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                        active ? 'bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-50' : 'text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800'
-                      }`}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${active ? 'bg-ink-100 dark:bg-ink-800 text-ink-900 dark:text-ink-50' : 'text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800'
+                        }`}
                     >
                       <item.icon className="h-4 w-4" />
                       {item.label}

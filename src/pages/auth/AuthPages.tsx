@@ -43,7 +43,7 @@ type RoleConfig = {
 };
 
 const roleConfigs: Record<
-  'customer' | 'provider' | 'admin',
+  'customer' | 'provider',
   RoleConfig
 > = {
   customer: {
@@ -94,29 +94,29 @@ const roleConfigs: Record<
     redirect: '/provider',
   },
 
-  admin: {
-    id: 'admin',
-    title: 'Admin Portal',
-    subtitle: 'Manage and monitor the marketplace',
-    icon: Shield,
-    accent: 'ink',
-    benefits: [
-      {
-        icon: ShieldCheck,
-        text: 'Verify and approve providers',
-      },
-      {
-        icon: LayoutDashboard,
-        text: 'Monitor platform analytics',
-      },
-      {
-        icon: CheckCircle2,
-        text: 'Resolve disputes and manage reviews',
-      },
-    ],
-    cta: 'Access admin dashboard',
-    redirect: '/admin',
-  },
+  // admin: {
+  //   id: 'admin',
+  //   title: 'Admin Portal',
+  //   subtitle: 'Manage and monitor the marketplace',
+  //   icon: Shield,
+  //   accent: 'ink',
+  //   benefits: [
+  //     {
+  //       icon: ShieldCheck,
+  //       text: 'Verify and approve providers',
+  //     },
+  //     {
+  //       icon: LayoutDashboard,
+  //       text: 'Monitor platform analytics',
+  //     },
+  //     {
+  //       icon: CheckCircle2,
+  //       text: 'Resolve disputes and manage reviews',
+  //     },
+  //   ],
+  //   cta: 'Access admin dashboard',
+  //   redirect: '/admin',
+  // },
 };
 
 // ─── Auth Shell ──────────────────────────────────────────────────────────────
@@ -478,7 +478,7 @@ export function SignupPage() {
     }
 
     if (role === 'provider') {
-      navigate('/provider/login');
+      navigate('/login/provider');
       return;
     }
 

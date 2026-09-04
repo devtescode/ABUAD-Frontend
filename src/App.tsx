@@ -44,13 +44,63 @@ import {
   AdminAnalytics,
   AdminSettings,
 } from '@/pages/admin/AdminDashboard';
+import AdminAuth from './pages/auth/AdminAuth';
 
-function ProtectedRoute({ role, children }: { role: 'customer' | 'provider' | 'admin'; children: React.ReactNode }) {
+// function ProtectedRoute({ role, children }: { role: 'customer' | 'provider' | 'admin'; children: React.ReactNode }) {
+//   const { user } = useAuth();
+//   if (!user) return <Navigate to={`/login/${role}`} replace />;
+//   if (user.role !== role) return <Navigate to={`/${user.role}`} replace />;
+//   return <>{children}</>;
+// }
+function ProtectedRoute({
+  role,
+  children,
+}: {
+  role: "customer" | "provider" | "admin";
+  children: React.ReactNode;
+}) {
+  // ADMIN HAS A COMPLETELY SEPARATE AUTH SYSTEM
+  if (role === "admin") {
+    const adminToken = sessionStorage.getItem(
+      "servicely_admin_token"
+    );
+
+    if (!adminToken) {
+      return (
+        <Navigate
+          to="/admin"
+          replace
+        />
+      );
+    }
+
+    return <>{children}</>;
+  }
+
+  // CUSTOMER / PROVIDER AUTH
   const { user } = useAuth();
-  if (!user) return <Navigate to={`/login/${role}`} replace />;
-  if (user.role !== role) return <Navigate to={`/${user.role}`} replace />;
+
+  if (!user) {
+    return (
+      <Navigate
+        to={`/login/${role}`}
+        replace
+      />
+    );
+  }
+
+  if (user.role !== role) {
+    return (
+      <Navigate
+        to={`/${user.role}`}
+        replace
+      />
+    );
+  }
+
   return <>{children}</>;
 }
+
 
 function AppRoutes() {
   return (
@@ -100,6 +150,7 @@ function AppRoutes() {
       <Route path="/provider/settings" element={<ProtectedRoute role="provider"><ProviderSettings /></ProtectedRoute>} />
 
       {/* Admin */}
+      <Route path="/login/admin" element={<AdminAuth />} />
       <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} />
       <Route path="/admin/providers" element={<ProtectedRoute role="admin"><AdminProviders /></ProtectedRoute>} />
