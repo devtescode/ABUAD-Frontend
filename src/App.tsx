@@ -32,7 +32,7 @@ import {
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
   AdminDashboard,
-  AdminUsers,
+  // AdminUsers,
   AdminProviders,
   AdminVerification,
   AdminCategories,
@@ -45,6 +45,7 @@ import {
   AdminSettings,
 } from '@/pages/admin/AdminDashboard';
 import AdminAuth from './pages/auth/AdminAuth';
+import { AdminUsers } from './pages/admin/AdminUsers';
 
 // function ProtectedRoute({ role, children }: { role: 'customer' | 'provider' | 'admin'; children: React.ReactNode }) {
 //   const { user } = useAuth();
