@@ -463,7 +463,7 @@ export function ProviderServices() {
 
                 /* SERVICES */
 
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 xl:grid-cols-3">
                     <AnimatePresence mode="popLayout">
                         {services.map((service, index) => (
                             <motion.div
@@ -522,7 +522,7 @@ export function ProviderServices() {
                                 </div>
 
                                 {/* ================= CONTENT ================= */}
-                                <div className="p-5">
+                                <div className="p-3">
                                     {/* Title */}
                                     <h3 className="line-clamp-1 text-base font-bold text-ink-900 dark:text-white">
                                         {service.title}
