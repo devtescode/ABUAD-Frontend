@@ -823,7 +823,7 @@ export function AdminUsers() {
                 </motion.div>
 
                 {/* User ID */}
-                <motion.div
+                {/* <motion.div
                   variants={{
                     hidden: {
                       opacity: 0,
@@ -849,7 +849,7 @@ export function AdminUsers() {
                       {selectedUser._id}
                     </p>
                   </div>
-                </motion.div>
+                </motion.div> */}
               </motion.div>
 
               {/* Modal Footer */}
