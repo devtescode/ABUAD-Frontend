@@ -227,37 +227,7 @@ export function ProviderDashboard() {
   );
 }
 
-export function ProviderServices() {
-  return (
-    <DashboardLayout role="provider" navItems={navItems}>
-      <DashboardHeader title="My Services" subtitle="Manage your service listings" action={<Link to="/provider/add-service" className="btn-primary"><Plus className="h-4 w-4" /> Add Service</Link>} />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {currentProvider.services.map((service) => (
-          <div key={service.id} className="card overflow-hidden">
-            <img src={service.image} alt="" className="h-36 w-full object-cover" />
-            <div className="p-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-ink-900">{service.title}</h3>
-                <span className={`badge ${service.active ? 'bg-primary-100 text-primary-700' : 'bg-ink-100 text-ink-500'}`}>
-                  {service.active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-ink-500 line-clamp-2">{service.description}</p>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="font-bold text-ink-900">{formatNaira(service.price)}</span>
-                <span className="text-xs text-ink-400">{service.duration}</span>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <button className="btn-outline btn-sm flex-1"><Edit className="h-3.5 w-3.5" /> Edit</button>
-                <button className="btn-outline btn-sm text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </DashboardLayout>
-  );
-}
+
 
 
 export function ProviderPortfolio() {

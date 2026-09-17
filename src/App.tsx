@@ -18,8 +18,6 @@ import {
 import {
   ProviderOnboarding,
   ProviderDashboard,
-  ProviderServices,
-  // ProviderAddService,
   ProviderPortfolio,
   ProviderAvailability,
   ProviderRequests,
@@ -30,6 +28,8 @@ import {
   ProviderSettings,
 } from '@/pages/provider/ProviderDashboard';
 import {ProviderAddService} from '@/pages/provider/ProviderAddService';
+import {ProviderServices} from '@/pages/provider/ProviderServices';
+
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
   AdminDashboard,
