@@ -90,19 +90,6 @@ export function CustomerDashboard() {
   );
 }
 
-export function CustomerBrowse() {
-  const verified = providers.filter((p) => p.verified);
-  return (
-    <DashboardLayout role="customer" navItems={navItems}>
-      <DashboardHeader title="Browse Services" subtitle="Find verified providers for your needs" />
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {verified.map((provider) => (
-          <ProviderCard key={provider.id} provider={provider} />
-        ))}
-      </div>
-    </DashboardLayout>
-  );
-}
 
 export function CustomerSaved() {
   const { savedProviders } = useBookings();
