@@ -473,7 +473,7 @@ export function AdminUsers() {
                           </motion.button>
 
                           {/* Suspend */}
-                          <motion.button
+                          {/* <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             className="btn-ghost btn-sm text-red-600"
@@ -486,7 +486,7 @@ export function AdminUsers() {
                             }}
                           >
                             <Ban className="h-4 w-4" />
-                          </motion.button>
+                          </motion.button> */}
                         </div>
                       </td>
                     </motion.tr>

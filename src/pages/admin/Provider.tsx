@@ -456,7 +456,7 @@ export function AdminProviders() {
                   {/* =====================
                       SUSPEND / UNSUSPEND
                   ====================== */}
-                  <button
+                  {/* <button
                     type="button"
                     onClick={() =>
                       handleProviderStatus(
@@ -481,7 +481,7 @@ export function AdminProviders() {
                         Suspend Provider
                       </>
                     )}
-                  </button>
+                  </button> */}
                 </div>
               );
             })}
