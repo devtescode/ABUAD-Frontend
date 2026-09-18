@@ -492,7 +492,7 @@ export function CustomerBrowse() {
           HERO SEARCH AREA
       ===================================================== */}
 
-      <div className="mb-7 overflow-hidden rounded-2xl border border-ink-100 bg-gradient-to-br from-ink-50 via-white to-ink-50 p-5 dark:border-ink-800 dark:from-ink-900 dark:via-ink-900 dark:to-ink-800 sm:p-6">
+      <div className="mb-2 overflow-hidden rounded-2xl border border-ink-100 bg-gradient-to-br from-ink-50 via-white to-ink-50 p-5 dark:border-ink-800 dark:from-ink-900 dark:via-ink-900 dark:to-ink-800 sm:p-6">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="mb-2 flex items-center gap-2">
@@ -510,7 +510,7 @@ export function CustomerBrowse() {
               you
             </h2>
 
-            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+            <p className="mt-0 text-sm text-ink-500 dark:text-ink-400">
               Browse services offered by
               ABUAD providers.
             </p>
@@ -582,7 +582,7 @@ export function CustomerBrowse() {
       ===================================================== */}
 
       <div
-        className={`mb-7 ${
+        className={`mb-4 ${
           showFilters
             ? "block"
             : "hidden"

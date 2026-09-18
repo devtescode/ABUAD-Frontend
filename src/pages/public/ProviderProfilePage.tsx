@@ -342,7 +342,7 @@ export default function ProviderProfilePage() {
         if (!response.ok || !result.success) {
           throw new Error(
             result.message ||
-              "Failed to load provider profile."
+            "Failed to load provider profile."
           );
         }
 
@@ -412,8 +412,8 @@ export default function ProviderProfilePage() {
 
   const reviewCount = Number(
     provider?.reviewCount ||
-      reviews.length ||
-      0
+    reviews.length ||
+    0
   );
 
   const portfolio =
@@ -607,13 +607,22 @@ export default function ProviderProfilePage() {
               {/* Provider information */}
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
                 <div className="relative">
-                  <div className="absolute -inset-2 rounded-[2rem] bg-gradient-to-br from-primary-300/70 via-white/20 to-accent-300/50 blur-sm" />
-                  <img
-                    src={providerImage}
-                    alt={providerName}
-                    onError={(event) => { event.currentTarget.src = "/images/default-avatar.png"; }}
-                    className="relative h-28 w-28 rounded-[1.65rem] border-2 border-white/70 object-cover shadow-2xl sm:h-32 sm:w-32"
-                  />
+
+                  <div className="relative flex h-24 w-24 items-center justify-center sm:h-32 sm:w-32">
+                    <div className="absolute -inset-1.5 rounded-[1.5rem] bg-gradient-to-br from-primary-300/70 via-white/20 to-accent-300/50 blur-sm sm:-inset-2 sm:rounded-[2rem]" />
+
+                    <img
+                      src={providerImage}
+                      alt={providerName}
+                      onError={(event) => {
+                        event.currentTarget.src =
+                          "/images/default-avatar.png";
+                      }}
+                      className="relative h-24 w-24 rounded-[1.4rem] border-2 border-white/70 object-cover shadow-2xl sm:h-32 sm:w-32 sm:rounded-[1.65rem]"
+                    />
+                  </div>
+
+
 
                   {provider.verified && (
                     <div className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-full border-4 border-ink-900 bg-emerald-500 text-white">
@@ -690,18 +699,16 @@ export default function ProviderProfilePage() {
                   onClick={() =>
                     setSaved(!saved)
                   }
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    saved
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${saved
                       ? "bg-white text-ink-900 shadow-lg"
                       : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20"
-                  }`}
+                    }`}
                 >
                   <Heart
-                    className={`h-4 w-4 ${
-                      saved
+                    className={`h-4 w-4 ${saved
                         ? "fill-current text-red-500"
                         : ""
-                    }`}
+                      }`}
                   />
 
                   {saved
@@ -769,10 +776,10 @@ export default function ProviderProfilePage() {
               <div className="px-4 py-5 text-center sm:px-6">
                 <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
                   {averageServicePrice >
-                  0
+                    0
                     ? formatNaira(
-                        averageServicePrice
-                      )
+                      averageServicePrice
+                    )
                     : "—"}
                 </p>
 
@@ -790,27 +797,27 @@ export default function ProviderProfilePage() {
 
         {(provider.bio ||
           provider.about) && (
-          <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-            <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
-              <div className="max-w-4xl">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
-                    <User className="h-4 w-4" />
+            <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+              <div className="rounded-2xl border border-ink-100 bg-white p-6 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
+                <div className="max-w-4xl">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
+                      <User className="h-4 w-4" />
+                    </div>
+
+                    <h2 className="text-lg font-bold text-ink-900 dark:text-white">
+                      About {providerName}
+                    </h2>
                   </div>
 
-                  <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-                    About {providerName}
-                  </h2>
+                  <p className="mt-4 text-[15px] leading-7 text-ink-600 dark:text-ink-300">
+                    {provider.about ||
+                      provider.bio}
+                  </p>
                 </div>
-
-                <p className="mt-4 text-[15px] leading-7 text-ink-600 dark:text-ink-300">
-                  {provider.about ||
-                    provider.bio}
-                </p>
               </div>
-            </div>
-          </section>
-        )}
+            </section>
+          )}
 
         {/* =================================================
             TABS
@@ -829,11 +836,10 @@ export default function ProviderProfilePage() {
                     onClick={() =>
                       setActiveTab(tab.id)
                     }
-                    className={`relative flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${
-                      isActive
+                    className={`relative flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${isActive
                         ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
                         : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
-                    }`}
+                      }`}
                   >
                     {tab.icon}
 
@@ -842,7 +848,7 @@ export default function ProviderProfilePage() {
                     {tab.id ===
                       "services" &&
                       activeServices.length >
-                        0 && (
+                      0 && (
                         <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 dark:bg-ink-800 dark:text-ink-300">
                           {
                             activeServices.length
@@ -884,133 +890,133 @@ export default function ProviderProfilePage() {
 
             {activeTab ===
               "services" && (
-              <motion.div
-                key="services"
-                initial={{
-                  opacity: 0,
-                  y: 10,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                exit={{
-                  opacity: 0,
-                  y: -10,
-                }}
-                transition={{
-                  duration: 0.2,
-                }}
-              >
-                {activeServices.length ===
-                0 ? (
-                  <EmptyState
-                    icon={
-                      <Briefcase className="h-6 w-6" />
-                    }
-                    title="No services available"
-                    description={`${providerName} has not added any services yet.`}
-                  />
-                ) : (
-                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {activeServices.map(
-                      (
-                        service,
-                        index
-                      ) => (
-                        <motion.div
-                          key={
-                            service._id
-                          }
-                          initial={{
-                            opacity: 0,
-                            y: 15,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                          }}
-                          transition={{
-                            delay:
-                              index *
-                              0.05,
-                          }}
-                          className="group overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-primary-200 hover:shadow-2xl hover:shadow-primary-950/10 dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900"
-                        >
-                          <div className="relative h-56 overflow-hidden">
-                            <img
-                              src={
-                                service.image
-                              }
-                              alt={
-                                service.title
-                              }
-                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                            />
+                <motion.div
+                  key="services"
+                  initial={{
+                    opacity: 0,
+                    y: 10,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    y: -10,
+                  }}
+                  transition={{
+                    duration: 0.2,
+                  }}
+                >
+                  {activeServices.length ===
+                    0 ? (
+                    <EmptyState
+                      icon={
+                        <Briefcase className="h-6 w-6" />
+                      }
+                      title="No services available"
+                      description={`${providerName} has not added any services yet.`}
+                    />
+                  ) : (
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                      {activeServices.map(
+                        (
+                          service,
+                          index
+                        ) => (
+                          <motion.div
+                            key={
+                              service._id
+                            }
+                            initial={{
+                              opacity: 0,
+                              y: 15,
+                            }}
+                            animate={{
+                              opacity: 1,
+                              y: 0,
+                            }}
+                            transition={{
+                              delay:
+                                index *
+                                0.05,
+                            }}
+                            className="group overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-primary-200 hover:shadow-2xl hover:shadow-primary-950/10 dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900"
+                          >
+                            <div className="relative h-56 overflow-hidden">
+                              <img
+                                src={
+                                  service.image
+                                }
+                                alt={
+                                  service.title
+                                }
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
 
-                            <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-ink-950/5 to-transparent" />
+                              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-ink-950/5 to-transparent" />
 
-                            <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-ink-800 shadow-sm backdrop-blur dark:bg-ink-900/90 dark:text-white">
-                              {
-                                service.category
-                              }
-                            </span>
-
-                            <div className="absolute bottom-3 left-3 flex items-center gap-2 text-white">
-                              <Clock className="h-4 w-4" />
-
-                              <span className="text-xs font-medium">
+                              <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-ink-800 shadow-sm backdrop-blur dark:bg-ink-900/90 dark:text-white">
                                 {
-                                  service.duration
+                                  service.category
                                 }
                               </span>
-                            </div>
-                          </div>
 
-                          <div className="p-5">
-                            <h3 className="line-clamp-1 text-lg font-extrabold tracking-tight text-ink-900 dark:text-white">
-                              {
-                                service.title
-                              }
-                            </h3>
+                              <div className="absolute bottom-3 left-3 flex items-center gap-2 text-white">
+                                <Clock className="h-4 w-4" />
 
-                            <p className="mt-2 line-clamp-2 min-h-[40px] text-sm leading-5 text-ink-500 dark:text-ink-400">
-                              {
-                                service.description
-                              }
-                            </p>
-
-                            <div className="mt-5 flex items-end justify-between border-t border-ink-100 pt-4 dark:border-ink-800">
-                              <div>
-                                <p className="text-[10px] font-medium uppercase tracking-wider text-ink-400">
-                                  Starting
-                                  from
-                                </p>
-
-                                <p className="mt-0.5 text-lg font-bold text-ink-900 dark:text-white">
-                                  {formatNaira(
-                                    service.price
-                                  )}
-                                </p>
+                                <span className="text-xs font-medium">
+                                  {
+                                    service.duration
+                                  }
+                                </span>
                               </div>
-
-                              <Link
-                                to={`/book/${provider._id}?service=${service._id}`}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400"
-                              >
-                                Book
-
-                                <ArrowRight className="h-3.5 w-3.5" />
-                              </Link>
                             </div>
-                          </div>
-                        </motion.div>
-                      )
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            )}
+
+                            <div className="p-5">
+                              <h3 className="line-clamp-1 text-lg font-extrabold tracking-tight text-ink-900 dark:text-white">
+                                {
+                                  service.title
+                                }
+                              </h3>
+
+                              <p className="mt-2 line-clamp-2 min-h-[40px] text-sm leading-5 text-ink-500 dark:text-ink-400">
+                                {
+                                  service.description
+                                }
+                              </p>
+
+                              <div className="mt-5 flex items-end justify-between border-t border-ink-100 pt-4 dark:border-ink-800">
+                                <div>
+                                  <p className="text-[10px] font-medium uppercase tracking-wider text-ink-400">
+                                    Starting
+                                    from
+                                  </p>
+
+                                  <p className="mt-0.5 text-lg font-bold text-ink-900 dark:text-white">
+                                    {formatNaira(
+                                      service.price
+                                    )}
+                                  </p>
+                                </div>
+
+                                <Link
+                                  to={`/book/${provider._id}?service=${service._id}`}
+                                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400"
+                                >
+                                  Book
+
+                                  <ArrowRight className="h-3.5 w-3.5" />
+                                </Link>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
             {/* =================================================
                 PORTFOLIO
@@ -1018,115 +1024,115 @@ export default function ProviderProfilePage() {
 
             {activeTab ===
               "portfolio" && (
-              <motion.div
-                key="portfolio"
-                initial={{
-                  opacity: 0,
-                  y: 10,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                exit={{
-                  opacity: 0,
-                  y: -10,
-                }}
-                transition={{
-                  duration: 0.2,
-                }}
-              >
-                {portfolio.length ===
-                0 ? (
-                  <EmptyState
-                    icon={
-                      <ImageIcon className="h-6 w-6" />
-                    }
-                    title="No portfolio yet"
-                    description={`${providerName} has not added portfolio items yet.`}
-                  />
-                ) : (
-                  <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    {portfolio.map(
-                      (
-                        item,
-                        index
-                      ) => (
-                        <motion.div
-                          key={
-                            item._id ||
-                            `${item.title}-${index}`
-                          }
-                          initial={{
-                            opacity: 0,
-                            y: 15,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                          }}
-                          transition={{
-                            delay:
-                              index *
-                              0.05,
-                          }}
-                          className="group overflow-hidden rounded-2xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900"
-                        >
-                          {item.image ? (
-                            <div className="relative h-64 overflow-hidden">
-                              <img
-                                src={
-                                  item.image
-                                }
-                                alt={
-                                  item.title ||
-                                  "Portfolio"
-                                }
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              />
-
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
-
-                              {item.category && (
-                                <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-ink-800">
-                                  {
-                                    item.category
+                <motion.div
+                  key="portfolio"
+                  initial={{
+                    opacity: 0,
+                    y: 10,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    y: -10,
+                  }}
+                  transition={{
+                    duration: 0.2,
+                  }}
+                >
+                  {portfolio.length ===
+                    0 ? (
+                    <EmptyState
+                      icon={
+                        <ImageIcon className="h-6 w-6" />
+                      }
+                      title="No portfolio yet"
+                      description={`${providerName} has not added portfolio items yet.`}
+                    />
+                  ) : (
+                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                      {portfolio.map(
+                        (
+                          item,
+                          index
+                        ) => (
+                          <motion.div
+                            key={
+                              item._id ||
+                              `${item.title}-${index}`
+                            }
+                            initial={{
+                              opacity: 0,
+                              y: 15,
+                            }}
+                            animate={{
+                              opacity: 1,
+                              y: 0,
+                            }}
+                            transition={{
+                              delay:
+                                index *
+                                0.05,
+                            }}
+                            className="group overflow-hidden rounded-2xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900"
+                          >
+                            {item.image ? (
+                              <div className="relative h-64 overflow-hidden">
+                                <img
+                                  src={
+                                    item.image
                                   }
-                                </span>
-                              )}
+                                  alt={
+                                    item.title ||
+                                    "Portfolio"
+                                  }
+                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
 
-                              {item.title && (
-                                <div className="absolute bottom-4 left-4 right-4">
-                                  <h3 className="font-bold text-white">
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
+
+                                {item.category && (
+                                  <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-ink-800">
                                     {
-                                      item.title
+                                      item.category
                                     }
-                                  </h3>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="flex h-64 items-center justify-center bg-ink-50 dark:bg-ink-800">
-                              <ImageIcon className="h-10 w-10 text-ink-300" />
-                            </div>
-                          )}
+                                  </span>
+                                )}
 
-                          {item.description && (
-                            <div className="p-4">
-                              <p className="text-sm leading-6 text-ink-500 dark:text-ink-400">
-                                {
-                                  item.description
-                                }
-                              </p>
-                            </div>
-                          )}
-                        </motion.div>
-                      )
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            )}
+                                {item.title && (
+                                  <div className="absolute bottom-4 left-4 right-4">
+                                    <h3 className="font-bold text-white">
+                                      {
+                                        item.title
+                                      }
+                                    </h3>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex h-64 items-center justify-center bg-ink-50 dark:bg-ink-800">
+                                <ImageIcon className="h-10 w-10 text-ink-300" />
+                              </div>
+                            )}
+
+                            {item.description && (
+                              <div className="p-4">
+                                <p className="text-sm leading-6 text-ink-500 dark:text-ink-400">
+                                  {
+                                    item.description
+                                  }
+                                </p>
+                              </div>
+                            )}
+                          </motion.div>
+                        )
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
 
             {/* =================================================
                 REVIEWS
@@ -1134,188 +1140,187 @@ export default function ProviderProfilePage() {
 
             {activeTab ===
               "reviews" && (
-              <motion.div
-                key="reviews"
-                initial={{
-                  opacity: 0,
-                  y: 10,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                exit={{
-                  opacity: 0,
-                  y: -10,
-                }}
-                transition={{
-                  duration: 0.2,
-                }}
-              >
-                {reviews.length ===
-                0 ? (
-                  <EmptyState
-                    icon={
-                      <Star className="h-6 w-6" />
-                    }
-                    title="No reviews yet"
-                    description="Reviews from customers will appear here after completed bookings."
-                  />
-                ) : (
-                  <div className="grid gap-5 lg:grid-cols-3">
+                <motion.div
+                  key="reviews"
+                  initial={{
+                    opacity: 0,
+                    y: 10,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    y: -10,
+                  }}
+                  transition={{
+                    duration: 0.2,
+                  }}
+                >
+                  {reviews.length ===
+                    0 ? (
+                    <EmptyState
+                      icon={
+                        <Star className="h-6 w-6" />
+                      }
+                      title="No reviews yet"
+                      description="Reviews from customers will appear here after completed bookings."
+                    />
+                  ) : (
+                    <div className="grid gap-5 lg:grid-cols-3">
 
-                    {/* Rating summary */}
-                    <div className="rounded-2xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
-                      <p className="text-sm font-semibold text-ink-500 dark:text-ink-400">
-                        Overall rating
-                      </p>
+                      {/* Rating summary */}
+                      <div className="rounded-2xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
+                        <p className="text-sm font-semibold text-ink-500 dark:text-ink-400">
+                          Overall rating
+                        </p>
 
-                      <div className="mt-3 flex items-end gap-3">
-                        <span className="text-5xl font-bold tracking-tight text-ink-900 dark:text-white">
-                          {rating > 0
-                            ? rating.toFixed(
+                        <div className="mt-3 flex items-end gap-3">
+                          <span className="text-5xl font-bold tracking-tight text-ink-900 dark:text-white">
+                            {rating > 0
+                              ? rating.toFixed(
                                 1
                               )
-                            : "0.0"}
-                        </span>
+                              : "0.0"}
+                          </span>
 
-                        <div className="pb-2">
-                          <div className="flex gap-1">
-                            {Array.from({
-                              length: 5,
-                            }).map(
-                              (
-                                _,
-                                index
-                              ) => (
-                                <Star
-                                  key={
-                                    index
-                                  }
-                                  className={`h-4 w-4 ${
-                                    index <
-                                    Math.round(
-                                      rating
-                                    )
-                                      ? "fill-yellow-400 text-yellow-400"
-                                      : "text-ink-200 dark:text-ink-700"
-                                  }`}
-                                />
-                              )
-                            )}
+                          <div className="pb-2">
+                            <div className="flex gap-1">
+                              {Array.from({
+                                length: 5,
+                              }).map(
+                                (
+                                  _,
+                                  index
+                                ) => (
+                                  <Star
+                                    key={
+                                      index
+                                    }
+                                    className={`h-4 w-4 ${index <
+                                        Math.round(
+                                          rating
+                                        )
+                                        ? "fill-yellow-400 text-yellow-400"
+                                        : "text-ink-200 dark:text-ink-700"
+                                      }`}
+                                  />
+                                )
+                              )}
+                            </div>
+
+                            <p className="mt-1 text-xs text-ink-400">
+                              {
+                                reviewCount
+                              }{" "}
+                              reviews
+                            </p>
                           </div>
-
-                          <p className="mt-1 text-xs text-ink-400">
-                            {
-                              reviewCount
-                            }{" "}
-                            reviews
-                          </p>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Reviews */}
-                    <div className="space-y-4 lg:col-span-2">
-                      {reviews.map(
-                        (
-                          review,
-                          index
-                        ) => {
-                          const customerName =
-                            review
-                              .customer
-                              ?.fullName ||
-                            review
-                              .customer
-                              ?.name ||
-                            "Customer";
+                      {/* Reviews */}
+                      <div className="space-y-4 lg:col-span-2">
+                        {reviews.map(
+                          (
+                            review,
+                            index
+                          ) => {
+                            const customerName =
+                              review
+                                .customer
+                                ?.fullName ||
+                              review
+                                .customer
+                                ?.name ||
+                              "Customer";
 
-                          const customerImage =
-                            review
-                              .customer
-                              ?.avatar ||
-                            review
-                              .customer
-                              ?.profileImage ||
-                            "/images/default-avatar.png";
+                            const customerImage =
+                              review
+                                .customer
+                                ?.avatar ||
+                              review
+                                .customer
+                                ?.profileImage ||
+                              "/images/default-avatar.png";
 
-                          return (
-                            <motion.div
-                              key={
-                                review._id
-                              }
-                              initial={{
-                                opacity: 0,
-                                y: 10,
-                              }}
-                              animate={{
-                                opacity: 1,
-                                y: 0,
-                              }}
-                              transition={{
-                                delay:
-                                  index *
-                                  0.05,
-                              }}
-                              className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900"
-                            >
-                              <div className="flex items-start justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                  <img
-                                    src={
-                                      customerImage
-                                    }
-                                    alt={
-                                      customerName
-                                    }
-                                    className="h-10 w-10 rounded-full object-cover"
-                                  />
-
-                                  <div>
-                                    <p className="text-sm font-bold text-ink-900 dark:text-white">
-                                      {
+                            return (
+                              <motion.div
+                                key={
+                                  review._id
+                                }
+                                initial={{
+                                  opacity: 0,
+                                  y: 10,
+                                }}
+                                animate={{
+                                  opacity: 1,
+                                  y: 0,
+                                }}
+                                transition={{
+                                  delay:
+                                    index *
+                                    0.05,
+                                }}
+                                className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex items-center gap-3">
+                                    <img
+                                      src={
+                                        customerImage
+                                      }
+                                      alt={
                                         customerName
                                       }
-                                    </p>
+                                      className="h-10 w-10 rounded-full object-cover"
+                                    />
 
-                                    {review.createdAt && (
-                                      <p className="mt-0.5 text-xs text-ink-400">
-                                        {formatDate(
-                                          review.createdAt
-                                        )}
+                                    <div>
+                                      <p className="text-sm font-bold text-ink-900 dark:text-white">
+                                        {
+                                          customerName
+                                        }
                                       </p>
-                                    )}
+
+                                      {review.createdAt && (
+                                        <p className="mt-0.5 text-xs text-ink-400">
+                                          {formatDate(
+                                            review.createdAt
+                                          )}
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 rounded-lg bg-yellow-50 px-2.5 py-1.5 dark:bg-yellow-950/30">
+                                    <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+
+                                    <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">
+                                      {
+                                        review.rating
+                                      }
+                                    </span>
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-1 rounded-lg bg-yellow-50 px-2.5 py-1.5 dark:bg-yellow-950/30">
-                                  <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-
-                                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">
+                                {review.comment && (
+                                  <p className="mt-4 text-sm leading-6 text-ink-600 dark:text-ink-300">
                                     {
-                                      review.rating
+                                      review.comment
                                     }
-                                  </span>
-                                </div>
-                              </div>
-
-                              {review.comment && (
-                                <p className="mt-4 text-sm leading-6 text-ink-600 dark:text-ink-300">
-                                  {
-                                    review.comment
-                                  }
-                                </p>
-                              )}
-                            </motion.div>
-                          );
-                        }
-                      )}
+                                  </p>
+                                )}
+                              </motion.div>
+                            );
+                          }
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </motion.div>
-            )}
+                  )}
+                </motion.div>
+              )}
 
             {/* =================================================
                 AVAILABILITY
@@ -1323,106 +1328,105 @@ export default function ProviderProfilePage() {
 
             {activeTab ===
               "availability" && (
-              <motion.div
-                key="availability"
-                initial={{
-                  opacity: 0,
-                  y: 10,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                exit={{
-                  opacity: 0,
-                  y: -10,
-                }}
-                transition={{
-                  duration: 0.2,
-                }}
-              >
-                {availability.length ===
-                0 ? (
-                  <EmptyState
-                    icon={
-                      <Calendar className="h-6 w-6" />
-                    }
-                    title="Availability not added"
-                    description={`${providerName} has not provided their availability schedule yet.`}
-                  />
-                ) : (
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {availability.map(
-                      (
-                        slot,
-                        index
-                      ) => (
-                        <motion.div
-                          key={
-                            slot._id ||
-                            `${slot.day}-${index}`
-                          }
-                          initial={{
-                            opacity: 0,
-                            y: 10,
-                          }}
-                          animate={{
-                            opacity: 1,
-                            y: 0,
-                          }}
-                          transition={{
-                            delay:
-                              index *
-                              0.05,
-                          }}
-                          className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-bold text-ink-900 dark:text-white">
-                                {slot.day ||
-                                  "Available"}
-                              </p>
+                <motion.div
+                  key="availability"
+                  initial={{
+                    opacity: 0,
+                    y: 10,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    y: -10,
+                  }}
+                  transition={{
+                    duration: 0.2,
+                  }}
+                >
+                  {availability.length ===
+                    0 ? (
+                    <EmptyState
+                      icon={
+                        <Calendar className="h-6 w-6" />
+                      }
+                      title="Availability not added"
+                      description={`${providerName} has not provided their availability schedule yet.`}
+                    />
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {availability.map(
+                        (
+                          slot,
+                          index
+                        ) => (
+                          <motion.div
+                            key={
+                              slot._id ||
+                              `${slot.day}-${index}`
+                            }
+                            initial={{
+                              opacity: 0,
+                              y: 10,
+                            }}
+                            animate={{
+                              opacity: 1,
+                              y: 0,
+                            }}
+                            transition={{
+                              delay:
+                                index *
+                                0.05,
+                            }}
+                            className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-bold text-ink-900 dark:text-white">
+                                  {slot.day ||
+                                    "Available"}
+                                </p>
 
-                              {slot.startTime &&
-                                slot.endTime && (
-                                  <div className="mt-2 flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400">
-                                    <Clock className="h-4 w-4" />
+                                {slot.startTime &&
+                                  slot.endTime && (
+                                    <div className="mt-2 flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400">
+                                      <Clock className="h-4 w-4" />
 
-                                    {
-                                      slot.startTime
-                                    }
+                                      {
+                                        slot.startTime
+                                      }
 
-                                    {" - "}
+                                      {" - "}
 
-                                    {
-                                      slot.endTime
-                                    }
-                                  </div>
-                                )}
+                                      {
+                                        slot.endTime
+                                      }
+                                    </div>
+                                  )}
+                              </div>
+
+                              <span
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${slot.available ===
+                                    false
+                                    ? "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"
+                                    : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                  }`}
+                              >
+                                {slot.available ===
+                                  false
+                                  ? "Unavailable"
+                                  : "Available"}
+                              </span>
                             </div>
-
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                slot.available ===
-                                false
-                                  ? "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"
-                                  : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
-                              }`}
-                            >
-                              {slot.available ===
-                              false
-                                ? "Unavailable"
-                                : "Available"}
-                            </span>
-                          </div>
-                        </motion.div>
-                      )
-                    )}
-                  </div>
-                )}
-              </motion.div>
-            )}
+                          </motion.div>
+                        )
+                      )}
+                    </div>
+                  )}
+                </motion.div>
+              )}
           </AnimatePresence>
         </main>
 
@@ -1432,8 +1436,8 @@ export default function ProviderProfilePage() {
 
         {activeServices.length >
           0 && (
-          <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
-            <div className="relative overflow-hidden rounded-3xl bg-ink-950 px-6 py-10 text-center shadow-2xl shadow-ink-950/20 dark:bg-ink-800 sm:px-10 sm:py-12">
+            <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
+              <div className="relative overflow-hidden rounded-3xl bg-ink-950 px-6 py-10 text-center shadow-2xl shadow-ink-950/20 dark:bg-ink-800 sm:px-10 sm:py-12">
 
                 <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-400/25 blur-2xl" />
 
@@ -1480,8 +1484,8 @@ export default function ProviderProfilePage() {
                   </div>
                 </div>
               </div>
-          </section>
-        )}
+            </section>
+          )}
       </div>
     </DashboardLayout>
   );
