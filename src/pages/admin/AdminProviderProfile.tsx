@@ -418,11 +418,11 @@ export function AdminProviderProfile() {
                     </div>
                   </div>
 
-                  {/* <div className="mt-4">
+                  <div className="mt-4">
                     <span
                       className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                        service.status ===
-                        "approved"
+                        (service.status === "approved" ||
+                          service.status === "active")
                           ? "bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400"
                           : service.status ===
                             "rejected"
@@ -431,9 +431,9 @@ export function AdminProviderProfile() {
                       }`}
                     >
                       {service.status ||
-                        "pending"}
+                        "active"}
                     </span>
-                  </div> */}
+                  </div>
                 </div>
               </div>
             ))}

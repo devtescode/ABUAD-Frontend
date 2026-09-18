@@ -401,7 +401,7 @@ export function ProviderServices() {
                 return 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400';
 
             default:
-                return 'bg-ink-100 text-ink-500 dark:bg-ink-800 dark:text-ink-300';
+                return 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400';
         }
     };
 
@@ -423,7 +423,7 @@ export function ProviderServices() {
                 return 'Suspended';
 
             default:
-                return status || 'Pending';
+                return status || 'Active';
         }
     };
 

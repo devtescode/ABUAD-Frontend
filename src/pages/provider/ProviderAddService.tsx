@@ -11,7 +11,9 @@ import {
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
-const API_URL = 'http://localhost:5000';
+const API_URL =
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:5000';
 
 const categories = [
     'Photography',
@@ -143,6 +145,8 @@ export function ProviderAddService() {
             data.append('price', formData.price);
             data.append('duration', formData.duration.trim());
             data.append('description', formData.description.trim());
+            // New listings are live by default; an admin can suspend them later.
+            // data.append('status', 'active');
 
             // Use the guaranteed File value here
             data.append('image', serviceImage);
