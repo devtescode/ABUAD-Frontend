@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardLayout, DashboardHeader } from '@/components/DashboardLayout';
 import { providerNavItems } from '@/data/providerNavItems';
 import {
@@ -9,7 +9,7 @@ import {
     LoaderCircle,
     CheckCircle2,
 } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 const API_URL =
     import.meta.env.VITE_API_URL ||
@@ -23,8 +23,6 @@ const categories = [
 ];
 
 export function ProviderAddService() {
-
-    const navigate = useNavigate();
 
     const [formData, setFormData] = useState({
         title: '',
@@ -40,6 +38,18 @@ export function ProviderAddService() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+
+    // Keep feedback visible long enough to be read, then dismiss it.
+    useEffect(() => {
+        if (!error && !success) return;
+
+        const timeoutId = window.setTimeout(() => {
+            setError('');
+            setSuccess('');
+        }, 15_000);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [error, success]);
 
     const handleChange = (
         e: React.ChangeEvent<
@@ -170,11 +180,22 @@ export function ProviderAddService() {
                 );
             }
 
-            setSuccess('Service created successfully!');
+            setSuccess(
+                result.message ||
+                'Service created successfully!'
+            );
 
-            setTimeout(() => {
-                navigate('/provider/services');
-            }, 800);
+            // Keep the confirmation visible, but prepare a clean form for
+            // the provider's next service listing.
+            setFormData({
+                title: '',
+                category: 'Photography',
+                price: '',
+                duration: '',
+                description: '',
+            });
+            setImage(null);
+            setImagePreview('');
         } catch (err) {
             setError(
                 err instanceof Error
@@ -203,22 +224,6 @@ export function ProviderAddService() {
                     onSubmit={handleSubmit}
                     className="space-y-5"
                 >
-                    {/* Error */}
-                    {error && (
-                        <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
-                            <X className="h-5 w-5 shrink-0" />
-                            <span>{error}</span>
-                        </div>
-                    )}
-
-                    {/* Success */}
-                    {success && (
-                        <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-600 dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-400">
-                            <CheckCircle2 className="h-5 w-5 shrink-0" />
-                            <span>{success}</span>
-                        </div>
-                    )}
-
                     {/* Service Title */}
                     <div>
                         <label className="label">
@@ -387,6 +392,7 @@ export function ProviderAddService() {
                             Cancel
                         </Link>
 
+                        
                         <button
                             type="submit"
                             disabled={loading}
@@ -404,6 +410,39 @@ export function ProviderAddService() {
                     </div>
                 </form>
             </div>
+
+            {(error || success) && (
+                <div
+                    className={`fixed bottom-6 right-6 z-[100] flex w-[calc(100%-3rem)] max-w-md items-start gap-3 rounded-2xl border px-4 py-4 shadow-2xl sm:w-full ${
+                        error
+                            ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/40 dark:bg-red-950 dark:text-red-200'
+                            : 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/40 dark:bg-green-950 dark:text-green-200'
+                    }`}
+                    role="status"
+                >
+                    {/* {error ? (
+                        <X className="mt-0.5 h-5 w-5 shrink-0" />
+                    ) : (
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                    )} */}
+
+                    <p className="flex-1 text-sm font-medium leading-5">
+                        {error || success}
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setError('');
+                            setSuccess('');
+                        }}
+                        className="rounded-md p-1 transition hover:bg-black/10"
+                        aria-label="Dismiss notification"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+            )}
         </DashboardLayout>
     );
 }
