@@ -26,7 +26,10 @@ interface CustomerServiceCardProps {
       profileImage?: string;
     };
   };
+  additionalServicesCount?: number;
 }
+
+
 
 const formatNaira = (amount: number) => {
   return `₦${Number(amount || 0).toLocaleString("en-NG")}`;
@@ -34,6 +37,7 @@ const formatNaira = (amount: number) => {
 
 export function CustomerServiceCard({
   service,
+  additionalServicesCount = 0,
 }: CustomerServiceCardProps) {
   const providerName =
     service.provider?.fullName ||
@@ -98,19 +102,25 @@ export function CustomerServiceCard({
           {service.title}
         </h3>
 
+        {additionalServicesCount > 0 && (
+          <p className="mt-0 text-xs font-medium text-primary-600 dark:text-primary-400">
+            +{additionalServicesCount} more service{additionalServicesCount === 1 ? "" : "s"} from this provider
+          </p>
+        )}
+
         {/* Description */}
-        <p className="mt-2 line-clamp-2 min-h-[40px] text-sm leading-5 text-ink-500 dark:text-ink-400">
+        <p className="mt-0 line-clamp-2 min-h-[35px] text-sm leading-5 text-ink-500 dark:text-ink-400">
           {service.description}
         </p>
 
         {/* Price + Duration */}
-        <div className="mt-5 flex items-end justify-between border-t border-ink-100 pt-4 dark:border-ink-800">
+        <div className="flex items-end justify-between border-t border-ink-100 pt-4 dark:border-ink-800">
           <div>
             <p className="text-[10px] font-medium uppercase tracking-wider text-ink-400">
               Starting from
             </p>
 
-            <p className="mt-0.5 text-lg font-bold text-ink-900 dark:text-white">
+            <p className="text-lg font-bold text-ink-900 dark:text-white">
               {formatNaira(service.price)}
             </p>
           </div>
@@ -122,7 +132,7 @@ export function CustomerServiceCard({
         </div>
 
         {/* Location */}
-        <div className="mt-3 flex items-center gap-1.5 text-xs text-ink-400">
+        <div className="mt-0 flex items-center gap-1.5 text-xs text-ink-400">
           <MapPin className="h-3.5 w-3.5" />
           ABUAD
         </div>
