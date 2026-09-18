@@ -71,43 +71,6 @@ export function AdminDashboard() {
 }
 
 
-export function AdminVerification() {
-  const pending = providers.filter((p) => p.status === 'pending');
-  return (
-    <DashboardLayout role="admin" navItems={navItems}>
-      <DashboardHeader title="Verification Requests" subtitle="Review and approve provider applications" />
-      {pending.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-20 text-center">
-          <CheckCircle2 className="h-12 w-12 text-primary-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No pending requests</h3>
-          <p className="mt-1 text-sm text-ink-500">All provider applications have been reviewed.</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {pending.map((provider) => (
-            <div key={provider.id} className="card p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-4">
-                  <img src={provider.avatar} alt="" className="h-14 w-14 rounded-xl object-cover" />
-                  <div>
-                    <h3 className="font-semibold text-ink-900">{provider.name}</h3>
-                    <p className="text-sm text-ink-500">{provider.categories.join(', ')}</p>
-                    <p className="mt-1 text-xs text-ink-400">{provider.location} • Joined {provider.joinedDate}</p>
-                    <p className="mt-2 text-sm text-ink-600 line-clamp-2">{provider.about}</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button className="btn-primary btn-sm"><CheckCircle2 className="h-4 w-4" /> Approve</button>
-                  <button className="btn-outline btn-sm text-red-600"><XCircle className="h-4 w-4" /> Reject</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </DashboardLayout>
-  );
-}
 
 export function AdminCategories() {
   return (

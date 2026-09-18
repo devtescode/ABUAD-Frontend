@@ -39,7 +39,7 @@ import {
   AdminDashboard,
   // AdminUsers,
   // AdminProviders,
-  AdminVerification,
+  // AdminVerification,
   AdminCategories,
   AdminBookings,
   AdminPayments,
@@ -51,6 +51,7 @@ import {
 } from '@/pages/admin/AdminDashboard';
 import AdminAuth from './pages/auth/AdminAuth';
 import { AdminUsers } from './pages/admin/AdminUsers';
+import { AdminVerification } from './pages/admin/AdminVerification';
 import { AdminProviders } from './pages/admin/Provider';
 import { AdminProviderProfile } from './pages/admin/AdminProviderProfile';
 
