@@ -26,7 +26,12 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from "framer-motion";
 import { StatusBadge } from '@/components/shared';
 
-const API_URL = 'http://localhost:5000';
+// Keep this page on the same API instance as the admin status controls.
+// A hard-coded localhost URL can return stale service statuses from a
+// different backend than the one the admin just updated.
+const API_URL =
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:5000';
 
 interface Service {
     _id: string;
@@ -37,7 +42,8 @@ interface Service {
     duration: string;
     description: string;
     image: string;
-    status: 'pending' | 'approved' | 'rejected' | 'suspended';
+    // status: 'pending' | 'approved' | 'rejected' | 'suspended';
+    status: 'pending' | 'active' | 'approved' | 'rejected' | 'suspended' | string;
     createdAt?: string;
     updatedAt?: string;
 }
@@ -88,6 +94,7 @@ export function ProviderServices() {
     // FETCH SERVICES
     // ==========================================
 
+
     const fetchServices = async () => {
         try {
             setLoading(true);
@@ -100,24 +107,47 @@ export function ProviderServices() {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/provider/services`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
+            const response = await fetch(
+                `${API_URL}/provider/services`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        Accept: 'application/json',
+                        'Cache-Control': 'no-cache',
+                    },
+                    cache: 'no-store',
+                }
+            );
 
             const result = await response.json();
 
             if (!response.ok) {
                 throw new Error(
-                    result.message || 'Failed to load your services.'
+                    result.message ||
+                    'Failed to load your services.'
                 );
             }
 
-            setServices(result.services || []);
+            const fetchedServices = Array.isArray(result.services)
+                ? result.services
+                : [];
+
+            console.log(
+                'Provider services fetched:',
+                fetchedServices.map((service: Service) => ({
+                    id: service._id,
+                    title: service.title,
+                    status: service.status,
+                }))
+            );
+
+            setServices(fetchedServices);
         } catch (error) {
-            console.error('Fetch services error:', error);
+            console.error(
+                'Fetch services error:',
+                error
+            );
 
             setError(
                 error instanceof Error
@@ -128,6 +158,8 @@ export function ProviderServices() {
             setLoading(false);
         }
     };
+
+
 
     useEffect(() => {
         fetchServices();
@@ -352,27 +384,32 @@ export function ProviderServices() {
     // STATUS STYLE
     // ==========================================
 
+
     const getStatusStyle = (status: Service['status']) => {
-        switch (status) {
+        switch (status?.toLowerCase()) {
+            case 'active':
             case 'approved':
-                return 'bg-primary-100 text-primary-700';
+                return 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400';
 
             case 'pending':
-                return 'bg-yellow-100 text-yellow-700';
+                return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400';
 
             case 'rejected':
-                return 'bg-red-100 text-red-700';
+                return 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400';
 
             case 'suspended':
-                return 'bg-ink-100 text-ink-600';
+                return 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400';
 
             default:
-                return 'bg-ink-100 text-ink-500';
+                return 'bg-ink-100 text-ink-500 dark:bg-ink-800 dark:text-ink-300';
         }
     };
 
     const getStatusText = (status: Service['status']) => {
-        switch (status) {
+        switch (status?.toLowerCase()) {
+            case 'active':
+                return 'Active';
+
             case 'approved':
                 return 'Approved';
 
@@ -386,9 +423,10 @@ export function ProviderServices() {
                 return 'Suspended';
 
             default:
-                return status;
+                return status || 'Pending';
         }
     };
+
 
     return (
         <DashboardLayout role="provider" navItems={providerNavItems}>

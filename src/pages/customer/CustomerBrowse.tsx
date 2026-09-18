@@ -790,6 +790,11 @@ export function CustomerBrowse() {
                   additionalServicesCount={
                     service.additionalServicesCount
                   }
+                  providerServices={servicesFromOtherUsers.filter(
+                    (candidate) =>
+                      candidate.provider?._id ===
+                      service.provider?._id
+                  )}
                 />
               )
             )}

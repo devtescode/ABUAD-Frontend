@@ -27,6 +27,15 @@ interface CustomerServiceCardProps {
     };
   };
   additionalServicesCount?: number;
+  providerServices?: Array<{
+    _id: string;
+    title: string;
+    category: string;
+    price: number;
+    duration: string;
+    description: string;
+    image: string;
+  }>;
 }
 
 
@@ -38,6 +47,7 @@ const formatNaira = (amount: number) => {
 export function CustomerServiceCard({
   service,
   additionalServicesCount = 0,
+  providerServices = [],
 }: CustomerServiceCardProps) {
   const providerName =
     service.provider?.fullName ||
@@ -149,6 +159,7 @@ export function CustomerServiceCard({
         {service.provider?._id ? (
           <Link
             to={`/providers/${service.provider._id}`}
+            state={{ providerServices }}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-ink-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
           >
             View Service

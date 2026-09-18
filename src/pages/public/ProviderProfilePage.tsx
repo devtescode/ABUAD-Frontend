@@ -1,13 +1,20 @@
 
-
 import {
   useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import {
+  motion,
+  AnimatePresence,
+} from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
@@ -30,7 +37,8 @@ import { DashboardLayout } from "@/components/DashboardLayout";
 import { customerNavItems } from "@/data/customerNavItems";
 
 const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:5000";
 
 /* =========================================================
    TYPES
@@ -60,12 +68,23 @@ interface Provider {
 
   verified?: boolean;
 
+  /*
+   * Current User model status:
+   * active | pending | suspended
+   */
+  status?:
+  | "active"
+  | "pending"
+  | "suspended"
+  | string;
+
   rating?: number;
   reviewCount?: number;
   completedBookings?: number;
 
   portfolio?: PortfolioItem[];
   availability?: Availability[];
+  services?: Service[];
 }
 
 interface Service {
@@ -120,17 +139,6 @@ interface Review {
   createdAt?: string;
 }
 
-/*
- * IMPORTANT:
- * All fields returned by the backend are optional except
- * success. This prevents TypeScript errors when the backend
- * sends an error response containing only:
- *
- * {
- *   success: false,
- *   message: "..."
- * }
- */
 interface ProviderProfileResponse {
   success: boolean;
   message?: string;
@@ -138,6 +146,10 @@ interface ProviderProfileResponse {
   provider?: Provider;
   services?: Service[];
   reviews?: Review[];
+}
+
+interface ProviderProfileLocationState {
+  providerServices?: Service[];
 }
 
 interface TabItem {
@@ -151,30 +163,28 @@ interface TabItem {
 ========================================================= */
 
 const formatNaira = (amount: number) => {
-  return `₦${Number(amount || 0).toLocaleString("en-NG")}`;
+  return `₦${Number(amount || 0).toLocaleString(
+    "en-NG"
+  )}`;
 };
 
 const formatDate = (date?: string) => {
   if (!date) return "";
 
   try {
-    return new Date(date).toLocaleDateString("en-NG", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
+    return new Date(date).toLocaleDateString(
+      "en-NG",
+      {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      }
+    );
   } catch {
     return "";
   }
 };
 
-/*
- * Provider can be null because the state starts as null.
- * This fixes:
- *
- * Argument of type 'Provider | null' is not assignable
- * to parameter of type 'Provider | undefined'
- */
 const getProviderName = (
   provider?: Provider | null
 ) => {
@@ -230,16 +240,28 @@ function EmptyState({
 ========================================================= */
 
 export default function ProviderProfilePage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } =
+    useParams<{ id: string }>();
 
   const navigate = useNavigate();
+
+  const location = useLocation();
+
+  const routeServices = useMemo(
+    () =>
+      (location.state as ProviderProfileLocationState | null)
+        ?.providerServices || [],
+    [location.state]
+  );
 
   const [provider, setProvider] =
     useState<Provider | null>(null);
 
-  const [services, setServices] = useState<Service[]>([]);
+  const [services, setServices] =
+    useState<Service[]>([]);
 
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] =
+    useState<Review[]>([]);
 
   const [activeTab, setActiveTab] =
     useState<TabType>("services");
@@ -296,14 +318,14 @@ export default function ProviderProfilePage() {
   ========================================================= */
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchProviderProfile = async () => {
       if (!id) {
         setError(
           "Provider profile could not be found."
         );
-
         setLoading(false);
-
         return;
       }
 
@@ -317,55 +339,76 @@ export default function ProviderProfilePage() {
           );
 
         if (!token) {
-          navigate("/login/customer");
+          navigate("/login/customer", {
+            replace: true,
+          });
           return;
         }
 
         const response = await fetch(
-          `${API_URL}/provider/profile/${id}`,
+          `${API_URL}/provider/profile/${encodeURIComponent(
+            id
+          )}`,
           {
             method: "GET",
-
             headers: {
               Authorization: `Bearer ${token}`,
+              Accept: "application/json",
             },
           }
         );
+        console.log(response, "wowwwwww");
 
-        const result: ProviderProfileResponse =
-          await response.json();
 
-        /*
-         * result.message is now valid because
-         * message?: string was added to the interface.
-         */
+        let result: ProviderProfileResponse;
+
+        try {
+          result = await response.json();
+        } catch {
+          throw new Error(
+            "The server returned an invalid response."
+          );
+        }
+
         if (!response.ok || !result.success) {
           throw new Error(
             result.message ||
-            "Failed to load provider profile."
+            `Failed to load provider profile. (${response.status})`
           );
         }
 
-        /*
-         * The backend should return provider on success.
-         * Check it before putting it into state.
-         */
         if (!result.provider) {
           throw new Error(
-            "Provider profile was not returned."
+            "Provider profile was not returned by the server."
           );
         }
+
+        if (cancelled) return;
 
         setProvider(result.provider);
 
+        const profileServices = Array.isArray(
+          result.services
+        )
+          ? result.services
+          : Array.isArray(result.provider.services)
+            ? result.provider.services
+            : [];
+
         setServices(
-          result.services || []
+          profileServices.length > 0
+            ? profileServices
+            : routeServices
         );
 
         setReviews(
-          result.reviews || []
+          Array.isArray(result.reviews)
+            ? result.reviews
+            : []
         );
       } catch (err) {
+        if (cancelled) return;
+
         console.error(
           "Fetch provider profile error:",
           err
@@ -377,24 +420,26 @@ export default function ProviderProfilePage() {
             : "Failed to load provider profile."
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchProviderProfile();
-  }, [id, navigate]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, navigate, routeServices]);
 
   /* =========================================================
      ACTIVE SERVICES
   ========================================================= */
 
-  const activeServices = useMemo(() => {
-    return services.filter(
-      (service) =>
-        service.status !== "rejected" &&
-        service.status !== "suspended"
-    );
-  }, [services]);
+  const activeServices = services.filter(
+    (service) => service.status !== "rejected"
+  );
 
   /* =========================================================
      PROVIDER DATA
@@ -422,6 +467,16 @@ export default function ProviderProfilePage() {
   const availability =
     provider?.availability || [];
 
+  /*
+   * Provider is considered active when:
+   * - backend status is active
+   * OR
+   * - old verified field is true
+   */
+  const providerIsActive =
+    provider?.status === "active" ||
+    provider?.verified === true;
+
   /* =========================================================
      AVERAGE SERVICE PRICE
   ========================================================= */
@@ -440,7 +495,9 @@ export default function ProviderProfilePage() {
           0
         );
 
-      return total / activeServices.length;
+      return (
+        total / activeServices.length
+      );
     }, [activeServices]);
 
   /* =========================================================
@@ -457,7 +514,9 @@ export default function ProviderProfilePage() {
           text: `Check out ${providerName}'s services on Servicely.`,
           url: window.location.href,
         });
-      } else {
+      } else if (
+        navigator.clipboard
+      ) {
         await navigator.clipboard.writeText(
           window.location.href
         );
@@ -484,10 +543,8 @@ export default function ProviderProfilePage() {
       >
         <div className="min-h-screen bg-ink-50 px-4 py-8 dark:bg-ink-950 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl">
-            {/* Back skeleton */}
             <div className="mb-6 h-6 w-32 animate-pulse rounded bg-ink-200 dark:bg-ink-800" />
 
-            {/* Profile skeleton */}
             <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900">
               <div className="h-56 animate-pulse bg-ink-100 dark:bg-ink-800" />
 
@@ -504,7 +561,6 @@ export default function ProviderProfilePage() {
               </div>
             </div>
 
-            {/* Cards skeleton */}
             <div className="mt-6 grid gap-6 lg:grid-cols-3">
               {Array.from({
                 length: 3,
@@ -547,7 +603,9 @@ export default function ProviderProfilePage() {
             </p>
 
             <button
-              onClick={() => navigate(-1)}
+              onClick={() =>
+                navigate(-1)
+              }
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -570,7 +628,6 @@ export default function ProviderProfilePage() {
       navItems={customerNavItems}
     >
       <div className="min-h-screen bg-[#f7f8f7] dark:bg-ink-950">
-
         {/* =================================================
             BACK BUTTON
         ================================================= */}
@@ -578,7 +635,9 @@ export default function ProviderProfilePage() {
         <div className="border-b border-ink-100/80 bg-white/80 backdrop-blur-xl dark:border-ink-800 dark:bg-ink-900/80">
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <button
-              onClick={() => navigate(-1)}
+              onClick={() =>
+                navigate(-1)
+              }
               className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-ink-500 transition hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -603,18 +662,28 @@ export default function ProviderProfilePage() {
 
           <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-12 sm:px-6 sm:pb-12 sm:pt-16 lg:px-8">
             <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
-
               {/* Provider information */}
+
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
                 <div className="relative">
-
                   <div className="relative flex h-24 w-24 items-center justify-center sm:h-32 sm:w-32">
                     <div className="absolute -inset-1.5 rounded-[1.5rem] bg-gradient-to-br from-primary-300/70 via-white/20 to-accent-300/50 blur-sm sm:-inset-2 sm:rounded-[2rem]" />
 
                     <img
                       src={providerImage}
                       alt={providerName}
-                      onError={(event) => {
+                      onError={(
+                        event
+                      ) => {
+                        if (
+                          event.currentTarget
+                            .src.endsWith(
+                              "/images/default-avatar.png"
+                            )
+                        ) {
+                          return;
+                        }
+
                         event.currentTarget.src =
                           "/images/default-avatar.png";
                       }}
@@ -622,9 +691,7 @@ export default function ProviderProfilePage() {
                     />
                   </div>
 
-
-
-                  {provider.verified && (
+                  {providerIsActive && (
                     <div className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-full border-4 border-ink-900 bg-emerald-500 text-white">
                       <CheckCircle2 className="h-4 w-4" />
                     </div>
@@ -637,7 +704,7 @@ export default function ProviderProfilePage() {
                       {providerName}
                     </h1>
 
-                    {provider.verified && (
+                    {providerIsActive && (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-400/15 px-3 py-1.5 text-xs font-bold text-primary-100 ring-1 ring-primary-300/30">
                         <ShieldCheck className="h-3.5 w-3.5" />
 
@@ -663,7 +730,8 @@ export default function ProviderProfilePage() {
 
                       {reviewCount > 0 && (
                         <span>
-                          ({reviewCount} reviews)
+                          ({reviewCount}{" "}
+                          reviews)
                         </span>
                       )}
                     </span>
@@ -673,28 +741,35 @@ export default function ProviderProfilePage() {
                     {(
                       provider.categories ||
                       []
-                    ).map((category) => (
-                      <span
-                        key={category}
-                        className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 ring-1 ring-white/10 backdrop-blur"
-                      >
-                        {category}
-                      </span>
-                    ))}
+                    ).map(
+                      (category) => (
+                        <span
+                          key={category}
+                          className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 ring-1 ring-white/10 backdrop-blur"
+                        >
+                          {category}
+                        </span>
+                      )
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Actions */}
+
               <div className="flex flex-wrap items-center gap-2">
-                {activeServices.length > 0 && (
-                  <Link
-                    to={`/book/${provider._id}`}
-                    className="inline-flex items-center gap-2 rounded-xl bg-primary-400 px-4 py-2.5 text-sm font-extrabold text-primary-950 shadow-lg shadow-primary-950/20 transition hover:bg-primary-300 hover:shadow-primary-950/35"
-                  >
-                    Book now <ArrowRight className="h-4 w-4" />
-                  </Link>
-                )}
+                {activeServices.length >
+                  0 && (
+                    <Link
+                      to={`/book/${provider._id}`}
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary-400 px-4 py-2.5 text-sm font-extrabold text-primary-950 shadow-lg shadow-primary-950/20 transition hover:bg-primary-300 hover:shadow-primary-950/35"
+                    >
+                      Book now
+
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  )}
+
                 <button
                   onClick={() =>
                     setSaved(!saved)
@@ -741,10 +816,11 @@ export default function ProviderProfilePage() {
         <section className="relative z-10 -mt-5 px-4 sm:-mt-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-white/70 bg-white/95 shadow-xl shadow-ink-950/10 backdrop-blur dark:border-ink-700 dark:bg-ink-900/95">
             <div className="grid grid-cols-2 divide-x divide-y divide-ink-100 dark:divide-ink-800 sm:grid-cols-4 sm:divide-y-0">
-
               <div className="px-4 py-5 text-center sm:px-6">
                 <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
-                  {activeServices.length}
+                  {
+                    activeServices.length
+                  }
                 </p>
 
                 <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
@@ -883,7 +959,6 @@ export default function ProviderProfilePage() {
 
         <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <AnimatePresence mode="wait">
-
             {/* =================================================
                 SERVICES
             ================================================= */}
@@ -946,11 +1021,25 @@ export default function ProviderProfilePage() {
                             <div className="relative h-56 overflow-hidden">
                               <img
                                 src={
-                                  service.image
+                                  service.image ||
+                                  "/images/service-placeholder.png"
                                 }
                                 alt={
                                   service.title
                                 }
+                                onError={(
+                                  event
+                                ) => {
+                                  if (
+                                    !event.currentTarget
+                                      .src.endsWith(
+                                        "/images/service-placeholder.png"
+                                      )
+                                  ) {
+                                    event.currentTarget.src =
+                                      "/images/service-placeholder.png";
+                                  }
+                                }}
                                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                               />
 
@@ -1088,6 +1177,12 @@ export default function ProviderProfilePage() {
                                     item.title ||
                                     "Portfolio"
                                   }
+                                  onError={(
+                                    event
+                                  ) => {
+                                    event.currentTarget.style.display =
+                                      "none";
+                                  }}
                                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                                 />
 
@@ -1169,8 +1264,8 @@ export default function ProviderProfilePage() {
                     />
                   ) : (
                     <div className="grid gap-5 lg:grid-cols-3">
-
                       {/* Rating summary */}
+
                       <div className="rounded-2xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
                         <p className="text-sm font-semibold text-ink-500 dark:text-ink-400">
                           Overall rating
@@ -1221,6 +1316,7 @@ export default function ProviderProfilePage() {
                       </div>
 
                       {/* Reviews */}
+
                       <div className="space-y-4 lg:col-span-2">
                         {reviews.map(
                           (
@@ -1274,6 +1370,12 @@ export default function ProviderProfilePage() {
                                       alt={
                                         customerName
                                       }
+                                      onError={(
+                                        event
+                                      ) => {
+                                        event.currentTarget.src =
+                                          "/images/default-avatar.png";
+                                      }}
                                       className="h-10 w-10 rounded-full object-cover"
                                     />
 
@@ -1438,7 +1540,6 @@ export default function ProviderProfilePage() {
           0 && (
             <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
               <div className="relative overflow-hidden rounded-3xl bg-ink-950 px-6 py-10 text-center shadow-2xl shadow-ink-950/20 dark:bg-ink-800 sm:px-10 sm:py-12">
-
                 <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-400/25 blur-2xl" />
 
                 <div className="absolute -bottom-20 -left-10 h-48 w-48 rounded-full bg-accent-400/15 blur-2xl" />
@@ -1490,4 +1591,3 @@ export default function ProviderProfilePage() {
     </DashboardLayout>
   );
 }
-

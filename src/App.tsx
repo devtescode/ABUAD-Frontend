@@ -15,7 +15,7 @@ import {
   CustomerSettings,
 } from '@/pages/customer/CustomerDashboard';
 
-import {CustomerBrowse} from '@/pages/customer/CustomerBrowse';
+import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
 
 
 
@@ -31,8 +31,8 @@ import {
   ProviderProfile,
   ProviderSettings,
 } from '@/pages/provider/ProviderDashboard';
-import {ProviderAddService} from '@/pages/provider/ProviderAddService';
-import {ProviderServices} from '@/pages/provider/ProviderServices';
+import { ProviderAddService } from '@/pages/provider/ProviderAddService';
+import { ProviderServices } from '@/pages/provider/ProviderServices';
 
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
@@ -52,6 +52,7 @@ import {
 import AdminAuth from './pages/auth/AdminAuth';
 import { AdminUsers } from './pages/admin/AdminUsers';
 import { AdminProviders } from './pages/admin/Provider';
+import { AdminProviderProfile } from './pages/admin/AdminProviderProfile';
 
 // function ProtectedRoute({ role, children }: { role: 'customer' | 'provider' | 'admin'; children: React.ReactNode }) {
 //   const { user } = useAuth();
@@ -170,6 +171,11 @@ function AppRoutes() {
       <Route path="/admin/featured" element={<ProtectedRoute role="admin"><AdminFeatured /></ProtectedRoute>} />
       <Route path="/admin/analytics" element={<ProtectedRoute role="admin"><AdminAnalytics /></ProtectedRoute>} />
       <Route path="/admin/settings" element={<ProtectedRoute role="admin"><AdminSettings /></ProtectedRoute>} />
+      {/* AdminProviderProfile */}
+      <Route
+        path="/admin/providers/:id"
+        element={<ProtectedRoute role="admin"><AdminProviderProfile /></ProtectedRoute>}
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
