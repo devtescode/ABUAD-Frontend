@@ -174,58 +174,58 @@ export function ProviderOnboarding() {
   );
 }
 
-export function ProviderDashboard() {
-  const { user } = useAuth();
-  return (
-    <DashboardLayout role="provider" navItems={navItems}>
-      <DashboardHeader
-        title={`Hello, ${user?.name?.split(' ')[0] || 'Provider'}`}
-        subtitle="Your provider dashboard overview"
-        action={<Link to="/provider/add-service" className="btn-primary"><Plus className="h-4 w-4" /> Add Service</Link>}
-      />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Total Bookings" value="57" icon={ClipboardList} color="primary" />
-        <StatCard label="Pending Requests" value="3" icon={Inbox} color="accent" />
-        <StatCard label="Total Earnings" value="₦845k" icon={Money} color="sky" trend="+12%" />
-        <StatCard label="Avg Rating" value="4.9" icon={Star} color="rose" />
-      </div>
+// export function ProviderDashboard() {
+//   const { user } = useAuth();
+//   return (
+//     <DashboardLayout role="provider" navItems={navItems}>
+//       <DashboardHeader
+//         title={`Hello, ${user?.name?.split(' ')[0] || 'Provider'}`}
+//         subtitle="Your provider dashboard overview"
+//         action={<Link to="/provider/add-service" className="btn-primary"><Plus className="h-4 w-4" /> Add Service</Link>}
+//       />
+//       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+//         <StatCard label="Total Bookings" value="57" icon={ClipboardList} color="primary" />
+//         <StatCard label="Pending Requests" value="3" icon={Inbox} color="accent" />
+//         <StatCard label="Total Earnings" value="₦845k" icon={Money} color="sky" trend="+12%" />
+//         <StatCard label="Avg Rating" value="4.9" icon={Star} color="rose" />
+//       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <h2 className="mb-4 font-display text-lg font-bold text-ink-900 dark:text-ink-50">Recent Booking Requests</h2>
-          <div className="space-y-3">
-            {sampleBookings.slice(0, 3).map((booking) => (
-              <div key={booking.id} className="card flex items-center gap-4 p-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
-                  {booking.customerName[0]}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-ink-900">{booking.serviceName}</h3>
-                  <p className="text-xs text-ink-500">{booking.date} at {booking.time} • {booking.location}</p>
-                </div>
-                <StatusBadge status={booking.status} />
-              </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <h2 className="mb-4 font-display text-lg font-bold text-ink-900 dark:text-ink-50">Active Services</h2>
-          <div className="space-y-3">
-            {currentProvider.services.slice(0, 3).map((service) => (
-              <div key={service.id} className="card p-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-ink-900">{service.title}</h3>
-                  <span className="text-sm font-bold text-primary-600">{formatNaira(service.price)}</span>
-                </div>
-                <p className="mt-0.5 text-xs text-ink-400">{service.duration}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </DashboardLayout>
-  );
-}
+//       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+//         <div className="lg:col-span-2">
+//           <h2 className="mb-4 font-display text-lg font-bold text-ink-900 dark:text-ink-50">Recent Booking Requests</h2>
+//           <div className="space-y-3">
+//             {sampleBookings.slice(0, 3).map((booking) => (
+//               <div key={booking.id} className="card flex items-center gap-4 p-4">
+//                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
+//                   {booking.customerName[0]}
+//                 </div>
+//                 <div className="flex-1">
+//                   <h3 className="font-semibold text-ink-900">{booking.serviceName}</h3>
+//                   <p className="text-xs text-ink-500">{booking.date} at {booking.time} • {booking.location}</p>
+//                 </div>
+//                 <StatusBadge status={booking.status} />
+//               </div>
+//             ))}
+//           </div>
+//         </div>
+//         <div>
+//           <h2 className="mb-4 font-display text-lg font-bold text-ink-900 dark:text-ink-50">Active Services</h2>
+//           <div className="space-y-3">
+//             {currentProvider.services.slice(0, 3).map((service) => (
+//               <div key={service.id} className="card p-3">
+//                 <div className="flex items-center justify-between">
+//                   <h3 className="text-sm font-semibold text-ink-900">{service.title}</h3>
+//                   <span className="text-sm font-bold text-primary-600">{formatNaira(service.price)}</span>
+//                 </div>
+//                 <p className="mt-0.5 text-xs text-ink-400">{service.duration}</p>
+//               </div>
+//             ))}
+//           </div>
+//         </div>
+//       </div>
+//     </DashboardLayout>
+//   );
+// }
 
 
 

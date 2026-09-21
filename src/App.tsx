@@ -21,7 +21,7 @@ import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
 
 import {
   ProviderOnboarding,
-  ProviderDashboard,
+  // ProviderDashboard,
   ProviderAvailability,
   ProviderRequests,
   ProviderBookings,
@@ -30,6 +30,9 @@ import {
   ProviderProfile,
   ProviderSettings,
 } from '@/pages/provider/ProviderDashboard';
+import {
+ ProvidersDashboard
+} from '@/pages/provider/ProvidersDashboard';
 import { ProviderAddService } from '@/pages/provider/ProviderAddService';
 import { ProviderPortfolio } from '@/pages/provider/ProviderPortfolio';
 import { ProviderServices } from '@/pages/provider/ProviderServices';
@@ -146,7 +149,8 @@ function AppRoutes() {
 
       {/* Provider */}
       <Route path="/provider/onboarding" element={<ProviderOnboarding />} />
-      <Route path="/provider" element={<ProtectedRoute role="provider"><ProviderDashboard /></ProtectedRoute>} />
+      {/* <Route path="/provider" element={<ProtectedRoute role="provider"><ProviderDashboard /></ProtectedRoute>} /> */}
+      <Route path="/provider" element={<ProtectedRoute role="provider"><ProvidersDashboard /></ProtectedRoute>} />
       <Route path="/provider/services" element={<ProtectedRoute role="provider"><ProviderServices /></ProtectedRoute>} />
       <Route path="/provider/add-service" element={<ProtectedRoute role="provider"><ProviderAddService /></ProtectedRoute>} />
       <Route path="/provider/portfolio" element={<ProtectedRoute role="provider"><ProviderPortfolio /></ProtectedRoute>} />
