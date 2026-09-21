@@ -21,28 +21,22 @@ import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
 
 import {
   ProviderOnboarding,
-  // ProviderDashboard,
   ProviderAvailability,
   ProviderRequests,
   ProviderBookings,
   ProviderEarnings,
   ProviderReviews,
-  ProviderProfile,
   ProviderSettings,
 } from '@/pages/provider/ProviderDashboard';
-import {
- ProvidersDashboard
-} from '@/pages/provider/ProvidersDashboard';
+import { ProvidersDashboard} from '@/pages/provider/ProvidersDashboard';
 import { ProviderAddService } from '@/pages/provider/ProviderAddService';
 import { ProviderPortfolio } from '@/pages/provider/ProviderPortfolio';
 import { ProviderServices } from '@/pages/provider/ProviderServices';
+import { ProviderProfile } from '@/pages/provider/ProviderProfile';
 
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
   AdminDashboard,
-  // AdminUsers,
-  // AdminProviders,
-  // AdminVerification,
   AdminCategories,
   AdminBookings,
   AdminPayments,
