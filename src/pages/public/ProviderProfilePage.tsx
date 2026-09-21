@@ -1154,35 +1154,86 @@ export default function ProviderProfilePage() {
             <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
 
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-                <div className="relative">
-                  <div className="relative flex h-24 w-24 items-center justify-center sm:h-32 sm:w-32">
-                    <div className="absolute -inset-1.5 rounded-[1.5rem] bg-gradient-to-br from-primary-300/70 via-white/20 to-accent-300/50 blur-sm sm:-inset-2 sm:rounded-[2rem]" />
+                <div className="relative h-24 w-24 sm:h-32 sm:w-32">
+  {/* Glow */}
+  <div
+    className="
+      absolute
+      -inset-1.5
+      rounded-[1.5rem]
+      bg-gradient-to-br
+      from-primary-300/70
+      via-white/20
+      to-accent-300/50
+      blur-sm
+      sm:-inset-2
+      sm:rounded-[2rem]
+    "
+  />
 
-                    <img
-                      src={providerImage}
-                      alt={providerName}
-                      onError={(event) => {
-                        if (
-                          event.currentTarget.src.endsWith(
-                            "/images/default-avatar.png"
-                          )
-                        ) {
-                          return;
-                        }
+  {/* Profile Image */}
+  <img
+    src={providerImage}
+    alt={providerName}
+    onError={(event) => {
+      if (
+        event.currentTarget.src.endsWith(
+          "/images/default-avatar.png"
+        )
+      ) {
+        return;
+      }
 
-                        event.currentTarget.src =
-                          "/images/default-avatar.png";
-                      }}
-                      className="relative h-24 w-24 rounded-[1.4rem] border-2 border-white/70 object-cover shadow-2xl sm:h-32 sm:w-32 sm:rounded-[1.65rem]"
-                    />
-                  </div>
+      event.currentTarget.src =
+        "/images/default-avatar.png";
+    }}
+    className="
+      relative
+      h-24
+      w-24
+      rounded-[1.4rem]
+      border-2
+      border-white/70
+      object-cover
+      shadow-2xl
+      sm:h-32
+      sm:w-32
+      sm:rounded-[1.65rem]
+    "
+  />
 
-                  {providerIsActive && (
-                    <div className="absolute -bottom-2 -right-2 flex h-9 w-9 items-center justify-center rounded-full border-4 border-ink-900 bg-emerald-500 text-white">
-                      <CheckCircle2 className="h-4 w-4" />
-                    </div>
-                  )}
-                </div>
+  {/* Active / Verified Circle */}
+  {providerIsActive && (
+    <div
+      className="
+        absolute
+        bottom-0
+        right-0
+        z-10
+        flex
+        h-8
+        w-8
+        translate-x-1/4
+        translate-y-1/4
+        items-center
+        justify-center
+        rounded-full
+        border-[3px]
+        border-ink-900
+        bg-emerald-500
+        text-white
+        shadow-lg
+        sm:h-9
+        sm:w-9
+        sm:border-4
+        sm:translate-x-1/4
+        sm:translate-y-1/4
+      "
+    >
+      <CheckCircle2 className="h-4 w-4 sm:h-4 sm:w-4" />
+    </div>
+  )}
+</div>
 
                 <div className="pb-1">
                   <div className="flex flex-wrap items-center gap-2">

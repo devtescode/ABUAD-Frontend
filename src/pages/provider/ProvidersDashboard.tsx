@@ -39,6 +39,9 @@ import { providerNavItems } from "@/data/providerNavItems";
 export function ProvidersDashboard() {
   const { user } = useAuth();
 
+
+// Award-winning photographer specializing in birthday shoots, graduation photos, and portraits. I bring creativity and professionalism to every session, ensuring you get images you will treasure forever.
+
   /*
    * For now we find the provider using the logged-in user's id.
    * This is better than using providers[0], because providers[0]
