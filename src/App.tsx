@@ -22,7 +22,6 @@ import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
 import {
   ProviderOnboarding,
   ProviderDashboard,
-  ProviderPortfolio,
   ProviderAvailability,
   ProviderRequests,
   ProviderBookings,
@@ -32,6 +31,7 @@ import {
   ProviderSettings,
 } from '@/pages/provider/ProviderDashboard';
 import { ProviderAddService } from '@/pages/provider/ProviderAddService';
+import { ProviderPortfolio } from '@/pages/provider/ProviderPortfolio';
 import { ProviderServices } from '@/pages/provider/ProviderServices';
 
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';

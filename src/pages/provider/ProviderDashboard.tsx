@@ -230,33 +230,7 @@ export function ProviderDashboard() {
 
 
 
-export function ProviderPortfolio() {
-  return (
-    <DashboardLayout role="provider" navItems={navItems}>
-      <DashboardHeader title="Portfolio" subtitle="Showcase your best work" action={<button className="btn-primary"><Plus className="h-4 w-4" /> Add Work</button>} />
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        {currentProvider.portfolio.map((item) => (
-          <div key={item.id} className="group relative overflow-hidden rounded-xl">
-            <img src={item.image} alt={item.title} className="aspect-square w-full object-cover" />
-            <div className="absolute inset-0 flex items-end bg-gradient-to-t from-ink-900/70 to-transparent p-3 opacity-0 transition-opacity group-hover:opacity-100">
-              <div className="flex w-full items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-white">{item.title}</p>
-                  <p className="text-xs text-white/70">{item.category}</p>
-                </div>
-                <button className="text-white/80 hover:text-white"><Trash2 className="h-4 w-4" /></button>
-              </div>
-            </div>
-          </div>
-        ))}
-        <button className="flex aspect-square flex-col items-center justify-center rounded-xl border-2 border-dashed border-ink-200 text-ink-400 hover:border-primary-300 hover:text-primary-600">
-          <Plus className="h-8 w-8" />
-          <span className="mt-1 text-sm">Add Work</span>
-        </button>
-      </div>
-    </DashboardLayout>
-  );
-}
+
 
 export function ProviderAvailability() {
   const [days, setDays] = useState(currentProvider.availability);

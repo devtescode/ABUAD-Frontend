@@ -1,36 +1,45 @@
-
 import {
   useEffect,
   useMemo,
   useState,
   type ReactNode,
+  type SyntheticEvent,
 } from "react";
+
 import {
   Link,
   useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
+
 import {
   motion,
   AnimatePresence,
 } from "framer-motion";
+
 import {
   ArrowLeft,
   ArrowRight,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
+  ExternalLink,
   Heart,
   ImageIcon,
   Loader2,
   MapPin,
+  Maximize2,
   MessageCircle,
   Share2,
   ShieldCheck,
   Star,
+  Tag,
   User,
   Briefcase,
+  X,
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -68,10 +77,6 @@ interface Provider {
 
   verified?: boolean;
 
-  /*
-   * Current User model status:
-   * active | pending | suspended
-   */
   status?:
   | "active"
   | "pending"
@@ -83,6 +88,8 @@ interface Provider {
   completedBookings?: number;
 
   portfolio?: PortfolioItem[];
+  portfolioItems?: PortfolioItem[];
+
   availability?: Availability[];
   services?: Service[];
 }
@@ -108,8 +115,37 @@ interface PortfolioItem {
 
   title?: string;
   description?: string;
+
   image?: string;
+  imageUrl?: string;
+
+  images?: string[];
+
   category?: string;
+
+  tags?: string[];
+
+  link?: string;
+  url?: string;
+
+  createdAt?: string;
+  updatedAt?: string;
+
+  providerId?: string | { _id?: string };
+
+  userId?: string | { _id?: string };
+
+  provider?: {
+    _id?: string;
+    fullName?: string;
+    name?: string;
+  };
+
+  user?: {
+    _id?: string;
+    fullName?: string;
+    name?: string;
+  };
 }
 
 interface Availability {
@@ -146,6 +182,15 @@ interface ProviderProfileResponse {
   provider?: Provider;
   services?: Service[];
   reviews?: Review[];
+}
+
+interface PortfolioResponse {
+  success?: boolean;
+  message?: string;
+
+  count?: number;
+
+  portfolio?: PortfolioItem[];
 }
 
 interface ProviderProfileLocationState {
@@ -205,6 +250,47 @@ const getProviderImage = (
   );
 };
 
+const getPortfolioImage = (
+  item: PortfolioItem
+) => {
+  return (
+    item.image ||
+    item.imageUrl ||
+    item.images?.[0] ||
+    ""
+  );
+};
+
+const getPortfolioImages = (
+  item: PortfolioItem
+) => {
+  const images: string[] = [];
+
+  if (item.image) {
+    images.push(item.image);
+  }
+
+  if (
+    item.imageUrl &&
+    !images.includes(item.imageUrl)
+  ) {
+    images.push(item.imageUrl);
+  }
+
+  if (Array.isArray(item.images)) {
+    item.images.forEach((image) => {
+      if (
+        image &&
+        !images.includes(image)
+      ) {
+        images.push(image);
+      }
+    });
+  }
+
+  return images;
+};
+
 /* =========================================================
    EMPTY STATE
 ========================================================= */
@@ -219,12 +305,12 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-white px-6 text-center dark:border-ink-800 dark:bg-ink-900">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-50 text-ink-400 dark:bg-ink-800">
+    <div className="flex min-h-[300px] flex-col items-center justify-center rounded-3xl border border-dashed border-ink-200 bg-white px-6 text-center shadow-sm dark:border-ink-800 dark:bg-ink-900">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ink-50 text-ink-400 dark:bg-ink-800">
         {icon}
       </div>
 
-      <h3 className="mt-4 text-base font-bold text-ink-900 dark:text-white">
+      <h3 className="mt-5 text-base font-bold text-ink-900 dark:text-white">
         {title}
       </h3>
 
@@ -244,15 +330,21 @@ export default function ProviderProfilePage() {
     useParams<{ id: string }>();
 
   const navigate = useNavigate();
-
   const location = useLocation();
 
   const routeServices = useMemo(
     () =>
-      (location.state as ProviderProfileLocationState | null)
-        ?.providerServices || [],
+      (
+        location.state as
+        | ProviderProfileLocationState
+        | null
+      )?.providerServices || [],
     [location.state]
   );
+
+  /* =========================================================
+     STATE
+  ========================================================= */
 
   const [provider, setProvider] =
     useState<Provider | null>(null);
@@ -263,6 +355,9 @@ export default function ProviderProfilePage() {
   const [reviews, setReviews] =
     useState<Review[]>([]);
 
+  const [portfolioItems, setPortfolioItems] =
+    useState<PortfolioItem[]>([]);
+
   const [activeTab, setActiveTab] =
     useState<TabType>("services");
 
@@ -272,11 +367,25 @@ export default function ProviderProfilePage() {
   const [error, setError] =
     useState("");
 
+  const [portfolioLoading, setPortfolioLoading] =
+    useState(false);
+
+  const [portfolioError, setPortfolioError] =
+    useState("");
+
   const [saved, setSaved] =
     useState(false);
 
   const [sharing, setSharing] =
     useState(false);
+
+  const [portfolioFilter, setPortfolioFilter] =
+    useState("All");
+
+  const [
+    selectedPortfolioIndex,
+    setSelectedPortfolioIndex,
+  ] = useState<number | null>(null);
 
   /* =========================================================
      TABS
@@ -357,8 +466,6 @@ export default function ProviderProfilePage() {
             },
           }
         );
-        console.log(response, "wowwwwww");
-
 
         let result: ProviderProfileResponse;
 
@@ -370,7 +477,10 @@ export default function ProviderProfilePage() {
           );
         }
 
-        if (!response.ok || !result.success) {
+        if (
+          !response.ok ||
+          !result.success
+        ) {
           throw new Error(
             result.message ||
             `Failed to load provider profile. (${response.status})`
@@ -387,13 +497,14 @@ export default function ProviderProfilePage() {
 
         setProvider(result.provider);
 
-        const profileServices = Array.isArray(
-          result.services
-        )
-          ? result.services
-          : Array.isArray(result.provider.services)
-            ? result.provider.services
-            : [];
+        const profileServices =
+          Array.isArray(result.services)
+            ? result.services
+            : Array.isArray(
+              result.provider.services
+            )
+              ? result.provider.services
+              : [];
 
         setServices(
           profileServices.length > 0
@@ -434,11 +545,156 @@ export default function ProviderProfilePage() {
   }, [id, navigate, routeServices]);
 
   /* =========================================================
+     FETCH THIS PROVIDER'S PORTFOLIO
+     
+     IMPORTANT:
+     
+     We are NOT using:
+     
+       /portfolio/allportfolio
+     
+     We are using:
+     
+       /portfolio/provider/:providerId
+     
+     This matches the new backend controller.
+  ========================================================= */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchProviderPortfolio = async () => {
+      if (!id) return;
+
+      try {
+        setPortfolioLoading(true);
+        setPortfolioError("");
+
+        const token =
+          sessionStorage.getItem(
+            "servicely_token"
+          );
+
+        if (!token) {
+          return;
+        }
+
+        const portfolioUrl =
+          `${API_URL}/portfolio/provider/${encodeURIComponent(
+            id
+          )}`;
+
+        console.log(
+          "Fetching provider portfolio from:",
+          portfolioUrl
+        );
+
+        const response = await fetch(
+          portfolioUrl,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        let result: PortfolioResponse;
+
+        try {
+          result = await response.json();
+        } catch {
+          throw new Error(
+            "The portfolio server returned an invalid response."
+          );
+        }
+
+        console.log(
+          "Provider portfolio response:",
+          result
+        );
+
+        if (
+          !response.ok ||
+          result.success === false
+        ) {
+          throw new Error(
+            result.message ||
+            `Failed to load portfolio. (${response.status})`
+          );
+        }
+
+        if (cancelled) return;
+
+        const portfolio = Array.isArray(
+          result.portfolio
+        )
+          ? result.portfolio
+          : [];
+
+        /*
+         * Backend already filters by provider.
+         *
+         * We therefore DO NOT need to filter
+         * every portfolio on the frontend.
+         */
+
+        portfolio.sort((a, b) => {
+          if (
+            !a.createdAt ||
+            !b.createdAt
+          ) {
+            return 0;
+          }
+
+          return (
+            new Date(
+              b.createdAt
+            ).getTime() -
+            new Date(
+              a.createdAt
+            ).getTime()
+          );
+        });
+
+        setPortfolioItems(portfolio);
+      } catch (err) {
+        if (cancelled) return;
+
+        console.error(
+          "Fetch provider portfolio error:",
+          err
+        );
+
+        setPortfolioError(
+          err instanceof Error
+            ? err.message
+            : "Failed to load provider portfolio."
+        );
+
+        setPortfolioItems([]);
+      } finally {
+        if (!cancelled) {
+          setPortfolioLoading(false);
+        }
+      }
+    };
+
+    fetchProviderPortfolio();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  /* =========================================================
      ACTIVE SERVICES
   ========================================================= */
 
   const activeServices = services.filter(
-    (service) => service.status !== "rejected"
+    (service) =>
+      service.status !== "rejected"
   );
 
   /* =========================================================
@@ -461,21 +717,248 @@ export default function ProviderProfilePage() {
     0
   );
 
-  const portfolio =
-    provider?.portfolio || [];
-
   const availability =
     provider?.availability || [];
 
-  /*
-   * Provider is considered active when:
-   * - backend status is active
-   * OR
-   * - old verified field is true
-   */
   const providerIsActive =
     provider?.status === "active" ||
     provider?.verified === true;
+
+  /* =========================================================
+     PORTFOLIO CATEGORIES
+  ========================================================= */
+
+  const portfolioCategories =
+    useMemo(() => {
+      const categories =
+        portfolioItems
+          .map((item) =>
+            item.category?.trim()
+          )
+          .filter(Boolean) as string[];
+
+      return [
+        "All",
+        ...Array.from(
+          new Set(categories)
+        ),
+      ];
+    }, [portfolioItems]);
+
+  /* =========================================================
+     FILTERED PORTFOLIO
+  ========================================================= */
+
+  const filteredPortfolio =
+    useMemo(() => {
+      if (
+        portfolioFilter === "All"
+      ) {
+        return portfolioItems;
+      }
+
+      return portfolioItems.filter(
+        (item) =>
+          item.category?.trim() ===
+          portfolioFilter
+      );
+    }, [
+      portfolioItems,
+      portfolioFilter,
+    ]);
+
+  /* =========================================================
+     RESET INVALID FILTER
+  ========================================================= */
+
+  useEffect(() => {
+    if (
+      !portfolioCategories.includes(
+        portfolioFilter
+      )
+    ) {
+      setPortfolioFilter("All");
+    }
+  }, [
+    portfolioCategories,
+    portfolioFilter,
+  ]);
+
+  /* =========================================================
+     SELECTED PORTFOLIO
+  ========================================================= */
+
+  const selectedPortfolio =
+    selectedPortfolioIndex !== null
+      ? filteredPortfolio[
+      selectedPortfolioIndex
+      ] || null
+      : null;
+
+  /* =========================================================
+     CLOSE MODAL
+  ========================================================= */
+
+  const closePortfolioModal = () => {
+    setSelectedPortfolioIndex(null);
+  };
+
+  /* =========================================================
+     KEYBOARD CONTROLS
+  ========================================================= */
+
+  useEffect(() => {
+    if (
+      selectedPortfolioIndex === null
+    ) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    const handleKeyDown = (
+      event: KeyboardEvent
+    ) => {
+      if (event.key === "Escape") {
+        setSelectedPortfolioIndex(null);
+      }
+
+      if (
+        event.key === "ArrowRight" &&
+        filteredPortfolio.length > 1
+      ) {
+        setSelectedPortfolioIndex(
+          (current) => {
+            if (current === null) {
+              return 0;
+            }
+
+            return (
+              (current + 1) %
+              filteredPortfolio.length
+            );
+          }
+        );
+      }
+
+      if (
+        event.key === "ArrowLeft" &&
+        filteredPortfolio.length > 1
+      ) {
+        setSelectedPortfolioIndex(
+          (current) => {
+            if (current === null) {
+              return 0;
+            }
+
+            return (
+              (current -
+                1 +
+                filteredPortfolio.length) %
+              filteredPortfolio.length
+            );
+          }
+        );
+      }
+    };
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
+    };
+  }, [
+    selectedPortfolioIndex,
+    filteredPortfolio.length,
+  ]);
+
+  /* =========================================================
+     NEXT PORTFOLIO
+  ========================================================= */
+
+  const showNextPortfolio = () => {
+    if (
+      filteredPortfolio.length <= 1
+    ) {
+      return;
+    }
+
+    setSelectedPortfolioIndex(
+      (current) => {
+        if (current === null) {
+          return 0;
+        }
+
+        return (
+          (current + 1) %
+          filteredPortfolio.length
+        );
+      }
+    );
+  };
+
+  /* =========================================================
+     PREVIOUS PORTFOLIO
+  ========================================================= */
+
+  const showPreviousPortfolio = () => {
+    if (
+      filteredPortfolio.length <= 1
+    ) {
+      return;
+    }
+
+    setSelectedPortfolioIndex(
+      (current) => {
+        if (current === null) {
+          return 0;
+        }
+
+        return (
+          (current -
+            1 +
+            filteredPortfolio.length) %
+          filteredPortfolio.length
+        );
+      }
+    );
+  };
+
+  /* =========================================================
+     IMAGE ERROR
+  ========================================================= */
+
+  const handlePortfolioImageError = (
+    event: SyntheticEvent<HTMLImageElement>
+  ) => {
+    const image =
+      event.currentTarget;
+
+    if (
+      image.dataset.fallback ===
+      "true"
+    ) {
+      return;
+    }
+
+    image.dataset.fallback = "true";
+
+    image.src =
+      "/images/service-placeholder.png";
+  };
 
   /* =========================================================
      AVERAGE SERVICE PRICE
@@ -491,14 +974,22 @@ export default function ProviderProfilePage() {
         activeServices.reduce(
           (sum, service) =>
             sum +
-            Number(service.price || 0),
+            Number(
+              service.price || 0
+            ),
           0
         );
 
       return (
-        total / activeServices.length
+        total /
+        activeServices.length
       );
     }, [activeServices]);
+
+  const [selectedServiceImage, setSelectedServiceImage] = useState<{
+    image: string;
+    title: string;
+  } | null>(null);
 
   /* =========================================================
      SHARE
@@ -511,7 +1002,7 @@ export default function ProviderProfilePage() {
       if (navigator.share) {
         await navigator.share({
           title: `${providerName} - Servicely`,
-          text: `Check out ${providerName}'s services on Servicely.`,
+          text: `Check out ${providerName}'s services and portfolio on Servicely.`,
           url: window.location.href,
         });
       } else if (
@@ -609,7 +1100,6 @@ export default function ProviderProfilePage() {
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
             >
               <ArrowLeft className="h-4 w-4" />
-
               Go Back
             </button>
           </div>
@@ -628,6 +1118,7 @@ export default function ProviderProfilePage() {
       navItems={customerNavItems}
     >
       <div className="min-h-screen bg-[#f7f8f7] dark:bg-ink-950">
+
         {/* =================================================
             BACK BUTTON
         ================================================= */}
@@ -641,7 +1132,6 @@ export default function ProviderProfilePage() {
               className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-ink-500 transition hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
-
               Back
             </button>
           </div>
@@ -662,7 +1152,6 @@ export default function ProviderProfilePage() {
 
           <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-12 sm:px-6 sm:pb-12 sm:pt-16 lg:px-8">
             <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
-              {/* Provider information */}
 
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
                 <div className="relative">
@@ -672,14 +1161,11 @@ export default function ProviderProfilePage() {
                     <img
                       src={providerImage}
                       alt={providerName}
-                      onError={(
-                        event
-                      ) => {
+                      onError={(event) => {
                         if (
-                          event.currentTarget
-                            .src.endsWith(
-                              "/images/default-avatar.png"
-                            )
+                          event.currentTarget.src.endsWith(
+                            "/images/default-avatar.png"
+                          )
                         ) {
                           return;
                         }
@@ -707,7 +1193,6 @@ export default function ProviderProfilePage() {
                     {providerIsActive && (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-400/15 px-3 py-1.5 text-xs font-bold text-primary-100 ring-1 ring-primary-300/30">
                         <ShieldCheck className="h-3.5 w-3.5" />
-
                         Verified
                       </span>
                     )}
@@ -716,7 +1201,6 @@ export default function ProviderProfilePage() {
                   <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/75">
                     <span className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/10">
                       <MapPin className="h-4 w-4" />
-
                       {provider.location ||
                         "ABUAD"}
                     </span>
@@ -755,17 +1239,14 @@ export default function ProviderProfilePage() {
                 </div>
               </div>
 
-              {/* Actions */}
-
               <div className="flex flex-wrap items-center gap-2">
                 {activeServices.length >
                   0 && (
                     <Link
                       to={`/book/${provider._id}`}
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary-400 px-4 py-2.5 text-sm font-extrabold text-primary-950 shadow-lg shadow-primary-950/20 transition hover:bg-primary-300 hover:shadow-primary-950/35"
+                      className="inline-flex items-center gap-2 rounded-xl bg-primary-400 px-4 py-2.5 text-sm font-extrabold text-primary-950 shadow-lg shadow-primary-950/20 transition hover:bg-primary-300"
                     >
                       Book now
-
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   )}
@@ -775,14 +1256,14 @@ export default function ProviderProfilePage() {
                     setSaved(!saved)
                   }
                   className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${saved
-                      ? "bg-white text-ink-900 shadow-lg"
-                      : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20"
+                    ? "bg-white text-ink-900 shadow-lg"
+                    : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20"
                     }`}
                 >
                   <Heart
                     className={`h-4 w-4 ${saved
-                        ? "fill-current text-red-500"
-                        : ""
+                      ? "fill-current text-red-500"
+                      : ""
                       }`}
                   />
 
@@ -816,15 +1297,24 @@ export default function ProviderProfilePage() {
         <section className="relative z-10 -mt-5 px-4 sm:-mt-6 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-white/70 bg-white/95 shadow-xl shadow-ink-950/10 backdrop-blur dark:border-ink-700 dark:bg-ink-900/95">
             <div className="grid grid-cols-2 divide-x divide-y divide-ink-100 dark:divide-ink-800 sm:grid-cols-4 sm:divide-y-0">
+
               <div className="px-4 py-5 text-center sm:px-6">
                 <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
-                  {
-                    activeServices.length
-                  }
+                  {activeServices.length}
                 </p>
 
                 <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
                   Services
+                </p>
+              </div>
+
+              <div className="px-4 py-5 text-center sm:px-6">
+                <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
+                  {portfolioItems.length}
+                </p>
+
+                <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                  Portfolio
                 </p>
               </div>
 
@@ -849,20 +1339,6 @@ export default function ProviderProfilePage() {
                 </p>
               </div>
 
-              <div className="px-4 py-5 text-center sm:px-6">
-                <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
-                  {averageServicePrice >
-                    0
-                    ? formatNaira(
-                      averageServicePrice
-                    )
-                    : "—"}
-                </p>
-
-                <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-                  Avg. Service
-                </p>
-              </div>
             </div>
           </div>
         </section>
@@ -913,8 +1389,8 @@ export default function ProviderProfilePage() {
                       setActiveTab(tab.id)
                     }
                     className={`relative flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${isActive
-                        ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
-                        : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
+                      ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
+                      : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
                       }`}
                   >
                     {tab.icon}
@@ -928,6 +1404,17 @@ export default function ProviderProfilePage() {
                         <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 dark:bg-ink-800 dark:text-ink-300">
                           {
                             activeServices.length
+                          }
+                        </span>
+                      )}
+
+                    {tab.id ===
+                      "portfolio" &&
+                      portfolioItems.length >
+                      0 && (
+                        <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                          {
+                            portfolioItems.length
                           }
                         </span>
                       )}
@@ -959,275 +1446,843 @@ export default function ProviderProfilePage() {
 
         <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <AnimatePresence mode="wait">
+
             {/* =================================================
                 SERVICES
             ================================================= */}
 
-            {activeTab ===
-              "services" && (
-                <motion.div
-                  key="services"
-                  initial={{
-                    opacity: 0,
-                    y: 10,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    y: -10,
-                  }}
-                  transition={{
-                    duration: 0.2,
-                  }}
-                >
-                  {activeServices.length ===
-                    0 ? (
-                    <EmptyState
-                      icon={
-                        <Briefcase className="h-6 w-6" />
-                      }
-                      title="No services available"
-                      description={`${providerName} has not added any services yet.`}
-                    />
-                  ) : (
-                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                      {activeServices.map(
-                        (
-                          service,
-                          index
-                        ) => (
-                          <motion.div
-                            key={
-                              service._id
-                            }
+            {activeTab === "services" && (
+              <motion.div
+                key="services"
+                initial={{
+                  opacity: 0,
+                  y: 12,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                exit={{
+                  opacity: 0,
+                  y: -12,
+                }}
+                transition={{
+                  duration: 0.25,
+                }}
+              >
+                {activeServices.length === 0 ? (
+                  <div className="relative overflow-hidden rounded-[28px] border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900">
+                    <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl" />
+
+                    <div className="relative px-6 py-16 text-center sm:px-10 sm:py-20">
+                      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300">
+                        <Briefcase className="h-7 w-7" />
+                      </div>
+
+                      <h3 className="mt-6 text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
+                        No services available
+                      </h3>
+
+                      <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-ink-500 dark:text-ink-400">
+                        {providerName} has not added any services yet.
+                        Available services will appear here once they are
+                        published.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+
+                    {/* =================================================
+            SERVICES HEADER
+        ================================================= */}
+
+                    {/* <div className="relative overflow-hidden rounded-[28px] border border-ink-100 bg-white shadow-sm dark:border-ink-800 dark:bg-ink-900">
+                      <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-primary-400/10 blur-3xl" />
+
+                      <div className="pointer-events-none absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-accent-400/10 blur-3xl" />
+
+                      <div className="relative flex flex-col gap-6 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
+                            <Briefcase className="h-5 w-5" />
+                          </div>
+
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="text-xl font-extrabold tracking-tight text-ink-900 dark:text-white sm:text-2xl">
+                                Services by {providerName}
+                              </h2>
+
+                              <span className="rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-bold text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                                {activeServices.length}{" "}
+                                {activeServices.length === 1
+                                  ? "service"
+                                  : "services"}
+                              </span>
+                            </div>
+
+                            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500 dark:text-ink-400">
+                              Explore available services, view their details,
+                              and book directly with {providerName}.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-4 py-2.5 text-xs font-bold text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300">
+                          <span className="relative flex h-2.5 w-2.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+
+                            <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                          </span>
+
+                          Available for bookings
+                        </div>
+                      </div>
+                    </div> */}
+
+                    {/* =================================================
+            SERVICES GRID
+        ================================================= */}
+
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+                      {activeServices.map((service, index) => {
+                        const serviceImage =
+                          service.image ||
+                          "/images/service-placeholder.png";
+
+                        return (
+                          <motion.article
+                            key={service._id}
                             initial={{
                               opacity: 0,
-                              y: 15,
+                              y: 20,
                             }}
                             animate={{
                               opacity: 1,
                               y: 0,
                             }}
                             transition={{
-                              delay:
-                                index *
-                                0.05,
+                              delay: index * 0.06,
+                              duration: 0.4,
                             }}
-                            className="group overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-primary-200 hover:shadow-2xl hover:shadow-primary-950/10 dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900"
+                            className="group flex h-full min-w-0 flex-col overflow-hidden rounded-[28px] border border-ink-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-primary-200 hover:shadow-2xl hover:shadow-primary-950/10 dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900"
                           >
-                            <div className="relative h-56 overflow-hidden">
+
+                            {/* =================================================
+                    IMAGE
+                ================================================= */}
+
+                            <div className="relative aspect-[16/10] w-full shrink-0 overflow-hidden bg-ink-100 dark:bg-ink-800">
+
                               <img
-                                src={
-                                  service.image ||
-                                  "/images/service-placeholder.png"
-                                }
-                                alt={
-                                  service.title
-                                }
-                                onError={(
-                                  event
-                                ) => {
+                                src={serviceImage}
+                                alt={service.title}
+                                onError={(event) => {
                                   if (
-                                    !event.currentTarget
-                                      .src.endsWith(
-                                        "/images/service-placeholder.png"
-                                      )
+                                    !event.currentTarget.src.endsWith(
+                                      "/images/service-placeholder.png"
+                                    )
                                   ) {
                                     event.currentTarget.src =
                                       "/images/service-placeholder.png";
                                   }
                                 }}
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                className="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-110"
                               />
 
-                              <div className="absolute inset-0 bg-gradient-to-t from-ink-950/80 via-ink-950/5 to-transparent" />
+                              {/* Dark gradient */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
-                              <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-ink-800 shadow-sm backdrop-blur dark:bg-ink-900/90 dark:text-white">
-                                {
-                                  service.category
-                                }
-                              </span>
+                              {/* =================================================
+                      TOP BADGES
+                  ================================================= */}
 
-                              <div className="absolute bottom-3 left-3 flex items-center gap-2 text-white">
-                                <Clock className="h-4 w-4" />
+                              <div className="absolute left-4 right-4 top-4 flex items-start justify-between gap-3">
 
-                                <span className="text-xs font-medium">
-                                  {
-                                    service.duration
-                                  }
+                                {/* Category */}
+                                <span className="inline-flex max-w-[65%] items-center gap-1.5 truncate rounded-full border border-white/20 bg-white/95 px-3 py-1.5 text-xs font-bold text-ink-800 shadow-lg backdrop-blur-md dark:bg-ink-900/90 dark:text-white">
+                                  <Briefcase className="h-3 w-3 shrink-0" />
+
+                                  <span className="truncate">
+                                    {service.category || "Service"}
+                                  </span>
+                                </span>
+
+                                {/* Available */}
+                                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/20 bg-emerald-500/90 px-2.5 py-1.5 text-[10px] font-bold text-white shadow-lg backdrop-blur-md">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
+
+                                  Available
                                 </span>
                               </div>
-                            </div>
 
-                            <div className="p-5">
-                              <h3 className="line-clamp-1 text-lg font-extrabold tracking-tight text-ink-900 dark:text-white">
-                                {
-                                  service.title
+                              {/* =================================================
+                      VIEW IMAGE BUTTON
+                  ================================================= */}
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSelectedServiceImage({
+                                    image: serviceImage,
+                                    title: service.title,
+                                  })
                                 }
-                              </h3>
+                                className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-full border border-white/20 bg-black/40 px-4 py-2.5 text-xs font-bold text-white opacity-0 shadow-2xl backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/60 group-hover:opacity-100"
+                              >
+                                <Maximize2 className="h-4 w-4" />
 
-                              <p className="mt-2 line-clamp-2 min-h-[40px] text-sm leading-5 text-ink-500 dark:text-ink-400">
-                                {
-                                  service.description
+                                View image
+                              </button>
+
+                              {/* Small image icon */}
+                              <button
+                                type="button"
+                                aria-label={`View ${service.title} image`}
+                                onClick={() =>
+                                  setSelectedServiceImage({
+                                    image: serviceImage,
+                                    title: service.title,
+                                  })
                                 }
-                              </p>
+                                className="absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/50"
+                              >
+                                <Maximize2 className="h-4 w-4" />
+                              </button>
 
-                              <div className="mt-5 flex items-end justify-between border-t border-ink-100 pt-4 dark:border-ink-800">
-                                <div>
-                                  <p className="text-[10px] font-medium uppercase tracking-wider text-ink-400">
-                                    Starting
-                                    from
-                                  </p>
+                              {/* =================================================
+                      BOTTOM IMAGE INFO
+                  ================================================= */}
 
-                                  <p className="mt-0.5 text-lg font-bold text-ink-900 dark:text-white">
-                                    {formatNaira(
-                                      service.price
-                                    )}
-                                  </p>
+                              <div className="absolute bottom-4 left-4 right-16">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
+                                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 backdrop-blur-md">
+                                    <Clock className="h-3.5 w-3.5" />
+                                  </span>
+
+                                  <span>
+                                    {service.duration ||
+                                      "Flexible duration"}
+                                  </span>
                                 </div>
-
-                                <Link
-                                  to={`/book/${provider._id}?service=${service._id}`}
-                                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400"
-                                >
-                                  Book
-
-                                  <ArrowRight className="h-3.5 w-3.5" />
-                                </Link>
                               </div>
                             </div>
-                          </motion.div>
-                        )
-                      )}
+
+                            {/* =================================================
+                    CONTENT
+                ================================================= */}
+
+                            <div className="flex flex-1 flex-col p-5 sm:p-6">
+
+                              {/* Category mini label */}
+                              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-primary-600 dark:text-primary-400">
+                                {service.category || "Professional service"}
+                              </p>
+
+                              {/* Title */}
+                              <h3 className="mt-2 line-clamp-2 text-xl font-extrabold leading-tight tracking-tight text-ink-900 dark:text-white">
+                                {service.title}
+                              </h3>
+
+                              {/* Description */}
+                              <p className="mt-3 line-clamp-3 min-h-[72px] text-sm leading-6 text-ink-500 dark:text-ink-400">
+                                {service.description ||
+                                  "Professional service tailored to your needs."}
+                              </p>
+
+                              {/* =================================================
+                      PRICE / DURATION
+                  ================================================= */}
+
+                              <div className="mt-0 rounded-2xl bg-ink-50 p-4 dark:bg-ink-800/70">
+                                <div className="flex items-center justify-between gap-4">
+
+                                  {/* Price */}
+                                  <div className="min-w-0">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
+                                      Starting from
+                                    </p>
+
+                                    <p className="mt-1 truncate text-2xl font-black tracking-tight text-ink-900 dark:text-white">
+                                      {formatNaira(service.price)}
+                                    </p>
+                                  </div>
+
+                                  {/* Duration */}
+                                  <div className="flex shrink-0 flex-col items-end">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">
+                                      Duration
+                                    </p>
+
+                                    <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-ink-700 dark:text-ink-200">
+                                      <Clock className="h-3.5 w-3.5 text-primary-500" />
+
+                                      <span className="max-w-[100px] truncate">
+                                        {service.duration ||
+                                          "Flexible"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* =================================================
+                      ACTIONS
+                  ================================================= */}
+
+                              <div className="mt-3 grid grid-cols-[auto_1fr] gap-3">
+
+                                {/* View image */}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedServiceImage({
+                                      image: serviceImage,
+                                      title: service.title,
+                                    })
+                                  }
+                                  className="flex items-center justify-center gap-2 rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-xs font-bold text-ink-700 transition-all hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200 dark:hover:border-primary-700 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+                                >
+                                  <ImageIcon className="h-4 w-4" />
+
+                                  <span className="hidden sm:inline">
+                                    Image
+                                  </span>
+                                </button>
+
+                                {/* Book */}
+                                <Link
+                                  to={`/book/${provider._id}?service=${service._id}`}
+                                  className="flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-950/10 transition-all duration-300 hover:bg-primary-600 hover:shadow-xl hover:shadow-primary-600/20 active:scale-[0.98] dark:bg-white dark:text-ink-900 dark:hover:bg-primary-400"
+                                >
+                                  <span>
+                                    Book this service
+                                  </span>
+
+                                  <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                                </Link>
+                              </div>
+
+                              {/* Trust */}
+                              <div className="mt-4 flex items-center justify-center gap-1.5 text-[11px] font-medium text-ink-400">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+
+                                Secure booking through Servicely
+                              </div>
+                            </div>
+                          </motion.article>
+                        );
+                      })}
                     </div>
-                  )}
+
+                    {/* =================================================
+            FOOTER
+        ================================================= */}
+
+                    <div className="flex justify-center pt-1">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-ink-100 bg-white px-4 py-2.5 text-xs font-medium text-ink-400 shadow-sm dark:border-ink-800 dark:bg-ink-900">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+
+                        <span>
+                          Showing{" "}
+                          <span className="font-bold text-ink-700 dark:text-ink-200">
+                            {activeServices.length}
+                          </span>{" "}
+                          {activeServices.length === 1
+                            ? "service"
+                            : "services"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+            <AnimatePresence>
+              {selectedServiceImage && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md sm:p-6"
+                  onClick={() => setSelectedServiceImage(null)}
+                >
+                  {/* Close */}
+                  <button
+                    type="button"
+                    aria-label="Close image viewer"
+                    onClick={() => setSelectedServiceImage(null)}
+                    className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white backdrop-blur-xl transition hover:bg-white/20 sm:right-6 sm:top-6"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+
+                  <motion.div
+                    initial={{
+                      opacity: 0,
+                      scale: 0.94,
+                      y: 15,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      scale: 1,
+                      y: 0,
+                    }}
+                    exit={{
+                      opacity: 0,
+                      scale: 0.94,
+                      y: 15,
+                    }}
+                    transition={{
+                      duration: 0.25,
+                    }}
+                    className="relative flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-ink-950 shadow-2xl"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {/* Image */}
+                    <div className="relative flex min-h-0 flex-1 items-center justify-center bg-black">
+                      <img
+                        src={selectedServiceImage.image}
+                        alt={selectedServiceImage.title}
+                        className="max-h-[75vh] w-full object-contain"
+                      />
+                    </div>
+
+                    {/* Bottom information */}
+                    <div className="flex items-center justify-between gap-4 border-t border-white/10 bg-ink-950 px-5 py-4 sm:px-6">
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/40">
+                          Service image
+                        </p>
+
+                        <h3 className="mt-1 truncate text-sm font-bold text-white sm:text-base">
+                          {selectedServiceImage.title}
+                        </h3>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedServiceImage(null)}
+                        className="shrink-0 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/20"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </motion.div>
                 </motion.div>
               )}
+            </AnimatePresence>
 
             {/* =================================================
                 PORTFOLIO
             ================================================= */}
 
-            {activeTab ===
-              "portfolio" && (
-                <motion.div
-                  key="portfolio"
-                  initial={{
-                    opacity: 0,
-                    y: 10,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    y: -10,
-                  }}
-                  transition={{
-                    duration: 0.2,
-                  }}
-                >
-                  {portfolio.length ===
-                    0 ? (
-                    <EmptyState
-                      icon={
-                        <ImageIcon className="h-6 w-6" />
-                      }
-                      title="No portfolio yet"
-                      description={`${providerName} has not added portfolio items yet.`}
-                    />
-                  ) : (
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                      {portfolio.map(
-                        (
-                          item,
-                          index
-                        ) => (
-                          <motion.div
-                            key={
-                              item._id ||
-                              `${item.title}-${index}`
-                            }
-                            initial={{
-                              opacity: 0,
-                              y: 15,
-                            }}
-                            animate={{
-                              opacity: 1,
-                              y: 0,
-                            }}
-                            transition={{
-                              delay:
-                                index *
-                                0.05,
-                            }}
-                            className="group overflow-hidden rounded-2xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900"
-                          >
-                            {item.image ? (
-                              <div className="relative h-64 overflow-hidden">
-                                <img
-                                  src={
-                                    item.image
-                                  }
-                                  alt={
-                                    item.title ||
-                                    "Portfolio"
-                                  }
-                                  onError={(
-                                    event
-                                  ) => {
-                                    event.currentTarget.style.display =
-                                      "none";
-                                  }}
-                                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                />
+            {activeTab === "portfolio" && (
+              <motion.div
+                key="portfolio"
+                initial={{
+                  opacity: 0,
+                  y: 12,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                exit={{
+                  opacity: 0,
+                  y: -12,
+                }}
+                transition={{
+                  duration: 0.25,
+                }}
+              >
+                {portfolioLoading ? (
+                  <div className="space-y-7">
+                    {/* Portfolio header skeleton */}
+                    <div className="rounded-3xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900 sm:p-7">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="space-y-3">
+                          <div className="h-7 w-52 animate-pulse rounded-lg bg-ink-100 dark:bg-ink-800" />
+                          <div className="h-4 w-80 max-w-full animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+                        </div>
 
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-80" />
-
-                                {item.category && (
-                                  <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-ink-800">
-                                    {
-                                      item.category
-                                    }
-                                  </span>
-                                )}
-
-                                {item.title && (
-                                  <div className="absolute bottom-4 left-4 right-4">
-                                    <h3 className="font-bold text-white">
-                                      {
-                                        item.title
-                                      }
-                                    </h3>
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="flex h-64 items-center justify-center bg-ink-50 dark:bg-ink-800">
-                                <ImageIcon className="h-10 w-10 text-ink-300" />
-                              </div>
-                            )}
-
-                            {item.description && (
-                              <div className="p-4">
-                                <p className="text-sm leading-6 text-ink-500 dark:text-ink-400">
-                                  {
-                                    item.description
-                                  }
-                                </p>
-                              </div>
-                            )}
-                          </motion.div>
-                        )
-                      )}
+                        <div className="h-10 w-28 animate-pulse rounded-xl bg-ink-100 dark:bg-ink-800" />
+                      </div>
                     </div>
-                  )}
-                </motion.div>
-              )}
+
+                    {/* Filter skeleton */}
+                    <div className="flex gap-2 overflow-hidden">
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="h-10 w-24 shrink-0 animate-pulse rounded-full bg-ink-100 dark:bg-ink-800"
+                        />
+                      ))}
+                    </div>
+
+                    {/* Cards skeleton */}
+                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                      {Array.from({ length: 6 }).map((_, index) => (
+                        <div
+                          key={index}
+                          className="overflow-hidden rounded-3xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900"
+                        >
+                          <div className="aspect-[4/3] animate-pulse bg-ink-100 dark:bg-ink-800" />
+
+                          <div className="space-y-3 p-5">
+                            <div className="h-5 w-2/3 animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+
+                            <div className="h-4 w-full animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+
+                            <div className="h-4 w-4/5 animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : portfolioError ? (
+                  <EmptyState
+                    icon={
+                      <ImageIcon className="h-6 w-6" />
+                    }
+                    title="Portfolio unavailable"
+                    description={portfolioError}
+                  />
+                ) : portfolioItems.length === 0 ? (
+                  <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900">
+                    <div className="relative px-6 py-14 text-center sm:px-10 sm:py-20">
+                      <div className="absolute left-1/2 top-0 h-40 w-40 -translate-x-1/2 rounded-full bg-primary-400/10 blur-3xl" />
+
+                      <div className="relative mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-ink-50 text-ink-400 dark:bg-ink-800 dark:text-ink-500">
+                        <ImageIcon className="h-7 w-7" />
+                      </div>
+
+                      <h3 className="relative mt-5 text-xl font-extrabold tracking-tight text-ink-900 dark:text-white">
+                        No portfolio yet
+                      </h3>
+
+                      <p className="relative mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500 dark:text-ink-400">
+                        {providerName} has not added any portfolio
+                        posts yet. Their completed work will appear
+                        here when available.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-7">
+                    {/* =====================================================
+            PORTFOLIO INTRO
+        ====================================================== */}
+
+                    <div className="relative overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm dark:border-ink-800 dark:bg-ink-900">
+                      {/* Decorative background */}
+                      <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-primary-400/10 blur-3xl" />
+
+                      <div className="absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-accent-400/10 blur-3xl" />
+
+                      <div className="relative flex flex-col gap-6 p-3 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-start gap-4">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
+                            <ImageIcon className="h-5 w-5" />
+                          </div>
+
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h2 className="text-xl font-extrabold tracking-tight text-ink-900 dark:text-white sm:text-2xl">
+                                {providerName}'s Portfolio
+                              </h2>
+
+                              <span className="rounded-full bg-ink-100 px-2.5 py-1 text-[11px] font-bold text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                                {portfolioItems.length}{" "}
+                                {portfolioItems.length === 1
+                                  ? "project"
+                                  : "projects"}
+                              </span>
+                            </div>
+
+                            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-500 dark:text-ink-400">
+                              Explore previous work, creative projects,
+                              and examples of what {providerName} can
+                              deliver.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Provider avatar */}
+                        <div className="hidden items-center gap-3 sm:flex">
+                          <div className="h-11 w-11 overflow-hidden rounded-full border-2 border-white shadow-md dark:border-ink-700">
+                            <img
+                              src={providerImage}
+                              alt={providerName}
+                              onError={(event) => {
+                                event.currentTarget.src =
+                                  "/images/default-avatar.png";
+                              }}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+
+                          <div>
+                            <p className="text-xs font-medium text-ink-400">
+                              Portfolio by
+                            </p>
+
+                            <p className="text-sm font-bold text-ink-900 dark:text-white">
+                              {providerName}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* =====================================================
+            CATEGORY FILTERS
+        ====================================================== */}
+
+                    {portfolioCategories.length > 1 && (
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                        {portfolioCategories.map((category) => {
+                          const active =
+                            portfolioFilter === category;
+
+                          return (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => {
+                                setPortfolioFilter(category);
+                                setSelectedPortfolioIndex(null);
+                              }}
+                              className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all ${active
+                                ? "bg-ink-900 text-white shadow-md shadow-ink-950/10 dark:bg-white dark:text-ink-900"
+                                : "border border-ink-200 bg-white text-ink-600 hover:border-primary-300 hover:bg-primary-50/50 hover:text-primary-700 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/20 dark:hover:text-primary-300"
+                                }`}
+                            >
+                              {category !== "All" && (
+                                <Tag className="h-3.5 w-3.5" />
+                              )}
+
+                              {category}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* =====================================================
+            FILTERED PORTFOLIO
+        ====================================================== */}
+
+                    {filteredPortfolio.length === 0 ? (
+                      <EmptyState
+                        icon={
+                          <Tag className="h-6 w-6" />
+                        }
+                        title="No work in this category"
+                        description={`There are no portfolio posts from ${providerName} under "${portfolioFilter}".`}
+                      />
+                    ) : (
+                      <>
+                        {/* 
+              IMPORTANT:
+              Every card uses the exact same column width.
+              No col-span-2.
+              No special first card.
+              This keeps 2, 3, 4, 5... items balanced.
+            */}
+
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                          {filteredPortfolio.map((item, index) => {
+                            const image =
+                              getPortfolioImage(item);
+
+                            const tags = Array.isArray(
+                              item.tags
+                            )
+                              ? item.tags.filter(Boolean)
+                              : [];
+
+                            return (
+                              <motion.article
+                                key={
+                                  item._id ||
+                                  `${item.title}-${index}`
+                                }
+                                initial={{
+                                  opacity: 0,
+                                  y: 18,
+                                }}
+                                animate={{
+                                  opacity: 1,
+                                  y: 0,
+                                }}
+                                transition={{
+                                  delay: index * 0.05,
+                                  duration: 0.35,
+                                }}
+                                className="group flex h-full flex-col overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary-200 hover:shadow-xl hover:shadow-ink-950/10 dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900"
+                              >
+                                {/* =================================================
+                        IMAGE
+                    ================================================== */}
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedPortfolioIndex(
+                                      index
+                                    )
+                                  }
+                                  className="relative block aspect-[4/3] w-full shrink-0 overflow-hidden bg-ink-100 text-left dark:bg-ink-800"
+                                >
+                                  {image ? (
+                                    <img
+                                      src={image}
+                                      alt={
+                                        item.title ||
+                                        `${providerName} portfolio`
+                                      }
+                                      onError={
+                                        handlePortfolioImageError
+                                      }
+                                      className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-ink-100 via-white to-primary-50 text-ink-300 dark:from-ink-900 dark:via-ink-800 dark:to-ink-900">
+                                      <ImageIcon className="h-10 w-10" />
+
+                                      <span className="mt-3 text-xs font-semibold text-ink-400">
+                                        No image available
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {/* Image overlay */}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent opacity-70 transition-opacity duration-300 group-hover:opacity-90" />
+
+                                  {/* Category */}
+                                  {item.category && (
+                                    <span className="absolute left-4 top-4 inline-flex max-w-[calc(100%-5rem)] items-center gap-1.5 truncate rounded-full bg-white/95 px-3 py-1.5 text-xs font-bold text-ink-800 shadow-lg backdrop-blur-md dark:bg-ink-900/90 dark:text-white">
+                                      <Tag className="h-3 w-3 shrink-0" />
+
+                                      <span className="truncate">
+                                        {item.category}
+                                      </span>
+                                    </span>
+                                  )}
+
+                                  {/* Expand button */}
+                                  <span className="absolute right-4 top-4 flex h-10 w-10 translate-y-1 items-center justify-center rounded-full bg-black/30 text-white opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                                    <Maximize2 className="h-4 w-4" />
+                                  </span>
+
+                                  {/* Bottom image content */}
+                                  <div className="absolute bottom-0 left-0 right-0 p-5">
+                                    {item.title && (
+                                      <h3 className="line-clamp-2 text-lg font-extrabold tracking-tight text-white">
+                                        {item.title}
+                                      </h3>
+                                    )}
+
+                                    <div className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-white/80">
+                                      <span>
+                                        View project
+                                      </span>
+
+                                      <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
+                                    </div>
+                                  </div>
+                                </button>
+
+                                {/* =================================================
+                        CARD BODY
+                    ================================================== */}
+
+                                <div className="flex flex-1 flex-col p-5">
+                                  {item.description && (
+                                    <p className="line-clamp-3 text-sm leading-6 text-ink-500 dark:text-ink-400">
+                                      {item.description}
+                                    </p>
+                                  )}
+
+                                  {/* Tags */}
+                                  {tags.length > 0 && (
+                                    <div className="mt-4 flex flex-wrap gap-1.5">
+                                      {tags
+                                        .slice(0, 4)
+                                        .map((tag) => (
+                                          <span
+                                            key={tag}
+                                            className="rounded-full bg-ink-50 px-2.5 py-1 text-[11px] font-medium text-ink-500 dark:bg-ink-800 dark:text-ink-300"
+                                          >
+                                            #{tag}
+                                          </span>
+                                        ))}
+                                    </div>
+                                  )}
+
+                                  {/* Footer */}
+                                  <div className="mt-auto flex items-center justify-between gap-3 border-t border-ink-100 pt-4 dark:border-ink-800">
+                                    {item.createdAt ? (
+                                      <div className="flex min-w-0 items-center gap-2 text-xs text-ink-400">
+                                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+
+                                        <span className="truncate">
+                                          {formatDate(
+                                            item.createdAt
+                                          )}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-xs text-ink-400">
+                                        Portfolio work
+                                      </span>
+                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setSelectedPortfolioIndex(
+                                          index
+                                        )
+                                      }
+                                      className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-ink-50 px-3 py-2 text-xs font-bold text-ink-700 transition hover:bg-primary-50 hover:text-primary-700 dark:bg-ink-800 dark:text-ink-200 dark:hover:bg-primary-950/50 dark:hover:text-primary-300"
+                                    >
+                                      <Maximize2 className="h-3.5 w-3.5" />
+
+                                      View
+                                    </button>
+                                  </div>
+                                </div>
+                              </motion.article>
+                            );
+                          })}
+                        </div>
+
+                        {/* =====================================================
+                PORTFOLIO FOOTER
+            ====================================================== */}
+
+                        <div className="flex items-center justify-center pt-2">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-ink-100 bg-white px-4 py-2 text-xs font-medium text-ink-400 shadow-sm dark:border-ink-800 dark:bg-ink-900">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+
+                            Showing{" "}
+                            <span className="font-bold text-ink-700 dark:text-ink-200">
+                              {filteredPortfolio.length}
+                            </span>{" "}
+                            {filteredPortfolio.length === 1
+                              ? "project"
+                              : "projects"}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
             {/* =================================================
                 REVIEWS
@@ -1249,9 +2304,6 @@ export default function ProviderProfilePage() {
                     opacity: 0,
                     y: -10,
                   }}
-                  transition={{
-                    duration: 0.2,
-                  }}
                 >
                   {reviews.length ===
                     0 ? (
@@ -1264,8 +2316,6 @@ export default function ProviderProfilePage() {
                     />
                   ) : (
                     <div className="grid gap-5 lg:grid-cols-3">
-                      {/* Rating summary */}
-
                       <div className="rounded-2xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
                         <p className="text-sm font-semibold text-ink-500 dark:text-ink-400">
                           Overall rating
@@ -1294,11 +2344,11 @@ export default function ProviderProfilePage() {
                                       index
                                     }
                                     className={`h-4 w-4 ${index <
-                                        Math.round(
-                                          rating
-                                        )
-                                        ? "fill-yellow-400 text-yellow-400"
-                                        : "text-ink-200 dark:text-ink-700"
+                                      Math.round(
+                                        rating
+                                      )
+                                      ? "fill-yellow-400 text-yellow-400"
+                                      : "text-ink-200 dark:text-ink-700"
                                       }`}
                                   />
                                 )
@@ -1314,8 +2364,6 @@ export default function ProviderProfilePage() {
                           </div>
                         </div>
                       </div>
-
-                      {/* Reviews */}
 
                       <div className="space-y-4 lg:col-span-2">
                         {reviews.map(
@@ -1444,9 +2492,6 @@ export default function ProviderProfilePage() {
                     opacity: 0,
                     y: -10,
                   }}
-                  transition={{
-                    duration: 0.2,
-                  }}
                 >
                   {availability.length ===
                     0 ? (
@@ -1511,9 +2556,9 @@ export default function ProviderProfilePage() {
 
                               <span
                                 className={`rounded-full px-3 py-1 text-xs font-semibold ${slot.available ===
-                                    false
-                                    ? "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"
-                                    : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                  false
+                                  ? "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"
+                                  : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
                                   }`}
                               >
                                 {slot.available ===
@@ -1568,7 +2613,6 @@ export default function ProviderProfilePage() {
                       className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-400 px-6 py-3 text-sm font-extrabold text-primary-950 shadow-lg transition hover:bg-primary-300"
                     >
                       Book a Service
-
                       <ArrowRight className="h-4 w-4" />
                     </Link>
 
@@ -1588,6 +2632,293 @@ export default function ProviderProfilePage() {
             </section>
           )}
       </div>
+
+      {/* =====================================================
+          PORTFOLIO LIGHTBOX
+      ===================================================== */}
+
+      <AnimatePresence>
+        {selectedPortfolio && (
+          <motion.div
+            key="portfolio-modal"
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+            }}
+            exit={{
+              opacity: 0,
+            }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-950/80 p-3 backdrop-blur-md sm:p-6"
+            onMouseDown={(event) => {
+              if (
+                event.target ===
+                event.currentTarget
+              ) {
+                closePortfolioModal();
+              }
+            }}
+          >
+            <motion.div
+              initial={{
+                opacity: 0,
+                scale: 0.96,
+                y: 20,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+                y: 20,
+              }}
+              transition={{
+                duration: 0.25,
+              }}
+              className="relative flex max-h-[94vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-ink-900 lg:flex-row"
+            >
+              {/* Close */}
+
+              <button
+                type="button"
+                onClick={
+                  closePortfolioModal
+                }
+                aria-label="Close portfolio preview"
+                className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              {/* Image */}
+
+              <div className="relative flex min-h-[320px] flex-1 items-center justify-center overflow-hidden bg-ink-950 lg:min-h-[650px]">
+                {getPortfolioImage(
+                  selectedPortfolio
+                ) ? (
+                  <img
+                    src={getPortfolioImage(
+                      selectedPortfolio
+                    )}
+                    alt={
+                      selectedPortfolio.title ||
+                      "Portfolio preview"
+                    }
+                    onError={
+                      handlePortfolioImageError
+                    }
+                    className="max-h-[75vh] w-full object-contain"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-white/30">
+                    <ImageIcon className="h-20 w-20" />
+
+                    <p className="mt-4 text-sm">
+                      No image available
+                    </p>
+                  </div>
+                )}
+
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/60 to-transparent" />
+
+                {filteredPortfolio.length >
+                  1 && (
+                    <button
+                      type="button"
+                      onClick={
+                        showPreviousPortfolio
+                      }
+                      aria-label="Previous portfolio"
+                      className="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60"
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                    </button>
+                  )}
+
+                {filteredPortfolio.length >
+                  1 && (
+                    <button
+                      type="button"
+                      onClick={
+                        showNextPortfolio
+                      }
+                      aria-label="Next portfolio"
+                      className="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-md transition hover:bg-black/60"
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </button>
+                  )}
+
+                {selectedPortfolioIndex !==
+                  null &&
+                  filteredPortfolio.length >
+                  1 && (
+                    <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-4 py-2 text-xs font-semibold text-white backdrop-blur-md">
+                      {selectedPortfolioIndex +
+                        1}{" "}
+                      /{" "}
+                      {
+                        filteredPortfolio.length
+                      }
+                    </div>
+                  )}
+              </div>
+
+              {/* Details */}
+
+              <div className="w-full overflow-y-auto lg:max-w-md">
+                <div className="p-6 sm:p-8">
+                  {selectedPortfolio.category && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1.5 text-xs font-bold text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
+                      <Tag className="h-3.5 w-3.5" />
+
+                      {
+                        selectedPortfolio.category
+                      }
+                    </span>
+                  )}
+
+                  <h2 className="mt-4 text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white sm:text-3xl">
+                    {selectedPortfolio.title ||
+                      "Portfolio project"}
+                  </h2>
+
+                  {selectedPortfolio.createdAt && (
+                    <div className="mt-3 flex items-center gap-2 text-xs text-ink-400">
+                      <Calendar className="h-4 w-4" />
+
+                      Posted{" "}
+                      {formatDate(
+                        selectedPortfolio.createdAt
+                      )}
+                    </div>
+                  )}
+
+                  <div className="my-6 h-px bg-ink-100 dark:bg-ink-800" />
+
+                  <div>
+                    <h3 className="text-sm font-bold text-ink-900 dark:text-white">
+                      About this work
+                    </h3>
+
+                    <p className="mt-3 text-sm leading-7 text-ink-600 dark:text-ink-300">
+                      {selectedPortfolio.description ||
+                        "The provider has not added a description for this portfolio project."}
+                    </p>
+                  </div>
+
+                  {selectedPortfolio.tags &&
+                    selectedPortfolio.tags
+                      .filter(Boolean)
+                      .length >
+                    0 && (
+                      <div className="mt-7">
+                        <h3 className="text-sm font-bold text-ink-900 dark:text-white">
+                          Tags
+                        </h3>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {selectedPortfolio.tags
+                            .filter(Boolean)
+                            .map(
+                              (tag) => (
+                                <span
+                                  key={
+                                    tag
+                                  }
+                                  className="rounded-full bg-ink-50 px-3 py-1.5 text-xs font-medium text-ink-600 dark:bg-ink-800 dark:text-ink-300"
+                                >
+                                  #{tag}
+                                </span>
+                              )
+                            )}
+                        </div>
+                      </div>
+                    )}
+
+                  {getPortfolioImages(
+                    selectedPortfolio
+                  ).length >
+                    1 && (
+                      <div className="mt-7 rounded-2xl border border-ink-100 bg-ink-50 p-4 dark:border-ink-800 dark:bg-ink-950">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-primary-600 shadow-sm dark:bg-ink-900">
+                            <ImageIcon className="h-4 w-4" />
+                          </div>
+
+                          <div>
+                            <p className="text-sm font-bold text-ink-900 dark:text-white">
+                              {
+                                getPortfolioImages(
+                                  selectedPortfolio
+                                ).length
+                              }{" "}
+                              images
+                            </p>
+
+                            <p className="text-xs text-ink-400">
+                              More project images
+                              are available.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                  {(selectedPortfolio.link ||
+                    selectedPortfolio.url) && (
+                      <a
+                        href={
+                          selectedPortfolio.link ||
+                          selectedPortfolio.url
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
+                      >
+                        View project link
+
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
+
+                  <div className="mt-7 rounded-2xl border border-ink-100 bg-white p-4 dark:border-ink-800 dark:bg-ink-900">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={providerImage}
+                        alt={providerName}
+                        onError={(event) => {
+                          event.currentTarget.src =
+                            "/images/default-avatar.png";
+                        }}
+                        className="h-11 w-11 rounded-xl object-cover"
+                      />
+
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">
+                          Created by
+                        </p>
+
+                        <p className="truncate text-sm font-bold text-ink-900 dark:text-white">
+                          {providerName}
+                        </p>
+                      </div>
+
+                      {providerIsActive && (
+                        <ShieldCheck className="ml-auto h-5 w-5 shrink-0 text-primary-500" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </DashboardLayout>
   );
 }
