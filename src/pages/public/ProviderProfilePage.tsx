@@ -1136,7 +1136,6 @@ export default function ProviderProfilePage() {
             </button>
           </div>
         </div>
-
         {/* =================================================
             PROFILE HERO
         ================================================= */}
