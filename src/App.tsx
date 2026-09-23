@@ -3,12 +3,11 @@ import { AuthProvider, BookingProvider, useAuth } from '@/context/AppContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { HomePage } from '@/pages/public/HomePage';
 import { ServicesPage } from '@/pages/public/ServicesPage';
-import ProviderProfilePage from '@/pages/public/ProviderProfilePage';
+import ProviderProfilePage from '@/pages/provider/ProviderProfilePage';
 import { ProvidersPage, HowItWorksPage, AboutPage } from '@/pages/public/StaticPages';
 import { SignupRolePage, SignupPage, LoginPage, RoleLoginPage, ForgotPasswordPage } from '@/pages/auth/AuthPages';
 import {
   CustomerDashboard,
-  CustomerSaved,
   CustomerBookings,
   CustomerReviews,
   CustomerProfile,
@@ -16,6 +15,7 @@ import {
 } from '@/pages/customer/CustomerDashboard';
 
 import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
+import { CustomerSaved } from '@/pages/customer/CustomerSaved';
 
 
 

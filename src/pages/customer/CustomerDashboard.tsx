@@ -91,29 +91,7 @@ export function CustomerDashboard() {
 }
 
 
-export function CustomerSaved() {
-  const { savedProviders } = useBookings();
-  const saved = providers.filter((p) => savedProviders.includes(p.id));
-  return (
-    <DashboardLayout role="customer" navItems={navItems}>
-      <DashboardHeader title="Saved Providers" subtitle="Providers you've saved for later" />
-      {saved.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-20 text-center">
-          <Heart className="h-12 w-12 text-ink-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No saved providers yet</h3>
-          <p className="mt-1 text-sm text-ink-500">Tap the heart icon on a provider to save them here.</p>
-          <Link to="/customer/browse" className="btn-primary mt-4">Browse Providers</Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {saved.map((provider) => (
-            <ProviderCard key={provider.id} provider={provider} />
-          ))}
-        </div>
-      )}
-    </DashboardLayout>
-  );
-}
+
 
 export function CustomerBookings() {
   const { bookings } = useBookings();
