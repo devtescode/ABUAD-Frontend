@@ -402,7 +402,7 @@ export function CustomerSaved() {
                                 </div>
 
                                 {/* Provider cards */}
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                     {savedProviders.map(
                                         (
                                             provider,
@@ -505,7 +505,7 @@ export function CustomerSaved() {
                                                                 </div>
 
                                                                 {provider.location ? (
-                                                                    <div className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
+                                                                    <div className="mt-1.5 flex items-center gap-1 text-xs text-ink-500 dark:text-ink-400">
                                                                         <MapPin className="h-3.5 w-3.5 shrink-0" />
 
                                                                         <span className="truncate">
@@ -516,8 +516,7 @@ export function CustomerSaved() {
                                                                     </div>
                                                                 ) : (
                                                                     <p className="mt-1.5 text-xs text-ink-400">
-                                                                        Servicely
-                                                                        Provider
+                                                                        Not specified
                                                                     </p>
                                                                 )}
                                                             </div>
