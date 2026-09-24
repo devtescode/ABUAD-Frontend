@@ -4,6 +4,43 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes toastEnter {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+@keyframes toastProgress {
+    from {
+        width: 100%;
+    }
+
+    to {
+        width: 0%;
+    }
+}
+
+@media (min-width: 640px) {
+    @keyframes toastEnter {
+        from {
+            opacity: 0;
+            transform: translate(20px, 0);
+        }
+
+        to {
+            opacity: 1;
+            transform: translate(0, 0);
+        }
+    }
+}
+
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
