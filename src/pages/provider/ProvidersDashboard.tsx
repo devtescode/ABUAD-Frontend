@@ -52,11 +52,11 @@ export function ProvidersDashboard() {
     providers[0];
 
   const profileImage =
-    user?.avatar 
-    // ||
-    // user?.profileImage ||
-    // currentProvider?.avatar ||
-    // "/images/default-avatar.png";
+    user?.avatar
+  // ||
+  // user?.profileImage ||
+  // currentProvider?.avatar ||
+  // "/images/default-avatar.png";
 
   const firstName =
     user?.name?.split(" ")[0] || "Provider";
@@ -109,19 +109,23 @@ export function ProvidersDashboard() {
                     <div className="group relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-ink-100 sm:h-20 sm:w-20 dark:bg-ink-800">
                       {profileImage ? (
                         <>
-                          <img
-                            src={profileImage}
-                            alt={`${firstName}'s profile`}
-                            className="h-full w-full rounded-full object-cover transition duration-500 group-hover:scale-110"
-                            onError={(event) => {
-                              event.currentTarget.style.display = "none";
-                            }}
-                          />
+                          <Link
+                            to="/provider/profile"
+                            className="absolute inset-0 flex items-center justify-center rounded-full transition-all duration-300 hover:bg-black/20">
+                            <img
+                              src={profileImage}
+                              alt={`${firstName}'s profile`}
+                              className="h-full w-full rounded-full object-cover transition duration-500 group-hover:scale-110"
+                              onError={(event) => {
+                                event.currentTarget.style.display = "none";
+                              }}
+                            />
 
                           {/* Hover overlay */}
                           <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-all duration-300 group-hover:bg-black/30">
                             <Eye className="h-5 w-5 scale-75 text-white opacity-0 transition-all duration-300 group-hover:scale-100 group-hover:opacity-100" />
                           </div>
+                          </Link>
                         </>
                       ) : (
                         /* No profile image */

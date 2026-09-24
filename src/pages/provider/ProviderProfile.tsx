@@ -775,34 +775,43 @@ export function ProviderProfile() {
                                                 sm:w-32
                                             "
                                         >
-                                            <img
-                                                src={
-                                                    profileImage
-                                                }
-                                                alt={
-                                                    displayName ||
-                                                    "Provider profile"
-                                                }
-                                                className="
-                                                    h-full
-                                                    w-full
-                                                    object-cover
-                                                    transition
-                                                    duration-500
-                                                    group-hover:scale-105
-                                                "
-                                                onError={() => {
-                                                    if (
-                                                        !profileImage.startsWith(
-                                                            "blob:"
-                                                        )
-                                                    ) {
-                                                        setProfileImage(
-                                                            "/images/default-avatar.png"
-                                                        );
-                                                    }
-                                                }}
-                                            />
+                                            {profileImage ? (
+                                                <img
+                                                    src={profileImage}
+                                                    alt={displayName || "Provider profile"}
+                                                    className="
+                                                              h-full
+                                                              w-full
+                                                              object-cover
+                                                              transition
+                                                              duration-500
+                                                              group-hover:scale-105
+                                                            "
+                                                    onError={(event) => {
+                                                        event.currentTarget.style.display = "none";
+                                                        setProfileImage("");
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="
+                                                                 flex
+                                                                 h-full
+                                                                 w-full
+                                                                 items-center
+                                                                 justify-center
+                                                                 bg-gradient-to-br
+                                                                 from-primary-50
+                                                                 to-ink-100
+                                                                 text-primary-600
+                                                                 dark:from-primary-950
+                                                                 dark:to-ink-800
+                                                                 dark:text-primary-400
+                                                               "
+                                                >
+                                                    <User className="h-10 w-10" />
+                                                </div>
+                                            )}
 
                                             <button
                                                 type="button"
