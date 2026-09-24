@@ -74,12 +74,28 @@ export function DashboardLayout({ role, navItems, children }: { role: UserRole; 
         <div className="border-t border-ink-100 dark:border-ink-800 p-3 space-y-2">
           <ThemeToggle />
           <div className="mb-2 flex items-center gap-3 rounded-lg px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ink-900 dark:bg-ink-100 text-xs font-semibold text-white dark:text-ink-900">
-              {user?.name?.[0] || 'U'}
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink-900 dark:bg-ink-100">
+              {user?.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user?.name || "Profile"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-xs font-semibold text-white dark:text-ink-900">
+                  {user?.name?.[0]?.toUpperCase() || "U"}
+                </span>
+              )}
             </div>
+
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-ink-900 dark:text-ink-50">{user?.name}</p>
-              <p className="truncate text-xs text-ink-400 dark:text-ink-500">{roleLabel} account</p>
+              <p className="truncate text-sm font-medium text-ink-900 dark:text-ink-50">
+                {user?.name}
+              </p>
+
+              <p className="truncate text-xs text-ink-400 dark:text-ink-500">
+                {roleLabel} account
+              </p>
             </div>
           </div>
           <button onClick={handleLogout} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink-500 dark:text-ink-400 transition-colors hover:bg-ink-50 dark:hover:bg-ink-800 hover:text-ink-900 dark:hover:text-ink-50">

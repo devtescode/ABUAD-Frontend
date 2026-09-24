@@ -40,7 +40,7 @@ export function ProvidersDashboard() {
   const { user } = useAuth();
 
 
-// Award-winning photographer specializing in birthday shoots, graduation photos, and portraits. I bring creativity and professionalism to every session, ensuring you get images you will treasure forever.
+  // Award-winning photographer specializing in birthday shoots, graduation photos, and portraits. I bring creativity and professionalism to every session, ensuring you get images you will treasure forever.
 
   /*
    * For now we find the provider using the logged-in user's id.
@@ -52,10 +52,11 @@ export function ProvidersDashboard() {
     providers[0];
 
   const profileImage =
-    user?.avatar ||
+    user?.avatar 
+    // ||
     // user?.profileImage ||
-    currentProvider?.avatar ||
-    "/images/default-avatar.png";
+    // currentProvider?.avatar ||
+    // "/images/default-avatar.png";
 
   const firstName =
     user?.name?.split(" ")[0] || "Provider";
@@ -105,22 +106,29 @@ export function ProvidersDashboard() {
                 {/* Gradient ring */}
                 <div className="rounded-full bg-gradient-to-br from-primary-500 via-primary-400 to-accent-500 p-[3px] shadow-xl shadow-primary-500/20">
                   <div className="rounded-full bg-white p-[3px] dark:bg-ink-900">
-                    {/* Image wrapper */}
-                    <div className="group relative overflow-hidden rounded-full">
-                      <img
-                        src={profileImage}
-                        alt={`${firstName}'s profile`}
-                        className="h-16 w-16 rounded-full object-cover transition duration-500 group-hover:scale-110 sm:h-20 sm:w-20"
-                        onError={(event) => {
-                          event.currentTarget.src =
-                            "/images/default-avatar.png";
-                        }}
-                      />
+                    <div className="group relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-ink-100 sm:h-20 sm:w-20 dark:bg-ink-800">
+                      {profileImage ? (
+                        <>
+                          <img
+                            src={profileImage}
+                            alt={`${firstName}'s profile`}
+                            className="h-full w-full rounded-full object-cover transition duration-500 group-hover:scale-110"
+                            onError={(event) => {
+                              event.currentTarget.style.display = "none";
+                            }}
+                          />
 
-                      {/* Hover overlay */}
-                      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-all duration-300 group-hover:bg-black/30">
-                        <Eye className="h-5 w-5 scale-75 text-white opacity-0 transition-all duration-300 group-hover:scale-100 group-hover:opacity-100" />
-                      </div>
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-all duration-300 group-hover:bg-black/30">
+                            <Eye className="h-5 w-5 scale-75 text-white opacity-0 transition-all duration-300 group-hover:scale-100 group-hover:opacity-100" />
+                          </div>
+                        </>
+                      ) : (
+                        /* No profile image */
+                        <div className="flex h-full w-full items-center justify-center rounded-full bg-gradient-to-br from-primary-50 to-ink-100 text-primary-600 dark:from-primary-950 dark:to-ink-800 dark:text-primary-400">
+                          <User className="h-8 w-8 sm:h-9 sm:w-9" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
