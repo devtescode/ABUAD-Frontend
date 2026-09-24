@@ -14,6 +14,24 @@ import type { UserRole, Booking } from '@/data/mockData';
 
 const API_URL = 'http://localhost:5000';
 
+export function isTokenExpired(token: string): boolean {
+  try {
+    const tokenParts = token.split('.');
+
+    if (tokenParts.length !== 3) {
+      return true;
+    }
+
+    const payload = JSON.parse(
+      atob(tokenParts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    );
+
+    return Boolean(payload.exp && payload.exp * 1000 <= Date.now());
+  } catch {
+    return true;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // USER TYPES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -93,9 +111,110 @@ export function AuthProvider({
 }: {
   children: ReactNode;
 }) {
-  const [user, setUser] = useState<User | null>(null);
+  // const [user, setUser] = useState<User | null>(() => {
+  //   try {
+  //     const storedUser =
+  //       sessionStorage.getItem("servicely_user");
+
+  //     const token =
+  //       sessionStorage.getItem("servicely_token");
+
+  //     if (!storedUser || !token) {
+  //       return null;
+  //     }
+
+  //     return JSON.parse(storedUser);
+  //   } catch (error) {
+  //     console.error(
+  //       "Failed to restore stored user:",
+  //       error
+  //     );
+
+  //     sessionStorage.removeItem("servicely_user");
+  //     sessionStorage.removeItem("servicely_token");
+
+  //     return null;
+  //   }
+  // });
+  const [user, setUser] = useState<User | null>(() => {
+    try {
+      const storedUser =
+        sessionStorage.getItem("servicely_user");
+
+      const token =
+        sessionStorage.getItem("servicely_token");
+
+      if (!storedUser || !token) {
+        return null;
+      }
+
+      if (isTokenExpired(token)) {
+        console.log(
+          "Session expired. Logging out."
+        );
+
+        sessionStorage.removeItem(
+          "servicely_user"
+        );
+
+        sessionStorage.removeItem(
+          "servicely_token"
+        );
+
+        return null;
+      }
+
+      return JSON.parse(storedUser);
+    } catch (error) {
+      console.error(
+        "Failed to restore stored user:",
+        error
+      );
+
+      sessionStorage.removeItem(
+        "servicely_user"
+      );
+
+      sessionStorage.removeItem(
+        "servicely_token"
+      );
+
+      return null;
+    }
+  });
 
   const [savedProviders, setSavedProviders] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const token = sessionStorage.getItem("servicely_token");
+
+    if (!token || isTokenExpired(token)) {
+      setUser(null);
+      sessionStorage.removeItem("servicely_user");
+      sessionStorage.removeItem("servicely_token");
+      return;
+    }
+
+    const tokenPayload = JSON.parse(
+      atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
+    );
+
+    if (!tokenPayload.exp) {
+      return;
+    }
+
+    const expiryTimer = window.setTimeout(() => {
+      setUser(null);
+      sessionStorage.removeItem("servicely_user");
+      sessionStorage.removeItem("servicely_token");
+    }, Math.max(0, tokenPayload.exp * 1000 - Date.now()));
+
+    return () => window.clearTimeout(expiryTimer);
+  }, [user]);
 
   // 👇 PASTE fetchSavedProviders HERE
   const fetchSavedProviders = async () => {
@@ -140,31 +259,31 @@ export function AuthProvider({
     }
   };
 
-  
+
   // ───────────────────────────────────────────────────────────────────────────
   // RESTORE USER FROM SESSION
   // ───────────────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    const storedUser = sessionStorage.getItem('servicely_user');
-    const token = sessionStorage.getItem('servicely_token');
+  // useEffect(() => {
+  //   const storedUser = sessionStorage.getItem('servicely_user');
+  //   const token = sessionStorage.getItem('servicely_token');
 
-    if (storedUser && token) {
-      try {
-        const parsedUser: User = JSON.parse(storedUser);
+  //   if (storedUser && token) {
+  //     try {
+  //       const parsedUser: User = JSON.parse(storedUser);
 
-        setUser(parsedUser);
-      } catch (error) {
-        console.error(
-          'Failed to restore stored user:',
-          error
-        );
+  //       setUser(parsedUser);
+  //     } catch (error) {
+  //       console.error(
+  //         'Failed to restore stored user:',
+  //         error
+  //       );
 
-        sessionStorage.removeItem('servicely_user');
-        sessionStorage.removeItem('servicely_token');
-      }
-    }
-  }, []);
+  //       sessionStorage.removeItem('servicely_user');
+  //       sessionStorage.removeItem('servicely_token');
+  //     }
+  //   }
+  // }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
   // SIGNUP
@@ -673,7 +792,7 @@ export function BookingProvider({
         if (!response.ok) {
           throw new Error(
             data?.message ||
-              'Failed to fetch saved providers'
+            'Failed to fetch saved providers'
           );
         }
 
@@ -735,9 +854,9 @@ export function BookingProvider({
       const next = prev.map((booking) =>
         booking.id === id
           ? {
-              ...booking,
-              status,
-            }
+            ...booking,
+            status,
+          }
           : booking
       );
 
@@ -792,7 +911,7 @@ export function BookingProvider({
       if (!response.ok) {
         throw new Error(
           data?.message ||
-            'Failed to update saved provider.'
+          'Failed to update saved provider.'
         );
       }
 
@@ -837,7 +956,7 @@ export function BookingProvider({
 
       throw new Error(
         error?.message ||
-          'Unable to update saved provider.'
+        'Unable to update saved provider.'
       );
     }
   };

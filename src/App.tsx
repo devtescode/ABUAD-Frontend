@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, BookingProvider, useAuth } from '@/context/AppContext';
+import { AuthProvider, BookingProvider, isTokenExpired, useAuth } from '@/context/AppContext';
+import { useEffect, useState } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { HomePage } from '@/pages/public/HomePage';
 import { ServicesPage } from '@/pages/public/ServicesPage';
@@ -21,7 +22,6 @@ import { CustomerSaved } from '@/pages/customer/CustomerSaved';
 
 import {
   ProviderOnboarding,
-  ProviderAvailability,
   ProviderRequests,
   ProviderBookings,
   ProviderEarnings,
@@ -33,6 +33,7 @@ import { ProviderAddService } from '@/pages/provider/ProviderAddService';
 import { ProviderPortfolio } from '@/pages/provider/ProviderPortfolio';
 import { ProviderServices } from '@/pages/provider/ProviderServices';
 import { ProviderProfile } from '@/pages/provider/ProviderProfile';
+import { ProviderAvailability } from '@/pages/provider/ProviderAvailability';
 
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
@@ -65,13 +66,40 @@ function ProtectedRoute({
   role: "customer" | "provider" | "admin";
   children: React.ReactNode;
 }) {
-  // ADMIN HAS A COMPLETELY SEPARATE AUTH SYSTEM
-  if (role === "admin") {
-    const adminToken = sessionStorage.getItem(
-      "servicely_admin_token"
+  const [adminSessionExpired, setAdminSessionExpired] = useState(false);
+  const adminToken = role === "admin"
+    ? sessionStorage.getItem("servicely_admin_token")
+    : null;
+  const adminTokenIsExpired = role === "admin"
+    && (!adminToken || isTokenExpired(adminToken));
+
+  useEffect(() => {
+    if (role !== "admin" || !adminToken || adminTokenIsExpired) {
+      return;
+    }
+
+    const tokenPayload = JSON.parse(
+      atob(adminToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))
     );
 
-    if (!adminToken) {
+    if (!tokenPayload.exp) {
+      return;
+    }
+
+    const expiryTimer = window.setTimeout(() => {
+      sessionStorage.removeItem("servicely_admin_token");
+      sessionStorage.removeItem("servicely_admin");
+      setAdminSessionExpired(true);
+    }, Math.max(0, tokenPayload.exp * 1000 - Date.now()));
+
+    return () => window.clearTimeout(expiryTimer);
+  }, [adminToken, adminTokenIsExpired, role]);
+
+  // ADMIN HAS A COMPLETELY SEPARATE AUTH SYSTEM
+  if (role === "admin") {
+    if (!adminToken || adminTokenIsExpired || adminSessionExpired) {
+      sessionStorage.removeItem("servicely_admin_token");
+      sessionStorage.removeItem("servicely_admin");
       return (
         <Navigate
           to="/login/admin"
