@@ -727,8 +727,14 @@ export default function ProviderProfilePage() {
     0
   );
 
+  
+
   const availability =
     provider?.availability || [];
+
+    const availableDaysCount = availability.filter(
+  (slot) => slot.available !== false
+).length;
 
   const providerIsActive =
     provider?.status === "active" ||
@@ -1509,51 +1515,47 @@ export default function ProviderProfilePage() {
           <div className="mx-auto max-w-7xl overflow-x-auto px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-max gap-2 py-2">
               {tabs.map((tab) => {
-                const isActive =
-                  activeTab === tab.id;
+                const isActive = activeTab === tab.id;
 
                 return (
                   <button
                     key={tab.id}
-                    onClick={() =>
-                      setActiveTab(tab.id)
-                    }
+                    onClick={() => setActiveTab(tab.id)}
                     className={`relative flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${isActive
-                      ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
-                      : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
+                        ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
+                        : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
                       }`}
                   >
                     {tab.icon}
 
                     {tab.label}
 
-                    {tab.id ===
-                      "services" &&
-                      activeServices.length >
-                      0 && (
+                    {tab.id === "services" &&
+                      activeServices.length > 0 && (
                         <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 dark:bg-ink-800 dark:text-ink-300">
-                          {
-                            activeServices.length
-                          }
+                          {activeServices.length}
                         </span>
                       )}
 
-                    {tab.id ===
-                      "portfolio" &&
-                      portfolioItems.length >
-                      0 && (
+                    {tab.id === "portfolio" &&
+                      portfolioItems.length > 0 && (
                         <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 dark:bg-ink-800 dark:text-ink-300">
-                          {
-                            portfolioItems.length
-                          }
+                          {portfolioItems.length}
                         </span>
                       )}
 
-                    {tab.id ===
-                      "reviews" &&
+                    {tab.id === "reviews" &&
                       reviewCount > 0 && (
                         <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 dark:bg-ink-800 dark:text-ink-300">
                           {reviewCount}
+                        </span>
+                      )}
+
+                    {/* Availability count */}
+                    {tab.id === "availability" &&
+                      availableDaysCount > 0 && (
+                        <span className="rounded-full bg-ink-100 px-2 py-0.5 text-[10px] text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                          {availableDaysCount}
                         </span>
                       )}
 
