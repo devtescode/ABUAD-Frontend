@@ -727,8 +727,6 @@ export default function ProviderProfilePage() {
     0
   );
 
-  
-
   const availability =
     provider?.availability || [];
 
