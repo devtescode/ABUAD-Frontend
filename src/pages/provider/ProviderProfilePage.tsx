@@ -153,8 +153,8 @@ interface Availability {
   _id?: string;
 
   day?: string;
-  startTime?: string;
-  endTime?: string;
+  start?: string;
+  end?: string;
 
   available?: boolean;
 }
@@ -1072,6 +1072,25 @@ export default function ProviderProfilePage() {
     }
   };
 
+  const formatAvailabilityTime = (time: string) => {
+    if (!time) return "";
+
+    const [hours, minutes] = time.split(":");
+
+    const hour = Number(hours);
+
+    if (Number.isNaN(hour)) {
+      return time;
+    }
+
+    const period = hour >= 12 ? "PM" : "AM";
+
+    const formattedHour =
+      hour % 12 || 12;
+
+    return `${formattedHour}:${minutes} ${period}`;
+  };
+
   /* =========================================================
      LOADING STATE
   ========================================================= */
@@ -1360,21 +1379,19 @@ export default function ProviderProfilePage() {
                   type="button"
                   onClick={handleSaveProvider}
                   disabled={savingProvider}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    isSaved
-                      ? "bg-white text-ink-900 shadow-lg"
-                      : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20"
-                  } disabled:cursor-not-allowed disabled:opacity-70`}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${isSaved
+                    ? "bg-white text-ink-900 shadow-lg"
+                    : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20"
+                    } disabled:cursor-not-allowed disabled:opacity-70`}
                 >
                   {savingProvider ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Heart
-                      className={`h-4 w-4 ${
-                        isSaved
-                          ? "fill-current text-red-500"
-                          : ""
-                      }`}
+                      className={`h-4 w-4 ${isSaved
+                        ? "fill-current text-red-500"
+                        : ""
+                        }`}
                     />
                   )}
 
@@ -2442,104 +2459,359 @@ export default function ProviderProfilePage() {
                 AVAILABILITY
             ================================================= */}
 
-            {activeTab ===
-              "availability" && (
-                <motion.div
-                  key="availability"
-                  initial={{
-                    opacity: 0,
-                    y: 10,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    y: -10,
-                  }}
-                >
-                  {availability.length ===
-                    0 ? (
-                    <EmptyState
-                      icon={
-                        <Calendar className="h-6 w-6" />
-                      }
-                      title="Availability not added"
-                      description={`${providerName} has not provided their availability schedule yet.`}
-                    />
-                  ) : (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {availability.map(
-                        (
-                          slot,
-                          index
-                        ) => (
-                          <motion.div
-                            key={
-                              slot._id ||
-                              `${slot.day}-${index}`
-                            }
-                            initial={{
-                              opacity: 0,
-                              y: 10,
-                            }}
-                            animate={{
-                              opacity: 1,
-                              y: 0,
-                            }}
-                            transition={{
-                              delay:
-                                index *
-                                0.05,
-                            }}
-                            className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900"
+
+            {activeTab === "availability" && (
+              <motion.div
+                key="availability"
+                initial={{
+                  opacity: 0,
+                  y: 10,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                exit={{
+                  opacity: 0,
+                  y: -10,
+                }}
+              >
+                {(() => {
+                  // Only keep days the provider actually marked as available
+                  const availableDays = availability.filter(
+                    (slot) => slot.available !== false
+                  );
+
+                  const availableCount = availableDays.length;
+
+                  // ==========================================
+                  // NO AVAILABILITY ADDED
+                  // ==========================================
+                  if (availableCount === 0) {
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.25 }}
+                        className="
+              flex
+              min-h-[360px]
+              items-center
+              justify-center
+              rounded-2xl
+              border
+              border-dashed
+              border-ink-200
+              bg-white
+              px-6
+              py-12
+              dark:border-ink-700
+              dark:bg-ink-900
+            "
+                      >
+                        <div className="flex max-w-md flex-col items-center text-center">
+                          {/* Icon */}
+                          <div
+                            className="
+                  flex
+                  h-16
+                  w-16
+                  items-center
+                  justify-center
+                  rounded-2xl
+                  bg-ink-50
+                  text-ink-400
+                  dark:bg-ink-800
+                  dark:text-ink-500
+                "
                           >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-bold text-ink-900 dark:text-white">
-                                  {slot.day ||
-                                    "Available"}
-                                </p>
+                            <Calendar className="h-7 w-7" />
+                          </div>
 
-                                {slot.startTime &&
-                                  slot.endTime && (
-                                    <div className="mt-2 flex items-center gap-2 text-sm text-ink-500 dark:text-ink-400">
-                                      <Clock className="h-4 w-4" />
+                          {/* Text */}
+                          <h3 className="mt-5 text-lg font-bold text-ink-900 dark:text-white">
+                            Availability not added yet
+                          </h3>
 
-                                      {
-                                        slot.startTime
-                                      }
+                          <p className="mt-2 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
+                            {providerName} has not added their working days or
+                            booking hours yet. Availability will appear here once
+                            they set their schedule.
+                          </p>
 
-                                      {" - "}
+                          {/* Small status */}
+                          <div
+                            className="
+                  mt-5
+                  inline-flex
+                  items-center
+                  gap-2
+                  rounded-full
+                  bg-ink-50
+                  px-3
+                  py-1.5
+                  text-xs
+                  font-medium
+                  text-ink-500
+                  dark:bg-ink-800
+                  dark:text-ink-400
+                "
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-ink-300 dark:bg-ink-600" />
+                            Schedule not available
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  }
 
-                                      {
-                                        slot.endTime
-                                      }
-                                    </div>
-                                  )}
+                  // ==========================================
+                  // AVAILABILITY EXISTS
+                  // ==========================================
+                  return (
+                    <>
+                      {/* ==========================================
+              AVAILABILITY SUMMARY
+          ========================================== */}
+                      <div
+                        className="
+              mb-5
+              overflow-hidden
+              rounded-2xl
+              border
+              border-ink-100
+              bg-white
+              dark:border-ink-800
+              dark:bg-ink-900
+            "
+                      >
+                        <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                          {/* Left */}
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="
+                    flex
+                    h-11
+                    w-11
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                    bg-primary-50
+                    text-primary-600
+                    dark:bg-primary-950
+                  "
+                            >
+                              <Calendar className="h-5 w-5" />
+                            </div>
+
+                            <div>
+                              <p className="text-sm font-bold text-ink-900 dark:text-white">
+                                Weekly Availability
+                              </p>
+
+                              <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                                {providerName}'s available days and booking hours.
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Count */}
+                          <div
+                            className="
+                  inline-flex
+                  w-fit
+                  items-center
+                  gap-2
+                  rounded-full
+                  bg-emerald-50
+                  px-3
+                  py-1.5
+                  text-xs
+                  font-semibold
+                  text-emerald-600
+                  dark:bg-emerald-950/30
+                  dark:text-emerald-300
+                "
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
+                            {availableCount}{" "}
+                            {availableCount === 1 ? "day" : "days"} available
+                          </div>
+                        </div>
+
+                        {/* Small accent line */}
+                        <div className="h-1 w-full bg-gradient-to-r from-primary-500 via-primary-400 to-transparent" />
+                      </div>
+
+                      {/* ==========================================
+              AVAILABLE DAYS
+          ========================================== */}
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {availableDays.map((slot, index) => {
+                          const startTime = slot.start;
+                          const endTime = slot.end;
+
+                          return (
+                            <motion.div
+                              key={slot._id || `${slot.day}-${index}`}
+                              initial={{
+                                opacity: 0,
+                                y: 10,
+                              }}
+                              animate={{
+                                opacity: 1,
+                                y: 0,
+                              }}
+                              transition={{
+                                delay: index * 0.05,
+                              }}
+                              className="
+                    group
+                    rounded-2xl
+                    border
+                    border-ink-100
+                    bg-white
+                    p-5
+                    transition-all
+                    duration-200
+                    hover:-translate-y-0.5
+                    hover:border-primary-200
+                    hover:shadow-md
+                    dark:border-ink-800
+                    dark:bg-ink-900
+                    dark:hover:border-primary-900
+                  "
+                            >
+                              {/* Card header */}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  {/* Day icon */}
+                                  <div
+                                    className="
+                          flex
+                          h-11
+                          w-11
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-xl
+                          bg-primary-50
+                          text-primary-600
+                          transition-colors
+                          group-hover:bg-primary-100
+                          dark:bg-primary-950
+                          dark:group-hover:bg-primary-900
+                        "
+                                  >
+                                    <Calendar className="h-5 w-5" />
+                                  </div>
+
+                                  <div>
+                                    <p className="text-sm font-bold text-ink-900 dark:text-white">
+                                      {slot.day}
+                                    </p>
+
+                                    <p className="mt-0.5 text-xs text-ink-500 dark:text-ink-400">
+                                      Available for bookings
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Available badge */}
+                                <span
+                                  className="
+                        inline-flex
+                        shrink-0
+                        items-center
+                        gap-1.5
+                        rounded-full
+                        bg-emerald-50
+                        px-2.5
+                        py-1
+                        text-[11px]
+                        font-semibold
+                        text-emerald-600
+                        dark:bg-emerald-950/30
+                        dark:text-emerald-300
+                      "
+                                >
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  Available
+                                </span>
                               </div>
 
-                              <span
-                                className={`rounded-full px-3 py-1 text-xs font-semibold ${slot.available ===
-                                  false
-                                  ? "bg-red-50 text-red-600 dark:bg-red-950/30 dark:text-red-300"
-                                  : "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
-                                  }`}
-                              >
-                                {slot.available ===
-                                  false
-                                  ? "Unavailable"
-                                  : "Available"}
-                              </span>
-                            </div>
-                          </motion.div>
-                        )
-                      )}
-                    </div>
-                  )}
-                </motion.div>
-              )}
+                              {/* Time range */}
+                              {startTime && endTime && (
+                                <div
+                                  className="
+                        mt-4
+                        rounded-xl
+                        bg-ink-50
+                        px-4
+                        py-3
+                        dark:bg-ink-800/60
+                      "
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className="
+                            flex
+                            h-8
+                            w-8
+                            shrink-0
+                            items-center
+                            justify-center
+                            rounded-lg
+                            bg-white
+                            text-primary-600
+                            shadow-sm
+                            dark:bg-ink-900
+                          "
+                                    >
+                                      <Clock className="h-4 w-4" />
+                                    </div>
+
+                                    <div>
+                                      <p
+                                        className="
+                              text-[10px]
+                              font-medium
+                              uppercase
+                              tracking-wider
+                              text-ink-400
+                            "
+                                      >
+                                        Working hours
+                                      </p>
+
+                                      <p className="mt-0.5 text-sm font-semibold text-ink-800 dark:text-white">
+                                        {formatAvailabilityTime(startTime)}
+
+                                        <span className="mx-1.5 text-ink-400">
+                                          –
+                                        </span>
+
+                                        {formatAvailabilityTime(endTime)}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  );
+                })()}
+              </motion.div>
+            )}
+
+
+
+
           </AnimatePresence>
         </main>
 
@@ -2831,20 +3103,20 @@ export default function ProviderProfilePage() {
 
                   {(selectedPortfolio.link ||
                     selectedPortfolio.url) && (
-                    <a
-                      href={
-                        selectedPortfolio.link ||
-                        selectedPortfolio.url
-                      }
-                      target="_blank"
-                      rel="noreferrer"
-                      className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
-                    >
-                      View project link
+                      <a
+                        href={
+                          selectedPortfolio.link ||
+                          selectedPortfolio.url
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
+                      >
+                        View project link
 
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  )}
+                        <ExternalLink className="h-4 w-4" />
+                      </a>
+                    )}
 
                   <div className="mt-7 rounded-2xl border border-ink-100 bg-white p-4 dark:border-ink-800 dark:bg-ink-900">
                     <div className="flex items-center gap-3">
