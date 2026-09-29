@@ -34,6 +34,7 @@ import { ProviderPortfolio } from '@/pages/provider/ProviderPortfolio';
 import { ProviderServices } from '@/pages/provider/ProviderServices';
 import { ProviderProfile } from '@/pages/provider/ProviderProfile';
 import { ProviderAvailability } from '@/pages/provider/ProviderAvailability';
+import { ProviderAccount } from '@/pages/provider/ProviderAccount';
 
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
@@ -183,6 +184,7 @@ function AppRoutes() {
       <Route path="/provider/reviews" element={<ProtectedRoute role="provider"><ProviderReviews /></ProtectedRoute>} />
       <Route path="/provider/profile" element={<ProtectedRoute role="provider"><ProviderProfile /></ProtectedRoute>} />
       <Route path="/provider/settings" element={<ProtectedRoute role="provider"><ProviderSettings /></ProtectedRoute>} />
+      <Route path="/provider/add-account" element={<ProtectedRoute role="provider"><ProviderAccount /></ProtectedRoute>} />
 
       {/* Admin */}
       <Route path="/login/admin" element={<AdminAuth />} />

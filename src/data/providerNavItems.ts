@@ -6,6 +6,7 @@ export const providerNavItems = [
   { label: 'Add Service', icon: Plus, path: '/provider/add-service' },
   { label: 'Portfolio', icon: Image, path: '/provider/portfolio' },
   { label: 'Availability', icon: Calendar, path: '/provider/availability' },
+  { label: 'Add Account', icon: Money, path: '/provider/add-account' },
   { label: 'Booking Requests', icon: Inbox, path: '/provider/requests' },
   { label: 'My Bookings', icon: ClipboardList, path: '/provider/bookings' },
   { label: 'Earnings', icon: DollarSign, path: '/provider/earnings' },

@@ -671,12 +671,17 @@ export function BookingFlow() {
      SUBMIT BOOKING
   ======================================================= */
 
+ /* =======================================================
+   SUBMIT BOOKING — REAL DATABASE
+======================================================= */
+
 const handleConfirmBooking = async () => {
   if (!provider || !selectedService) {
     return;
   }
 
-  const validationError = validateCurrentStep();
+  const validationError =
+    validateCurrentStep();
 
   if (validationError) {
     setError(validationError);
@@ -687,56 +692,261 @@ const handleConfirmBooking = async () => {
     setSubmitting(true);
     setError("");
 
-    const servicePrice = getServicePrice(selectedService);
+    // ==========================================
+    // AUTH TOKEN
+    // ==========================================
 
-    /*
-     * Create a temporary booking object.
-     *
-     * IMPORTANT:
-     * This is currently stored in AppContext so the existing
-     * PaymentPage can display the booking details.
-     *
-     * When we connect the real backend, this part will instead
-     * call the backend to create a pending_payment booking and
-     * initialize Paystack.
-     */
+    const token =
+      sessionStorage.getItem(
+        "servicely_token"
+      );
+
+    if (!token) {
+      navigate(
+        "/login/customer",
+        {
+          replace: true,
+        }
+      );
+
+      return;
+    }
+
+    // ==========================================
+    // CREATE REAL MONGODB BOOKING
+    // ==========================================
+
+    const response =
+      await fetch(
+        `${API_URL}/bookings/createbookings`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            Authorization:
+              `Bearer ${token}`,
+
+            Accept:
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            serviceId:
+              selectedService._id,
+
+            date:
+              data.date,
+
+            time:
+              data.time,
+
+            location:
+              data.location.trim(),
+
+            note:
+              data.notes.trim(),
+          }),
+        }
+      );
+
+    let result: any = {};
+
+    try {
+      result =
+        await response.json();
+    } catch {
+      throw new Error(
+        `Server returned an invalid response (${response.status}).`
+      );
+    }
+
+    console.log(
+      "Booking creation response:",
+      result
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        result?.message ||
+          result?.error ||
+          `Unable to create booking (${response.status}).`
+      );
+    }
+
+    if (!result?.success) {
+      throw new Error(
+        result?.message ||
+          "Unable to create booking."
+      );
+    }
+
+    // ==========================================
+    // GET REAL MONGODB BOOKING
+    // ==========================================
+
+    const backendBooking =
+      result?.booking ||
+      result?.data?.booking;
+
+    if (!backendBooking) {
+      console.error(
+        "No booking returned:",
+        result
+      );
+
+      throw new Error(
+        "Booking was created, but no booking information was returned."
+      );
+    }
+
+    // ==========================================
+    // REAL MONGODB ID
+    // ==========================================
+
+    const mongoBookingId =
+      backendBooking?._id ||
+      backendBooking?.id;
+
+    if (!mongoBookingId) {
+      console.error(
+        "No MongoDB booking ID:",
+        backendBooking
+      );
+
+      throw new Error(
+        "The booking was created but no valid booking ID was returned."
+      );
+    }
+
+    console.log(
+      "REAL MONGODB BOOKING ID:",
+      mongoBookingId
+    );
+
+    // ==========================================
+    // PRICE FROM BACKEND
+    // ==========================================
+
+    const bookingPrice =
+      Number(
+        backendBooking?.amount ??
+          backendBooking?.price ??
+          getServicePrice(
+            selectedService
+          )
+      ) || 0;
+
+    // ==========================================
+    // MAP BACKEND → FRONTEND BOOKING
+    // ==========================================
+
     const booking: Booking = {
-      id: "b" + Date.now(),
-      serviceId: selectedService._id,
-      serviceName: getServiceName(selectedService),
-      providerId: provider._id,
-      providerName: getProviderName(provider),
-      providerAvatar: getProviderImage(provider),
-      customerName: "You",
-      date: data.date,
-      time: data.time,
-      location: data.location,
-      price: servicePrice,
-      notes: data.notes,
+      id: String(
+        mongoBookingId
+      ),
 
-      /*
-       * The booking is NOT confirmed yet.
-       *
-       * It is waiting for payment.
-       */
-      status: "pending",
+      serviceId: String(
+        backendBooking?.service?._id ||
+          backendBooking?.service ||
+          selectedService._id
+      ),
 
-      createdAt: new Date()
-        .toISOString()
-        .split("T")[0],
+      serviceName:
+        backendBooking?.service?.title ||
+        backendBooking?.serviceName ||
+        getServiceName(
+          selectedService
+        ),
+
+      providerId: String(
+        backendBooking?.provider?._id ||
+          backendBooking?.provider ||
+          provider._id
+      ),
+
+      providerName:
+        backendBooking?.provider?.name ||
+        backendBooking?.providerName ||
+        getProviderName(
+          provider
+        ),
+
+      providerAvatar:
+        backendBooking?.provider?.avatar ||
+        backendBooking?.provider?.profileImage ||
+        backendBooking?.providerAvatar ||
+        getProviderImage(
+          provider
+        ),
+
+      customerName:
+        backendBooking?.customer?.name ||
+        backendBooking?.customerName ||
+        "You",
+
+      date:
+        backendBooking?.date ||
+        data.date,
+
+      time:
+        backendBooking?.time ||
+        data.time,
+
+      location:
+        backendBooking?.location ||
+        data.location,
+
+      price:
+        bookingPrice,
+
+      notes:
+        backendBooking?.note ||
+        backendBooking?.notes ||
+        data.notes,
+
+      // Frontend status
+      status:
+        "payment_pending",
+
+      createdAt:
+        backendBooking?.createdAt ||
+        new Date().toISOString(),
     };
 
-    addBooking(booking);
+    // ==========================================
+    // SAVE IN YOUR EXISTING CONTEXT
+    // ==========================================
 
-    /*
-     * Move directly to payment.
-     */
-    navigate(`/payment/${booking.id}`);
-  } catch (err) {
-    console.error("Preparing payment error:", err);
+    addBooking(
+      booking
+    );
+
+    console.log(
+      "Booking saved with real MongoDB ID:",
+      booking.id
+    );
+
+    // ==========================================
+    // GO TO PAYMENT
+    // ==========================================
+
+    navigate(
+      `/payment/${encodeURIComponent(
+        booking.id
+      )}`
+    );
+  } catch (error: any) {
+    console.error(
+      "Create booking error:",
+      error
+    );
 
     setError(
-      "Unable to prepare your payment. Please try again."
+      error?.message ||
+        "Unable to create your booking. Please try again."
     );
   } finally {
     setSubmitting(false);
@@ -1850,54 +2060,234 @@ export function PaymentPage() {
 
   const { bookings } = useBookings();
 
+  const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+
+  const API_URL =
+    import.meta.env.VITE_API_URL ||
+    "http://localhost:5000";
+
+  // ======================================================
+  // FIND BOOKING
+  // ======================================================
+  //
+  // IMPORTANT:
+  // booking.id is now the REAL MongoDB Booking._id
+  // created by POST /bookings.
+  //
+
   const booking = bookings.find(
-    (item: any) =>
+    (item: Booking) =>
       String(item.id) === String(id)
   );
 
-  const [paying, setPaying] = useState(false);
+  // ======================================================
+  // START PAYMENT
+  // ======================================================
 
   const handlePayment = async () => {
     if (!booking) {
+      setPaymentError(
+        "Booking could not be found."
+      );
+
       return;
     }
 
     try {
       setPaying(true);
+      setPaymentError("");
 
-      /*
-       * PAYSTACK WILL BE CONNECTED HERE.
-       *
-       * The correct production flow is:
-       *
-       * 1. Send booking details to backend.
-       * 2. Backend checks provider/service/date/time.
-       * 3. Backend checks that the slot is still available.
-       * 4. Backend uses the SERVER-SIDE service price.
-       * 5. Backend initializes Paystack.
-       * 6. Customer completes payment.
-       * 7. Backend verifies the Paystack transaction.
-       * 8. Booking becomes confirmed.
-       */
+      // ==========================================
+      // GET AUTH TOKEN
+      // ==========================================
 
-      console.log("Payment started for booking:", booking);
+      const token =
+        sessionStorage.getItem(
+          "servicely_token"
+        );
 
-      /*
-       * Temporary:
-       * Remove this when Paystack backend is connected.
-       */
-      alert(
-        "Paystack payment will be connected here."
+      if (!token) {
+        navigate(
+          "/login/customer",
+          {
+            replace: true,
+          }
+        );
+
+        return;
+      }
+
+      // ==========================================
+      // REAL MONGODB BOOKING ID
+      // ==========================================
+      //
+      // BookingFlow now saves:
+      //
+      // booking.id = MongoDB Booking._id
+      //
+      // Example:
+      // 68da12345678901234567890
+      //
+
+      const bookingId =
+        String(booking.id || "").trim();
+
+      if (!bookingId) {
+        throw new Error(
+          "This booking does not have a valid booking ID."
+        );
+      }
+
+      // ==========================================
+      // BASIC MONGODB OBJECT ID CHECK
+      // ==========================================
+      //
+      // MongoDB ObjectIds are 24 hexadecimal
+      // characters.
+      //
+
+      const isValidMongoId =
+        /^[a-fA-F0-9]{24}$/.test(
+          bookingId
+        );
+
+      if (!isValidMongoId) {
+        console.error(
+          "Invalid booking ID:",
+          bookingId
+        );
+
+        throw new Error(
+          "This booking does not have a valid MongoDB booking ID. Please create the booking again."
+        );
+      }
+
+      console.log(
+        "Payment booking:",
+        booking
       );
-    } catch (error) {
+
+      console.log(
+        "MongoDB Booking ID:",
+        bookingId
+      );
+
+      // ==========================================
+      // INITIALIZE PAYSTACK PAYMENT
+      // ==========================================
+
+      const response =
+        await fetch(
+          `${API_URL}/payments/initialize`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${token}`,
+
+              Accept:
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              bookingId,
+            }),
+          }
+        );
+
+      // ==========================================
+      // READ RESPONSE
+      // ==========================================
+
+      let result: any = {};
+
+      try {
+        result =
+          await response.json();
+      } catch {
+        throw new Error(
+          `The server returned an invalid response (${response.status}).`
+        );
+      }
+
+      console.log(
+        "Payment initialization response:",
+        result
+      );
+
+      // ==========================================
+      // HANDLE BACKEND ERROR
+      // ==========================================
+
+      if (!response.ok) {
+        throw new Error(
+          result?.message ||
+            result?.error ||
+            `Unable to initialize payment (${response.status}).`
+        );
+      }
+
+      if (!result?.success) {
+        throw new Error(
+          result?.message ||
+            "Unable to initialize payment."
+        );
+      }
+
+      // ==========================================
+      // GET PAYSTACK URL
+      // ==========================================
+
+      const authorizationUrl =
+        result?.authorization_url ||
+        result?.data?.authorization_url;
+
+      if (!authorizationUrl) {
+        console.error(
+          "Paystack URL missing:",
+          result
+        );
+
+        throw new Error(
+          "Paystack payment URL was not returned by the server."
+        );
+      }
+
+      console.log(
+        "Redirecting to Paystack:",
+        authorizationUrl
+      );
+
+      // ==========================================
+      // REDIRECT TO PAYSTACK
+      // ==========================================
+
+      window.location.assign(
+        authorizationUrl
+      );
+    } catch (error: any) {
       console.error(
-        "Payment error:",
+        "Payment initialization error:",
         error
+      );
+
+      setPaymentError(
+        error?.message ||
+          "Unable to start payment. Please try again."
       );
     } finally {
       setPaying(false);
     }
   };
+
+  // ======================================================
+  // BOOKING NOT FOUND
+  // ======================================================
 
   if (!booking) {
     return (
@@ -1907,6 +2297,7 @@ export function PaymentPage() {
       >
         <div className="mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center px-4">
           <div className="w-full rounded-3xl border border-ink-100 bg-white p-8 text-center shadow-sm dark:border-ink-800 dark:bg-ink-900">
+
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30">
               <X className="h-7 w-7 text-red-500" />
             </div>
@@ -1915,14 +2306,18 @@ export function PaymentPage() {
               Booking not found
             </h2>
 
-            <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
-              We could not find this booking.
+            <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
+              We could not find this booking. It may
+              have expired or may not have been loaded
+              yet.
             </p>
 
             <button
               type="button"
-              onClick={() => navigate("/customer")}
-              className="mt-6 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white dark:bg-white dark:text-ink-900"
+              onClick={() =>
+                navigate("/customer")
+              }
+              className="mt-6 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white transition hover:opacity-90 dark:bg-white dark:text-ink-900"
             >
               Back to Dashboard
             </button>
@@ -1932,18 +2327,43 @@ export function PaymentPage() {
     );
   }
 
+  // ======================================================
+  // BOOKING PRICE
+  // ======================================================
+  //
+  // The frontend Booking interface uses `price`.
+  //
+  // The backend uses `amount`.
+  //
+  // The backend remains the source of truth for the
+  // actual payment amount.
+  //
+  // This value is only for displaying the booking
+  // information on this page.
+  //
+
+  const bookingPrice =
+    Number(booking.price) || 0;
+
+  // ======================================================
+  // PAYMENT PAGE
+  // ======================================================
+
   return (
     <DashboardLayout
       role="customer"
       navItems={customerNavItems}
     >
       <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+
+        {/* BACK */}
         <button
           type="button"
           onClick={() => navigate(-1)}
           className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-500 transition hover:text-primary-600"
         >
           <ArrowLeft className="h-4 w-4" />
+
           Back
         </button>
 
@@ -1963,126 +2383,190 @@ export function PaymentPage() {
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-            Pay securely with Paystack to confirm your booking.
+            Pay securely with Paystack to confirm
+            your booking.
           </p>
 
           {/* BOOKING DETAILS */}
           <div className="mt-7 rounded-3xl border border-ink-100 p-5 dark:border-ink-800">
 
             <div className="flex items-start justify-between gap-4">
-              <div>
+
+              <div className="min-w-0">
+
                 <p className="text-xs font-bold uppercase tracking-wider text-ink-400">
                   Service
                 </p>
 
-                <p className="mt-1 font-bold text-ink-900 dark:text-white">
-                  {booking.serviceName}
+                <p className="mt-1 break-words font-bold text-ink-900 dark:text-white">
+                  {booking.serviceName ||
+                    "Service"}
                 </p>
 
-                <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                  {booking.providerName}
+                <p className="mt-1 break-words text-sm text-ink-500 dark:text-ink-400">
+                  {booking.providerName ||
+                    "Provider"}
                 </p>
               </div>
 
-              <p className="text-xl font-black text-primary-600 dark:text-primary-400">
+              <p className="shrink-0 text-xl font-black text-primary-600 dark:text-primary-400">
                 {formatNaira(
-                  Number(booking.price) || 0
+                  bookingPrice
                 )}
               </p>
             </div>
 
             <div className="mt-5 grid gap-4 border-t border-ink-100 pt-5 dark:border-ink-800 sm:grid-cols-2">
 
+              {/* DATE */}
               <div className="flex gap-3">
+
                 <Calendar className="h-4 w-4 shrink-0 text-primary-600" />
 
-                <div>
+                <div className="min-w-0">
+
                   <p className="text-xs text-ink-400">
                     Date
                   </p>
 
                   <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {formatDate(booking.date)}
+                    {formatDate(
+                      booking.date
+                    )}
                   </p>
+
                 </div>
               </div>
 
+              {/* TIME */}
               <div className="flex gap-3">
+
                 <Clock className="h-4 w-4 shrink-0 text-primary-600" />
 
-                <div>
+                <div className="min-w-0">
+
                   <p className="text-xs text-ink-400">
                     Time
                   </p>
 
                   <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {formatTime(booking.time)}
+                    {formatTime(
+                      booking.time
+                    )}
                   </p>
+
                 </div>
               </div>
 
+              {/* LOCATION */}
               <div className="flex gap-3 sm:col-span-2">
+
                 <MapPin className="h-4 w-4 shrink-0 text-primary-600" />
 
-                <div>
+                <div className="min-w-0">
+
                   <p className="text-xs text-ink-400">
                     Location
                   </p>
 
-                  <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
+                  <p className="mt-1 break-words text-sm font-semibold text-ink-800 dark:text-ink-200">
                     {booking.location}
                   </p>
+
                 </div>
               </div>
+
             </div>
           </div>
 
           {/* TOTAL */}
           <div className="mt-5 rounded-2xl bg-ink-50 p-5 dark:bg-ink-950/50">
-            <div className="flex items-center justify-between">
+
+            <div className="flex items-center justify-between gap-4">
+
               <span className="text-sm font-semibold text-ink-500 dark:text-ink-400">
                 Amount to pay
               </span>
 
               <span className="text-2xl font-black text-ink-900 dark:text-white">
                 {formatNaira(
-                  Number(booking.price) || 0
+                  bookingPrice
                 )}
               </span>
+
             </div>
           </div>
 
+          {/* PAYMENT ERROR */}
+          {paymentError && (
+            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+
+              <div className="flex gap-3">
+
+                <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+
+                <div className="min-w-0">
+
+                  <p className="text-sm font-bold text-red-800 dark:text-red-300">
+                    Payment could not start
+                  </p>
+
+                  <p className="mt-1 break-words text-xs leading-5 text-red-700 dark:text-red-400">
+                    {paymentError}
+                  </p>
+
+                </div>
+
+              </div>
+            </div>
+          )}
+
           {/* SECURITY */}
           <div className="mt-5 flex gap-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/20">
+
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
 
             <div>
+
               <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
                 Secure payment
               </p>
 
               <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-400">
-                Your payment is processed securely through Paystack. Your booking will only be confirmed after successful payment verification.
+                Your payment is processed securely
+                through Paystack. Your booking will
+                only be confirmed after successful
+                payment verification.
               </p>
+
             </div>
+
           </div>
 
           {/* PAY BUTTON */}
           <button
             type="button"
             onClick={handlePayment}
-            disabled={paying}
+            disabled={
+              paying ||
+              bookingPrice <= 0
+            }
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {paying ? (
               <>
                 <Loader2 className="h-5 w-5 animate-spin" />
+
                 Preparing Payment...
               </>
             ) : (
               <>
                 <CreditCard className="h-5 w-5" />
-                Pay {formatNaira(Number(booking.price) || 0)}
+
+                Pay{" "}
+                {formatNaira(
+                  bookingPrice
+                )}
               </>
             )}
           </button>
