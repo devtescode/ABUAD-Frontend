@@ -22,6 +22,11 @@ import {
   ShieldCheck,
   User,
   X,
+   AlertCircle,
+  RefreshCcw,
+  LockKeyhole,
+  Sparkles,
+  
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -2054,6 +2059,10 @@ export function BookingConfirmed() {
    PAYMENT PAGE
 ========================================================= */
 
+
+// Keep your existing imports for these if they are located elsewhere
+// import { formatNaira, formatDate, formatTime } from "...";
+
 export function PaymentPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -2063,23 +2072,209 @@ export function PaymentPage() {
   const [paying, setPaying] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
+  const [verifying, setVerifying] = useState(false);
+  const [verificationSuccess, setVerificationSuccess] =
+    useState(false);
+  const [verificationMessage, setVerificationMessage] =
+    useState("");
+
   const API_URL =
     import.meta.env.VITE_API_URL ||
     "http://localhost:5000";
 
   // ======================================================
+  // DETECT PAYSTACK CALLBACK
+  // ======================================================
+
+  const paymentReference = useMemo(() => {
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    return (
+      params.get("reference") ||
+      params.get("trxref") ||
+      ""
+    ).trim();
+  }, []);
+
+  const isPaymentCallback =
+    Boolean(paymentReference);
+
+  // ======================================================
   // FIND BOOKING
   // ======================================================
   //
-  // IMPORTANT:
-  // booking.id is now the REAL MongoDB Booking._id
-  // created by POST /bookings.
+  // Normal payment page:
+  //
+  // /payment/MONGODB_BOOKING_ID
+  //
+  // Paystack callback:
+  //
+  // /payment/verify?trxref=SERVICELY-...
+  //
+  // The callback does NOT use the booking ID.
   //
 
   const booking = bookings.find(
     (item: Booking) =>
       String(item.id) === String(id)
   );
+
+  // ======================================================
+  // VERIFY PAYSTACK PAYMENT
+  // ======================================================
+
+  useEffect(() => {
+    if (!isPaymentCallback || !paymentReference) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const verifyPaystackPayment = async () => {
+      try {
+        setVerifying(true);
+        setVerificationSuccess(false);
+        setVerificationMessage("");
+
+        // ==========================================
+        // GET AUTH TOKEN
+        // ==========================================
+
+        const token =
+          sessionStorage.getItem(
+            "servicely_token"
+          );
+
+        if (!token) {
+          navigate("/login/customer", {
+            replace: true,
+          });
+
+          return;
+        }
+
+        console.log(
+          "Paystack callback reference:",
+          paymentReference
+        );
+
+        // ==========================================
+        // VERIFY PAYMENT WITH BACKEND
+        // ==========================================
+
+        const response = await fetch(
+          `${API_URL}/payments/verify/${encodeURIComponent(
+            paymentReference
+          )}`,
+          {
+            method: "GET",
+
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          }
+        );
+
+        let result: any = {};
+
+        try {
+          result = await response.json();
+        } catch {
+          throw new Error(
+            `The server returned an invalid response (${response.status}).`
+          );
+        }
+
+        console.log(
+          "Payment verification response:",
+          result
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            result?.message ||
+              `Unable to verify payment (${response.status}).`
+          );
+        }
+
+        if (
+          !result?.success ||
+          !result?.verified
+        ) {
+          throw new Error(
+            result?.message ||
+              "Payment could not be verified."
+          );
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        // ==========================================
+        // SUCCESS
+        // ==========================================
+
+        setVerificationSuccess(true);
+
+        setVerificationMessage(
+          result?.message ||
+            "Your payment has been verified successfully."
+        );
+
+        // ==========================================
+        // CLEAN CALLBACK URL
+        // ==========================================
+        //
+        // Removes:
+        // ?trxref=...
+        // ?reference=...
+        //
+        // without reloading the page.
+        //
+
+        window.history.replaceState(
+          {},
+          document.title,
+          "/payment/verify"
+        );
+      } catch (error: any) {
+        if (cancelled) {
+          return;
+        }
+
+        console.error(
+          "Payment verification error:",
+          error
+        );
+
+        setVerificationSuccess(false);
+
+        setVerificationMessage(
+          error?.message ||
+            "Unable to verify your payment. Please try again."
+        );
+      } finally {
+        if (!cancelled) {
+          setVerifying(false);
+        }
+      }
+    };
+
+    verifyPaystackPayment();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    API_URL,
+    isPaymentCallback,
+    paymentReference,
+    navigate,
+  ]);
 
   // ======================================================
   // START PAYMENT
@@ -2108,12 +2303,9 @@ export function PaymentPage() {
         );
 
       if (!token) {
-        navigate(
-          "/login/customer",
-          {
-            replace: true,
-          }
-        );
+        navigate("/login/customer", {
+          replace: true,
+        });
 
         return;
       }
@@ -2121,14 +2313,6 @@ export function PaymentPage() {
       // ==========================================
       // REAL MONGODB BOOKING ID
       // ==========================================
-      //
-      // BookingFlow now saves:
-      //
-      // booking.id = MongoDB Booking._id
-      //
-      // Example:
-      // 68da12345678901234567890
-      //
 
       const bookingId =
         String(booking.id || "").trim();
@@ -2140,12 +2324,8 @@ export function PaymentPage() {
       }
 
       // ==========================================
-      // BASIC MONGODB OBJECT ID CHECK
+      // VALIDATE MONGODB OBJECT ID
       // ==========================================
-      //
-      // MongoDB ObjectIds are 24 hexadecimal
-      // characters.
-      //
 
       const isValidMongoId =
         /^[a-fA-F0-9]{24}$/.test(
@@ -2177,28 +2357,27 @@ export function PaymentPage() {
       // INITIALIZE PAYSTACK PAYMENT
       // ==========================================
 
-      const response =
-        await fetch(
-          `${API_URL}/payments/initialize`,
-          {
-            method: "POST",
+      const response = await fetch(
+        `${API_URL}/payments/initialize`,
+        {
+          method: "POST",
 
-            headers: {
-              "Content-Type":
-                "application/json",
+          headers: {
+            "Content-Type":
+              "application/json",
 
-              Authorization:
-                `Bearer ${token}`,
+            Authorization:
+              `Bearer ${token}`,
 
-              Accept:
-                "application/json",
-            },
+            Accept:
+              "application/json",
+          },
 
-            body: JSON.stringify({
-              bookingId,
-            }),
-          }
-        );
+          body: JSON.stringify({
+            bookingId,
+          }),
+        }
+      );
 
       // ==========================================
       // READ RESPONSE
@@ -2207,8 +2386,7 @@ export function PaymentPage() {
       let result: any = {};
 
       try {
-        result =
-          await response.json();
+        result = await response.json();
       } catch {
         throw new Error(
           `The server returned an invalid response (${response.status}).`
@@ -2286,6 +2464,251 @@ export function PaymentPage() {
   };
 
   // ======================================================
+  // BOOKING PRICE
+  // ======================================================
+
+  const bookingPrice =
+    Number(booking?.price) || 0;
+
+  // ======================================================
+  // PAYMENT CALLBACK UI
+  // ======================================================
+
+  if (isPaymentCallback) {
+    return (
+      <DashboardLayout
+        role="customer"
+        navItems={customerNavItems}
+      >
+        <div className="relative flex min-h-[calc(100vh-80px)] items-center justify-center overflow-hidden px-4 py-10 sm:px-6">
+
+          {/* BACKGROUND DECORATION */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl" />
+
+            <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+          </div>
+
+          <div className="relative w-full max-w-lg">
+
+            {/* VERIFICATION CARD */}
+            <div className="overflow-hidden rounded-[2rem] border border-ink-100 bg-white shadow-2xl shadow-ink-900/5 dark:border-ink-800 dark:bg-ink-900">
+
+              {/* TOP ACCENT */}
+              <div className="h-1.5 bg-gradient-to-r from-primary-500 via-primary-600 to-blue-600" />
+
+              <div className="p-7 text-center sm:p-10">
+
+                {/* LOADING */}
+                {verifying && (
+                  <>
+                    <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-950/40">
+                      <div className="absolute inset-0 animate-ping rounded-full bg-primary-500/10" />
+
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-sm dark:bg-ink-900">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary-600 dark:text-primary-400" />
+                      </div>
+                    </div>
+
+                    <div className="mt-7">
+                      <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 text-xs font-bold text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
+                        <Sparkles className="h-3.5 w-3.5" />
+
+                        Processing securely
+                      </div>
+
+                      <h1 className="mt-5 text-2xl font-black tracking-tight text-ink-900 dark:text-white sm:text-3xl">
+                        Verifying your payment
+                      </h1>
+
+                      <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
+                        We're confirming your transaction
+                        with Paystack. Please don't close
+                        this page.
+                      </p>
+                    </div>
+
+                    {/* PROGRESS */}
+                    <div className="mt-8 rounded-2xl border border-ink-100 bg-ink-50 p-4 dark:border-ink-800 dark:bg-ink-950/40">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-950/60">
+                          <LockKeyhole className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                        </div>
+
+                        <div className="min-w-0 flex-1 text-left">
+                          <p className="text-xs font-bold text-ink-800 dark:text-ink-200">
+                            Secure transaction verification
+                          </p>
+
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink-200 dark:bg-ink-800">
+                            <div className="h-full w-2/3 animate-pulse rounded-full bg-primary-600" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* SUCCESS */}
+                {!verifying &&
+                  verificationSuccess && (
+                    <>
+                      <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/30">
+                        <div className="absolute inset-0 rounded-full bg-emerald-500/10" />
+
+                        <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/20">
+                          <Check className="h-8 w-8 text-white" />
+                        </div>
+                      </div>
+
+                      <div className="mt-7">
+                        <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+
+                          Payment confirmed
+                        </div>
+
+                        <h1 className="mt-5 text-2xl font-black tracking-tight text-ink-900 dark:text-white sm:text-3xl">
+                          Payment successful
+                        </h1>
+
+                        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
+                          {verificationMessage ||
+                            "Your payment has been successfully verified and your booking is now confirmed."}
+                        </p>
+                      </div>
+
+                      {/* SUCCESS DETAILS */}
+                      <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                        <div className="flex items-start gap-3 text-left">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
+                            <ShieldCheck className="h-4 w-4 text-white" />
+                          </div>
+
+                          <div>
+                            <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">
+                              Booking confirmed
+                            </p>
+
+                            <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-400">
+                              Your payment has been verified.
+                              You can now manage your booking
+                              from your dashboard.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          navigate("/customer", {
+                            replace: true,
+                          })
+                        }
+                        className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-ink-900 px-5 py-4 text-sm font-bold text-white shadow-xl shadow-ink-900/10 transition hover:-translate-y-0.5 hover:opacity-90 dark:bg-white dark:text-ink-900"
+                      >
+                        Go to Dashboard
+
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
+
+                {/* FAILED */}
+                {!verifying &&
+                  !verificationSuccess && (
+                    <>
+                      <div className="relative mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30">
+                        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500 shadow-lg shadow-red-500/20">
+                          <AlertCircle className="h-8 w-8 text-white" />
+                        </div>
+                      </div>
+
+                      <div className="mt-7">
+                        <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                          <X className="h-3.5 w-3.5" />
+
+                          Verification failed
+                        </div>
+
+                        <h1 className="mt-5 text-2xl font-black tracking-tight text-ink-900 dark:text-white sm:text-3xl">
+                          Payment could not be verified
+                        </h1>
+
+                        <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
+                          {verificationMessage ||
+                            "We could not confirm this transaction. Your booking has not been marked as paid."}
+                        </p>
+                      </div>
+
+                      <div className="mt-7 rounded-2xl border border-red-100 bg-red-50/70 p-4 text-left dark:border-red-900/40 dark:bg-red-950/20">
+                        <div className="flex gap-3">
+                          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+
+                          <div>
+                            <p className="text-sm font-bold text-red-900 dark:text-red-300">
+                              What you can do
+                            </p>
+
+                            <p className="mt-1 text-xs leading-5 text-red-700 dark:text-red-400">
+                              If money was deducted from your
+                              account, don't make another
+                              payment immediately. Check your
+                              booking status or contact support
+                              first.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            window.location.reload()
+                          }
+                          className="flex items-center justify-center gap-2 rounded-2xl border border-ink-200 bg-white px-5 py-3.5 text-sm font-bold text-ink-800 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+                        >
+                          <RefreshCcw className="h-4 w-4" />
+
+                          Try Again
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate("/customer", {
+                              replace: true,
+                            })
+                          }
+                          className="flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-5 py-3.5 text-sm font-bold text-white transition hover:opacity-90 dark:bg-white dark:text-ink-900"
+                        >
+                          Dashboard
+
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+              </div>
+
+              {/* FOOTER */}
+              <div className="border-t border-ink-100 bg-ink-50/70 px-6 py-4 dark:border-ink-800 dark:bg-ink-950/40">
+                <div className="flex items-center justify-center gap-2 text-xs font-medium text-ink-500 dark:text-ink-400">
+                  <LockKeyhole className="h-3.5 w-3.5" />
+
+                  Secured by Servicely & Paystack
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ======================================================
   // BOOKING NOT FOUND
   // ======================================================
 
@@ -2295,19 +2718,24 @@ export function PaymentPage() {
         role="customer"
         navItems={customerNavItems}
       >
-        <div className="mx-auto flex min-h-[70vh] max-w-2xl items-center justify-center px-4">
-          <div className="w-full rounded-3xl border border-ink-100 bg-white p-8 text-center shadow-sm dark:border-ink-800 dark:bg-ink-900">
+        <div className="relative flex min-h-[70vh] items-center justify-center overflow-hidden px-4 py-10">
 
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30">
-              <X className="h-7 w-7 text-red-500" />
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full bg-red-500/5 blur-3xl" />
+          </div>
+
+          <div className="relative w-full max-w-lg rounded-[2rem] border border-ink-100 bg-white p-8 text-center shadow-xl shadow-ink-900/5 dark:border-ink-800 dark:bg-ink-900 sm:p-10">
+
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-red-50 dark:bg-red-950/30">
+              <X className="h-8 w-8 text-red-500" />
             </div>
 
-            <h2 className="mt-5 text-xl font-bold text-ink-900 dark:text-white">
+            <h2 className="mt-6 text-2xl font-black tracking-tight text-ink-900 dark:text-white">
               Booking not found
             </h2>
 
-            <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-              We could not find this booking. It may
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
+              We couldn't find this booking. It may
               have expired or may not have been loaded
               yet.
             </p>
@@ -2317,33 +2745,17 @@ export function PaymentPage() {
               onClick={() =>
                 navigate("/customer")
               }
-              className="mt-6 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white transition hover:opacity-90 dark:bg-white dark:text-ink-900"
+              className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-900/10 transition hover:-translate-y-0.5 hover:opacity-90 dark:bg-white dark:text-ink-900"
             >
               Back to Dashboard
+
+              <ChevronRight className="h-4 w-4" />
             </button>
           </div>
         </div>
       </DashboardLayout>
     );
   }
-
-  // ======================================================
-  // BOOKING PRICE
-  // ======================================================
-  //
-  // The frontend Booking interface uses `price`.
-  //
-  // The backend uses `amount`.
-  //
-  // The backend remains the source of truth for the
-  // actual payment amount.
-  //
-  // This value is only for displaying the booking
-  // information on this page.
-  //
-
-  const bookingPrice =
-    Number(booking.price) || 0;
 
   // ======================================================
   // PAYMENT PAGE
@@ -2354,223 +2766,284 @@ export function PaymentPage() {
       role="customer"
       navItems={customerNavItems}
     >
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="relative min-h-[calc(100vh-80px)] overflow-hidden px-4 py-6 sm:px-6 sm:py-10">
 
-        {/* BACK */}
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-500 transition hover:text-primary-600"
-        >
-          <ArrowLeft className="h-4 w-4" />
+        {/* BACKGROUND */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-primary-500/5 blur-3xl" />
 
-          Back
-        </button>
+          <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-blue-500/5 blur-3xl" />
+        </div>
 
-        <div className="rounded-3xl border border-ink-100 bg-white p-6 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-8">
+        <div className="relative mx-auto max-w-3xl">
 
-          {/* HEADER */}
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-400">
-            <CreditCard className="h-6 w-6" />
-          </div>
-
-          <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
-            Secure payment
-          </p>
-
-          <h1 className="mt-2 text-2xl font-black text-ink-900 dark:text-white">
-            Complete your payment
-          </h1>
-
-          <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-            Pay securely with Paystack to confirm
-            your booking.
-          </p>
-
-          {/* BOOKING DETAILS */}
-          <div className="mt-7 rounded-3xl border border-ink-100 p-5 dark:border-ink-800">
-
-            <div className="flex items-start justify-between gap-4">
-
-              <div className="min-w-0">
-
-                <p className="text-xs font-bold uppercase tracking-wider text-ink-400">
-                  Service
-                </p>
-
-                <p className="mt-1 break-words font-bold text-ink-900 dark:text-white">
-                  {booking.serviceName ||
-                    "Service"}
-                </p>
-
-                <p className="mt-1 break-words text-sm text-ink-500 dark:text-ink-400">
-                  {booking.providerName ||
-                    "Provider"}
-                </p>
-              </div>
-
-              <p className="shrink-0 text-xl font-black text-primary-600 dark:text-primary-400">
-                {formatNaira(
-                  bookingPrice
-                )}
-              </p>
-            </div>
-
-            <div className="mt-5 grid gap-4 border-t border-ink-100 pt-5 dark:border-ink-800 sm:grid-cols-2">
-
-              {/* DATE */}
-              <div className="flex gap-3">
-
-                <Calendar className="h-4 w-4 shrink-0 text-primary-600" />
-
-                <div className="min-w-0">
-
-                  <p className="text-xs text-ink-400">
-                    Date
-                  </p>
-
-                  <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {formatDate(
-                      booking.date
-                    )}
-                  </p>
-
-                </div>
-              </div>
-
-              {/* TIME */}
-              <div className="flex gap-3">
-
-                <Clock className="h-4 w-4 shrink-0 text-primary-600" />
-
-                <div className="min-w-0">
-
-                  <p className="text-xs text-ink-400">
-                    Time
-                  </p>
-
-                  <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {formatTime(
-                      booking.time
-                    )}
-                  </p>
-
-                </div>
-              </div>
-
-              {/* LOCATION */}
-              <div className="flex gap-3 sm:col-span-2">
-
-                <MapPin className="h-4 w-4 shrink-0 text-primary-600" />
-
-                <div className="min-w-0">
-
-                  <p className="text-xs text-ink-400">
-                    Location
-                  </p>
-
-                  <p className="mt-1 break-words text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {booking.location}
-                  </p>
-
-                </div>
-              </div>
-
-            </div>
-          </div>
-
-          {/* TOTAL */}
-          <div className="mt-5 rounded-2xl bg-ink-50 p-5 dark:bg-ink-950/50">
-
-            <div className="flex items-center justify-between gap-4">
-
-              <span className="text-sm font-semibold text-ink-500 dark:text-ink-400">
-                Amount to pay
-              </span>
-
-              <span className="text-2xl font-black text-ink-900 dark:text-white">
-                {formatNaira(
-                  bookingPrice
-                )}
-              </span>
-
-            </div>
-          </div>
-
-          {/* PAYMENT ERROR */}
-          {paymentError && (
-            <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
-
-              <div className="flex gap-3">
-
-                <X className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
-
-                <div className="min-w-0">
-
-                  <p className="text-sm font-bold text-red-800 dark:text-red-300">
-                    Payment could not start
-                  </p>
-
-                  <p className="mt-1 break-words text-xs leading-5 text-red-700 dark:text-red-400">
-                    {paymentError}
-                  </p>
-
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* SECURITY */}
-          <div className="mt-5 flex gap-3 rounded-2xl bg-emerald-50 p-4 dark:bg-emerald-950/20">
-
-            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
-
-            <div>
-
-              <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">
-                Secure payment
-              </p>
-
-              <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-400">
-                Your payment is processed securely
-                through Paystack. Your booking will
-                only be confirmed after successful
-                payment verification.
-              </p>
-
-            </div>
-
-          </div>
-
-          {/* PAY BUTTON */}
+          {/* BACK */}
           <button
             type="button"
-            onClick={handlePayment}
-            disabled={
-              paying ||
-              bookingPrice <= 0
-            }
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-5 py-4 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={() => navigate(-1)}
+            className="group mb-6 inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-semibold text-ink-500 transition hover:text-primary-600 dark:text-ink-400 dark:hover:text-primary-400"
           >
-            {paying ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
+            <ArrowLeft className="h-4 w-4 transition group-hover:-translate-x-0.5" />
 
-                Preparing Payment...
-              </>
-            ) : (
-              <>
-                <CreditCard className="h-5 w-5" />
-
-                Pay{" "}
-                {formatNaira(
-                  bookingPrice
-                )}
-              </>
-            )}
+            Back
           </button>
 
+          {/* MAIN CARD */}
+          <div className="overflow-hidden rounded-[2rem] border border-ink-100 bg-white shadow-2xl shadow-ink-900/5 dark:border-ink-800 dark:bg-ink-900">
+
+            {/* TOP ACCENT */}
+            <div className="h-1.5 bg-gradient-to-r from-primary-500 via-primary-600 to-blue-600" />
+
+            <div className="p-5 sm:p-8 lg:p-10">
+
+              {/* HEADER */}
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+
+                <div className="flex items-start gap-4">
+
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 shadow-sm dark:bg-primary-950/40 dark:text-primary-400">
+                    <CreditCard className="h-6 w-6" />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
+                        Secure checkout
+                      </span>
+                    </div>
+
+                    <h1 className="mt-1.5 text-2xl font-black tracking-tight text-ink-900 dark:text-white sm:text-3xl">
+                      Complete your payment
+                    </h1>
+
+                    <p className="mt-2 max-w-lg text-sm leading-6 text-ink-500 dark:text-ink-400">
+                      Confirm your booking by completing
+                      your secure payment through Paystack.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="hidden shrink-0 items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300 sm:flex">
+                  <LockKeyhole className="h-3.5 w-3.5" />
+
+                  Secure
+                </div>
+              </div>
+
+              {/* BOOKING SUMMARY */}
+              <div className="mt-8 overflow-hidden rounded-3xl border border-ink-100 dark:border-ink-800">
+
+                {/* SERVICE HEADER */}
+                <div className="bg-gradient-to-br from-ink-50 to-white p-5 dark:from-ink-950/70 dark:to-ink-900 sm:p-6">
+
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ink-400">
+                        Booking summary
+                      </p>
+
+                      <h2 className="mt-1.5 break-words text-lg font-black text-ink-900 dark:text-white sm:text-xl">
+                        {booking.serviceName ||
+                          "Service"}
+                      </h2>
+
+                      <p className="mt-1 text-sm font-medium text-ink-500 dark:text-ink-400">
+                        with{" "}
+                        <span className="text-ink-700 dark:text-ink-300">
+                          {booking.providerName ||
+                            "Provider"}
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 rounded-2xl bg-white px-4 py-3 text-left shadow-sm ring-1 ring-ink-100 dark:bg-ink-900 dark:ring-ink-800 sm:text-right">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">
+                        Total
+                      </p>
+
+                      <p className="mt-0.5 text-xl font-black text-primary-600 dark:text-primary-400">
+                        {formatNaira(
+                          bookingPrice
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DETAILS */}
+                <div className="grid gap-0 divide-y divide-ink-100 dark:divide-ink-800 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+
+                  {/* DATE */}
+                  <div className="flex gap-3 p-5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                      <Calendar className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                        Date
+                      </p>
+
+                      <p className="mt-1 text-sm font-bold text-ink-800 dark:text-ink-200">
+                        {formatDate(
+                          booking.date
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* TIME */}
+                  <div className="flex gap-3 p-5">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                      <Clock className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                        Time
+                      </p>
+
+                      <p className="mt-1 text-sm font-bold text-ink-800 dark:text-ink-200">
+                        {formatTime(
+                          booking.time
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* LOCATION */}
+                  <div className="flex gap-3 p-5 sm:col-span-2">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                      <MapPin className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                        Location
+                      </p>
+
+                      <p className="mt-1 break-words text-sm font-bold text-ink-800 dark:text-ink-200">
+                        {booking.location ||
+                          "Location not provided"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* PRICE */}
+              <div className="mt-5 rounded-3xl border border-primary-100 bg-primary-50/60 p-5 dark:border-primary-900/30 dark:bg-primary-950/20 sm:p-6">
+
+                <div className="flex items-center justify-between gap-4">
+
+                  <div>
+                    <p className="text-sm font-bold text-ink-700 dark:text-ink-300">
+                      Amount to pay
+                    </p>
+
+                    <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                      Your booking price
+                    </p>
+                  </div>
+
+                  <p className="text-2xl font-black tracking-tight text-ink-900 dark:text-white sm:text-3xl">
+                    {formatNaira(
+                      bookingPrice
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              {/* ERROR */}
+              {paymentError && (
+                <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
+
+                  <div className="flex gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-950/50">
+                      <X className="h-4 w-4 text-red-500" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-red-800 dark:text-red-300">
+                        Payment could not start
+                      </p>
+
+                      <p className="mt-1 break-words text-xs leading-5 text-red-700 dark:text-red-400">
+                        {paymentError}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECURITY */}
+              <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20">
+
+                <div className="flex gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/50">
+                    <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-bold text-emerald-900 dark:text-emerald-300">
+                      Safe & secure payment
+                    </p>
+
+                    <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-400">
+                      Your payment is processed securely
+                      by Paystack. Servicely only confirms
+                      your booking after successful payment
+                      verification.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* PAY BUTTON */}
+              <button
+                type="button"
+                onClick={handlePayment}
+                disabled={
+                  paying ||
+                  bookingPrice <= 0
+                }
+                className="group relative mt-6 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-primary-600 px-5 py-4 text-sm font-black text-white shadow-xl shadow-primary-600/20 transition duration-200 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-2xl hover:shadow-primary-600/25 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+              >
+                <span className="absolute inset-0 -translate-x-full bg-white/10 transition-transform duration-500 group-hover:translate-x-full" />
+
+                {paying ? (
+                  <>
+                    <Loader2 className="relative h-5 w-5 animate-spin" />
+
+                    <span className="relative">
+                      Preparing secure payment...
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="relative h-5 w-5" />
+
+                    <span className="relative">
+                      Pay{" "}
+                      {formatNaira(
+                        bookingPrice
+                      )}
+                    </span>
+
+                    <ChevronRight className="relative h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                  </>
+                )}
+              </button>
+
+              {/* FOOTER */}
+              <div className="mt-5 flex items-center justify-center gap-2 text-center text-[11px] font-medium text-ink-400 dark:text-ink-500">
+                <LockKeyhole className="h-3.5 w-3.5" />
+
+                Payments are securely handled by Paystack
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </DashboardLayout>
