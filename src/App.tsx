@@ -22,8 +22,6 @@ import { CustomerSaved } from '@/pages/customer/CustomerSaved';
 
 import {
   ProviderOnboarding,
-  ProviderRequests,
-  ProviderBookings,
   ProviderEarnings,
   ProviderReviews,
   ProviderSettings,
@@ -35,6 +33,8 @@ import { ProviderServices } from '@/pages/provider/ProviderServices';
 import { ProviderProfile } from '@/pages/provider/ProviderProfile';
 import { ProviderAvailability } from '@/pages/provider/ProviderAvailability';
 import { ProviderAccount } from '@/pages/provider/ProviderAccount';
+import { ProviderRequests } from '@/pages/provider/ProviderRequests';
+import { ProviderBookings } from '@/pages/provider/ProviderBookings';
 
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
