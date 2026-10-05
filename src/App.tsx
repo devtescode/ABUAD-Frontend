@@ -9,7 +9,6 @@ import { ProvidersPage, HowItWorksPage, AboutPage } from '@/pages/public/StaticP
 import { SignupRolePage, SignupPage, LoginPage, RoleLoginPage, ForgotPasswordPage } from '@/pages/auth/AuthPages';
 import {
   CustomerDashboard,
-  CustomerBookings,
   CustomerReviews,
   CustomerProfile,
   CustomerSettings,
@@ -17,6 +16,7 @@ import {
 
 import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
 import { CustomerSaved } from '@/pages/customer/CustomerSaved';
+import { CustomerBookings } from '@/pages/customer/CustomerBookings';
 
 
 

@@ -2063,33 +2063,204 @@ export function BookingConfirmed() {
 // Keep your existing imports for these if they are located elsewhere
 // import { formatNaira, formatDate, formatTime } from "...";
 
+
+
+
+
+const INVALID_BOOKINGS_KEY =
+  "servicely_invalid_bookings";
+
+// ======================================================
+// INVALID BOOKING STORAGE HELPERS
+// ======================================================
+
+function getInvalidBookingIds(): string[] {
+  try {
+    const stored =
+      sessionStorage.getItem(
+        INVALID_BOOKINGS_KEY
+      );
+
+    if (!stored) {
+      return [];
+    }
+
+    const parsed = JSON.parse(stored);
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .map((value) => String(value).trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function rememberInvalidBooking(
+  bookingId: string
+) {
+  const normalizedId =
+    String(bookingId || "").trim();
+
+  if (!normalizedId) {
+    return;
+  }
+
+  const currentIds =
+    getInvalidBookingIds();
+
+  if (!currentIds.includes(normalizedId)) {
+    currentIds.push(normalizedId);
+  }
+
+  sessionStorage.setItem(
+    INVALID_BOOKINGS_KEY,
+    JSON.stringify(currentIds)
+  );
+}
+
+function forgetInvalidBooking(
+  bookingId: string
+) {
+  const normalizedId =
+    String(bookingId || "").trim();
+
+  if (!normalizedId) {
+    return;
+  }
+
+  const remainingIds =
+    getInvalidBookingIds().filter(
+      (item) =>
+        String(item) !== normalizedId
+    );
+
+  if (remainingIds.length > 0) {
+    sessionStorage.setItem(
+      INVALID_BOOKINGS_KEY,
+      JSON.stringify(remainingIds)
+    );
+  } else {
+    sessionStorage.removeItem(
+      INVALID_BOOKINGS_KEY
+    );
+  }
+}
+
+// ======================================================
+// DATE FORMATTER
+// ======================================================
+
+// function formatDate(
+//   dateString: string
+// ) {
+//   if (!dateString) {
+//     return "Date not provided";
+//   }
+
+//   try {
+//     const date = new Date(dateString);
+
+//     if (Number.isNaN(date.getTime())) {
+//       return dateString;
+//     }
+
+//     return date.toLocaleDateString(
+//       "en-NG",
+//       {
+//         weekday: "long",
+//         day: "numeric",
+//         month: "long",
+//         year: "numeric",
+//       }
+//     );
+//   } catch {
+//     return dateString;
+//   }
+// }
+
+// ======================================================
+// TIME FORMATTER
+// ======================================================
+
+// function formatTime(
+//   timeString: string
+// ) {
+//   if (!timeString) {
+//     return "Time not provided";
+//   }
+
+//   try {
+//     const [hours, minutes] =
+//       timeString.split(":");
+
+//     const hour = Number(hours);
+
+//     if (
+//       Number.isNaN(hour) ||
+//       !minutes
+//     ) {
+//       return timeString;
+//     }
+
+//     const period =
+//       hour >= 12 ? "PM" : "AM";
+
+//     const formattedHour =
+//       hour % 12 || 12;
+
+//     return `${formattedHour}:${minutes} ${period}`;
+//   } catch {
+//     return timeString;
+//   }
+// }
+
+// ======================================================
+// PAYMENT PAGE
+// ======================================================
+
 export function PaymentPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const { bookings } = useBookings();
 
-  const [paying, setPaying] = useState(false);
-  const [paymentError, setPaymentError] = useState("");
+  const [resolvedBooking, setResolvedBooking] =
+    useState<Booking | null>(null);
 
-  const [verifying, setVerifying] = useState(false);
-  const [verificationSuccess, setVerificationSuccess] =
+  const [resolvingBooking, setResolvingBooking] =
     useState(false);
-  const [verificationMessage, setVerificationMessage] =
+
+  const [bookingResolutionFailed, setBookingResolutionFailed] =
+    useState(false);
+
+  const [paying, setPaying] =
+    useState(false);
+
+  const [paymentError, setPaymentError] =
     useState("");
 
-  const API_URL =
-    import.meta.env.VITE_API_URL ||
-    "http://localhost:5000";
+  const [verifying, setVerifying] =
+    useState(false);
+
+  const [verificationSuccess, setVerificationSuccess] =
+    useState(false);
+
+  const [verificationMessage, setVerificationMessage] =
+    useState("");
 
   // ======================================================
   // DETECT PAYSTACK CALLBACK
   // ======================================================
 
   const paymentReference = useMemo(() => {
-    const params = new URLSearchParams(
-      window.location.search
-    );
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
 
     return (
       params.get("reference") ||
@@ -2102,45 +2273,59 @@ export function PaymentPage() {
     Boolean(paymentReference);
 
   // ======================================================
-  // FIND BOOKING
+  // FIND BOOKING FROM APP CONTEXT
   // ======================================================
-  //
-  // Normal payment page:
-  //
-  // /payment/MONGODB_BOOKING_ID
-  //
-  // Paystack callback:
-  //
-  // /payment/verify?trxref=SERVICELY-...
-  //
-  // The callback does NOT use the booking ID.
-  //
 
-  const booking = bookings.find(
-    (item: Booking) =>
-      String(item.id) === String(id)
-  );
+  const contextBooking =
+    bookings.find(
+      (item: Booking) =>
+        String(item.id) === String(id)
+    ) || null;
 
   // ======================================================
-  // VERIFY PAYSTACK PAYMENT
+  // FINAL BOOKING
   // ======================================================
+  //
+  // Prefer booking from AppContext.
+  // If AppContext does not have it, resolvedBooking
+  // contains the booking fetched directly from backend.
+  //
+
+  const booking =
+    contextBooking || resolvedBooking;
+
+  // ======================================================
+  // RESOLVE BOOKING FROM BACKEND
+  // ======================================================
+  //
+  // This prevents the page from immediately saying
+  // "Booking not found" while AppContext is still loading.
+  //
 
   useEffect(() => {
-    if (!isPaymentCallback || !paymentReference) {
+    if (isPaymentCallback) {
+      return;
+    }
+
+    if (!id) {
+      return;
+    }
+
+    // Already available from AppContext.
+    if (contextBooking) {
+      forgetInvalidBooking(id);
+      setResolvedBooking(null);
+      setResolvingBooking(false);
+      setBookingResolutionFailed(false);
       return;
     }
 
     let cancelled = false;
 
-    const verifyPaystackPayment = async () => {
+    const resolveBooking = async () => {
       try {
-        setVerifying(true);
-        setVerificationSuccess(false);
-        setVerificationMessage("");
-
-        // ==========================================
-        // GET AUTH TOKEN
-        // ==========================================
+        setResolvingBooking(true);
+        setBookingResolutionFailed(false);
 
         const token =
           sessionStorage.getItem(
@@ -2148,32 +2333,25 @@ export function PaymentPage() {
           );
 
         if (!token) {
-          navigate("/login/customer", {
-            replace: true,
-          });
+          navigate(
+            "/login/customer",
+            {
+              replace: true,
+            }
+          );
 
           return;
         }
 
-        console.log(
-          "Paystack callback reference:",
-          paymentReference
-        );
-
-        // ==========================================
-        // VERIFY PAYMENT WITH BACKEND
-        // ==========================================
-
         const response = await fetch(
-          `${API_URL}/payments/verify/${encodeURIComponent(
-            paymentReference
-          )}`,
+          `${API_URL}/bookings/my-bookings`,
           {
             method: "GET",
-
             headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
+              Authorization:
+                `Bearer ${token}`,
+              Accept:
+                "application/json",
             },
           }
         );
@@ -2188,81 +2366,249 @@ export function PaymentPage() {
           );
         }
 
-        console.log(
-          "Payment verification response:",
-          result
-        );
-
         if (!response.ok) {
           throw new Error(
             result?.message ||
-              `Unable to verify payment (${response.status}).`
+              `Unable to load booking (${response.status}).`
           );
         }
 
-        if (
-          !result?.success ||
-          !result?.verified
-        ) {
-          throw new Error(
-            result?.message ||
-              "Payment could not be verified."
-          );
-        }
+        const backendBookings =
+          Array.isArray(
+            result?.bookings
+          )
+            ? result.bookings
+            : [];
+
+        const foundBooking =
+          backendBookings.find(
+            (item: Booking) =>
+              String(item.id) ===
+              String(id)
+          ) || null;
 
         if (cancelled) {
           return;
         }
 
-        // ==========================================
-        // SUCCESS
-        // ==========================================
+        // ==============================================
+        // BOOKING EXISTS
+        // ==============================================
 
-        setVerificationSuccess(true);
+        if (foundBooking) {
+          forgetInvalidBooking(id);
 
-        setVerificationMessage(
-          result?.message ||
-            "Your payment has been verified successfully."
+          setResolvedBooking(
+            foundBooking
+          );
+
+          setBookingResolutionFailed(
+            false
+          );
+
+          return;
+        }
+
+        // ==============================================
+        // BOOKING DOES NOT EXIST
+        // ==============================================
+
+        rememberInvalidBooking(id);
+
+        setResolvedBooking(null);
+
+        setBookingResolutionFailed(
+          true
         );
-
-        // ==========================================
-        // CLEAN CALLBACK URL
-        // ==========================================
-        //
-        // Removes:
-        // ?trxref=...
-        // ?reference=...
-        //
-        // without reloading the page.
-        //
-
-        window.history.replaceState(
-          {},
-          document.title,
-          "/payment/verify"
-        );
-      } catch (error: any) {
+      } catch (error) {
         if (cancelled) {
           return;
         }
 
         console.error(
-          "Payment verification error:",
+          "BOOKING RESOLUTION ERROR:",
           error
         );
 
-        setVerificationSuccess(false);
+        // Do not immediately remove the booking
+        // if the request itself failed.
+        //
+        // This prevents a temporary network error
+        // from deleting a valid booking from the list.
 
-        setVerificationMessage(
-          error?.message ||
-            "Unable to verify your payment. Please try again."
+        setBookingResolutionFailed(
+          false
         );
       } finally {
         if (!cancelled) {
-          setVerifying(false);
+          setResolvingBooking(false);
         }
       }
     };
+
+    resolveBooking();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    API_URL,
+    id,
+    contextBooking,
+    isPaymentCallback,
+    navigate,
+  ]);
+
+  // ======================================================
+  // VERIFY PAYSTACK PAYMENT
+  // ======================================================
+
+  useEffect(() => {
+    if (
+      !isPaymentCallback ||
+      !paymentReference
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const verifyPaystackPayment =
+      async () => {
+        try {
+          setVerifying(true);
+          setVerificationSuccess(false);
+          setVerificationMessage("");
+
+          // ==========================================
+          // GET AUTH TOKEN
+          // ==========================================
+
+          const token =
+            sessionStorage.getItem(
+              "servicely_token"
+            );
+
+          if (!token) {
+            navigate(
+              "/login/customer",
+              {
+                replace: true,
+              }
+            );
+
+            return;
+          }
+
+          console.log(
+            "Paystack callback reference:",
+            paymentReference
+          );
+
+          // ==========================================
+          // VERIFY PAYMENT WITH BACKEND
+          // ==========================================
+
+          const response = await fetch(
+            `${API_URL}/payments/verify/${encodeURIComponent(
+              paymentReference
+            )}`,
+            {
+              method: "GET",
+
+              headers: {
+                Authorization:
+                  `Bearer ${token}`,
+
+                Accept:
+                  "application/json",
+              },
+            }
+          );
+
+          let result: any = {};
+
+          try {
+            result =
+              await response.json();
+          } catch {
+            throw new Error(
+              `The server returned an invalid response (${response.status}).`
+            );
+          }
+
+          console.log(
+            "Payment verification response:",
+            result
+          );
+
+          if (!response.ok) {
+            throw new Error(
+              result?.message ||
+                `Unable to verify payment (${response.status}).`
+            );
+          }
+
+          if (
+            !result?.success ||
+            !result?.verified
+          ) {
+            throw new Error(
+              result?.message ||
+                "Payment could not be verified."
+            );
+          }
+
+          if (cancelled) {
+            return;
+          }
+
+          // ==========================================
+          // SUCCESS
+          // ==========================================
+
+          setVerificationSuccess(
+            true
+          );
+
+          setVerificationMessage(
+            result?.message ||
+              "Your payment has been verified successfully."
+          );
+
+          // ==========================================
+          // CLEAN CALLBACK URL
+          // ==========================================
+
+          window.history.replaceState(
+            {},
+            document.title,
+            "/payment/verify"
+          );
+        } catch (error: any) {
+          if (cancelled) {
+            return;
+          }
+
+          console.error(
+            "Payment verification error:",
+            error
+          );
+
+          setVerificationSuccess(
+            false
+          );
+
+          setVerificationMessage(
+            error?.message ||
+              "Unable to verify your payment. Please try again."
+          );
+        } finally {
+          if (!cancelled) {
+            setVerifying(false);
+          }
+        }
+      };
 
     verifyPaystackPayment();
 
@@ -2303,9 +2649,12 @@ export function PaymentPage() {
         );
 
       if (!token) {
-        navigate("/login/customer", {
-          replace: true,
-        });
+        navigate(
+          "/login/customer",
+          {
+            replace: true,
+          }
+        );
 
         return;
       }
@@ -2315,7 +2664,9 @@ export function PaymentPage() {
       // ==========================================
 
       const bookingId =
-        String(booking.id || "").trim();
+        String(
+          booking.id || ""
+        ).trim();
 
       if (!bookingId) {
         throw new Error(
@@ -2335,6 +2686,10 @@ export function PaymentPage() {
       if (!isValidMongoId) {
         console.error(
           "Invalid booking ID:",
+          bookingId
+        );
+
+        rememberInvalidBooking(
           bookingId
         );
 
@@ -2386,7 +2741,8 @@ export function PaymentPage() {
       let result: any = {};
 
       try {
-        result = await response.json();
+        result =
+          await response.json();
       } catch {
         throw new Error(
           `The server returned an invalid response (${response.status}).`
@@ -2397,6 +2753,35 @@ export function PaymentPage() {
         "Payment initialization response:",
         result
       );
+
+      // ==========================================
+      // BOOKING DOES NOT EXIST
+      // ==========================================
+
+      if (
+        response.status === 404 &&
+        /booking/i.test(
+          String(
+            result?.message ||
+              result?.error ||
+              ""
+          )
+        )
+      ) {
+        rememberInvalidBooking(
+          bookingId
+        );
+
+        setPaymentError(
+          "This booking is no longer available."
+        );
+
+        setTimeout(() => {
+          navigate(-1);
+        }, 800);
+
+        return;
+      }
 
       // ==========================================
       // HANDLE BACKEND ERROR
@@ -2423,7 +2808,8 @@ export function PaymentPage() {
 
       const authorizationUrl =
         result?.authorization_url ||
-        result?.data?.authorization_url;
+        result?.data
+          ?.authorization_url;
 
       if (!authorizationUrl) {
         console.error(
@@ -2468,7 +2854,9 @@ export function PaymentPage() {
   // ======================================================
 
   const bookingPrice =
-    Number(booking?.price) || 0;
+    Number(
+      booking?.price
+    ) || 0;
 
   // ======================================================
   // PAYMENT CALLBACK UI
@@ -2482,7 +2870,7 @@ export function PaymentPage() {
       >
         <div className="relative flex min-h-[calc(100vh-80px)] items-center justify-center overflow-hidden px-4 py-10 sm:px-6">
 
-          {/* BACKGROUND DECORATION */}
+          {/* BACKGROUND */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl" />
 
@@ -2513,7 +2901,6 @@ export function PaymentPage() {
                     <div className="mt-7">
                       <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 text-xs font-bold text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
                         <Sparkles className="h-3.5 w-3.5" />
-
                         Processing securely
                       </div>
 
@@ -2522,13 +2909,13 @@ export function PaymentPage() {
                       </h1>
 
                       <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
-                        We're confirming your transaction
-                        with Paystack. Please don't close
-                        this page.
+                        We're confirming your
+                        transaction with Paystack.
+                        Please don't close this
+                        page.
                       </p>
                     </div>
 
-                    {/* PROGRESS */}
                     <div className="mt-8 rounded-2xl border border-ink-100 bg-ink-50 p-4 dark:border-ink-800 dark:bg-ink-950/40">
                       <div className="flex items-center gap-3">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-950/60">
@@ -2564,7 +2951,6 @@ export function PaymentPage() {
                       <div className="mt-7">
                         <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
                           <CheckCircle2 className="h-3.5 w-3.5" />
-
                           Payment confirmed
                         </div>
 
@@ -2578,7 +2964,6 @@ export function PaymentPage() {
                         </p>
                       </div>
 
-                      {/* SUCCESS DETAILS */}
                       <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
                         <div className="flex items-start gap-3 text-left">
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-500">
@@ -2591,9 +2976,10 @@ export function PaymentPage() {
                             </p>
 
                             <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-400">
-                              Your payment has been verified.
-                              You can now manage your booking
-                              from your dashboard.
+                              Your payment has been
+                              verified. You can now
+                              manage your booking from
+                              your dashboard.
                             </p>
                           </div>
                         </div>
@@ -2602,9 +2988,12 @@ export function PaymentPage() {
                       <button
                         type="button"
                         onClick={() =>
-                          navigate("/customer", {
-                            replace: true,
-                          })
+                          navigate(
+                            "/customer",
+                            {
+                              replace: true,
+                            }
+                          )
                         }
                         className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-ink-900 px-5 py-4 text-sm font-bold text-white shadow-xl shadow-ink-900/10 transition hover:-translate-y-0.5 hover:opacity-90 dark:bg-white dark:text-ink-900"
                       >
@@ -2628,7 +3017,6 @@ export function PaymentPage() {
                       <div className="mt-7">
                         <div className="mx-auto flex w-fit items-center gap-2 rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 dark:bg-red-950/30 dark:text-red-300">
                           <X className="h-3.5 w-3.5" />
-
                           Verification failed
                         </div>
 
@@ -2652,11 +3040,12 @@ export function PaymentPage() {
                             </p>
 
                             <p className="mt-1 text-xs leading-5 text-red-700 dark:text-red-400">
-                              If money was deducted from your
-                              account, don't make another
-                              payment immediately. Check your
-                              booking status or contact support
-                              first.
+                              If money was deducted
+                              from your account, don't
+                              make another payment
+                              immediately. Check your
+                              booking status or contact
+                              support first.
                             </p>
                           </div>
                         </div>
@@ -2671,16 +3060,18 @@ export function PaymentPage() {
                           className="flex items-center justify-center gap-2 rounded-2xl border border-ink-200 bg-white px-5 py-3.5 text-sm font-bold text-ink-800 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
                         >
                           <RefreshCcw className="h-4 w-4" />
-
                           Try Again
                         </button>
 
                         <button
                           type="button"
                           onClick={() =>
-                            navigate("/customer", {
-                              replace: true,
-                            })
+                            navigate(
+                              "/customer",
+                              {
+                                replace: true,
+                              }
+                            )
                           }
                           className="flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-5 py-3.5 text-sm font-bold text-white transition hover:opacity-90 dark:bg-white dark:text-ink-900"
                         >
@@ -2693,11 +3084,9 @@ export function PaymentPage() {
                   )}
               </div>
 
-              {/* FOOTER */}
               <div className="border-t border-ink-100 bg-ink-50/70 px-6 py-4 dark:border-ink-800 dark:bg-ink-950/40">
                 <div className="flex items-center justify-center gap-2 text-xs font-medium text-ink-500 dark:text-ink-400">
                   <LockKeyhole className="h-3.5 w-3.5" />
-
                   Secured by Servicely & Paystack
                 </div>
               </div>
@@ -2709,17 +3098,56 @@ export function PaymentPage() {
   }
 
   // ======================================================
-  // BOOKING NOT FOUND
+  // RESOLVING BOOKING
   // ======================================================
 
-  if (!booking) {
+  if (
+    !booking &&
+    resolvingBooking
+  ) {
     return (
       <DashboardLayout
         role="customer"
         navItems={customerNavItems}
       >
         <div className="relative flex min-h-[70vh] items-center justify-center overflow-hidden px-4 py-10">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full bg-primary-500/5 blur-3xl" />
+          </div>
 
+          <div className="relative w-full max-w-lg rounded-[2rem] border border-ink-100 bg-white p-8 text-center shadow-xl shadow-ink-900/5 dark:border-ink-800 dark:bg-ink-900 sm:p-10">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-primary-50 dark:bg-primary-950/30">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600 dark:text-primary-400" />
+            </div>
+
+            <h2 className="mt-6 text-2xl font-black tracking-tight text-ink-900 dark:text-white">
+              Loading booking
+            </h2>
+
+            <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
+              We're loading your booking details.
+              Please wait a moment.
+            </p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ======================================================
+  // BOOKING NOT FOUND
+  // ======================================================
+
+  if (
+    !booking &&
+    bookingResolutionFailed
+  ) {
+    return (
+      <DashboardLayout
+        role="customer"
+        navItems={customerNavItems}
+      >
+        <div className="relative flex min-h-[70vh] items-center justify-center overflow-hidden px-4 py-10">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute left-1/2 top-20 h-64 w-64 -translate-x-1/2 rounded-full bg-red-500/5 blur-3xl" />
           </div>
@@ -2735,21 +3163,21 @@ export function PaymentPage() {
             </h2>
 
             <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
-              We couldn't find this booking. It may
-              have expired or may not have been loaded
-              yet.
+              We couldn't find this booking.
+              It may have been removed or is
+              no longer available for payment.
             </p>
 
             <button
               type="button"
               onClick={() =>
-                navigate("/customer")
+                navigate(-1)
               }
               className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-900/10 transition hover:-translate-y-0.5 hover:opacity-90 dark:bg-white dark:text-ink-900"
             >
-              Back to Dashboard
+              <ArrowLeft className="h-4 w-4" />
 
-              <ChevronRight className="h-4 w-4" />
+              Back to My Bookings
             </button>
           </div>
         </div>
@@ -2780,11 +3208,12 @@ export function PaymentPage() {
           {/* BACK */}
           <button
             type="button"
-            onClick={() => navigate(-1)}
+            onClick={() =>
+              navigate(-1)
+            }
             className="group mb-6 inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-semibold text-ink-500 transition hover:text-primary-600 dark:text-ink-400 dark:hover:text-primary-400"
           >
             <ArrowLeft className="h-4 w-4 transition group-hover:-translate-x-0.5" />
-
             Back
           </button>
 
@@ -2806,26 +3235,24 @@ export function PaymentPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
-                        Secure checkout
-                      </span>
-                    </div>
+                    <span className="text-xs font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
+                      Secure checkout
+                    </span>
 
                     <h1 className="mt-1.5 text-2xl font-black tracking-tight text-ink-900 dark:text-white sm:text-3xl">
                       Complete your payment
                     </h1>
 
                     <p className="mt-2 max-w-lg text-sm leading-6 text-ink-500 dark:text-ink-400">
-                      Confirm your booking by completing
-                      your secure payment through Paystack.
+                      Confirm your booking by
+                      completing your secure payment
+                      through Paystack.
                     </p>
                   </div>
                 </div>
 
                 <div className="hidden shrink-0 items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300 sm:flex">
                   <LockKeyhole className="h-3.5 w-3.5" />
-
                   Secure
                 </div>
               </div>
@@ -2844,14 +3271,14 @@ export function PaymentPage() {
                       </p>
 
                       <h2 className="mt-1.5 break-words text-lg font-black text-ink-900 dark:text-white sm:text-xl">
-                        {booking.serviceName ||
+                        {booking?.serviceName ||
                           "Service"}
                       </h2>
 
                       <p className="mt-1 text-sm font-medium text-ink-500 dark:text-ink-400">
                         with{" "}
                         <span className="text-ink-700 dark:text-ink-300">
-                          {booking.providerName ||
+                          {booking?.providerName ||
                             "Provider"}
                         </span>
                       </p>
@@ -2887,7 +3314,7 @@ export function PaymentPage() {
 
                       <p className="mt-1 text-sm font-bold text-ink-800 dark:text-ink-200">
                         {formatDate(
-                          booking.date
+                          booking?.date || ""
                         )}
                       </p>
                     </div>
@@ -2906,7 +3333,7 @@ export function PaymentPage() {
 
                       <p className="mt-1 text-sm font-bold text-ink-800 dark:text-ink-200">
                         {formatTime(
-                          booking.time
+                          booking?.time || ""
                         )}
                       </p>
                     </div>
@@ -2924,7 +3351,7 @@ export function PaymentPage() {
                       </p>
 
                       <p className="mt-1 break-words text-sm font-bold text-ink-800 dark:text-ink-200">
-                        {booking.location ||
+                        {booking?.location ||
                           "Location not provided"}
                       </p>
                     </div>
@@ -2958,7 +3385,6 @@ export function PaymentPage() {
               {/* ERROR */}
               {paymentError && (
                 <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-900/50 dark:bg-red-950/20">
-
                   <div className="flex gap-3">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-100 dark:bg-red-950/50">
                       <X className="h-4 w-4 text-red-500" />
@@ -2979,7 +3405,6 @@ export function PaymentPage() {
 
               {/* SECURITY */}
               <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 dark:border-emerald-900/30 dark:bg-emerald-950/20">
-
                 <div className="flex gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 dark:bg-emerald-950/50">
                     <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -2991,10 +3416,10 @@ export function PaymentPage() {
                     </p>
 
                     <p className="mt-1 text-xs leading-5 text-emerald-700 dark:text-emerald-400">
-                      Your payment is processed securely
-                      by Paystack. Servicely only confirms
-                      your booking after successful payment
-                      verification.
+                      Your payment is processed
+                      securely by Paystack. Servicely
+                      only confirms your booking after
+                      successful payment verification.
                     </p>
                   </div>
                 </div>
@@ -3039,7 +3464,6 @@ export function PaymentPage() {
               {/* FOOTER */}
               <div className="mt-5 flex items-center justify-center gap-2 text-center text-[11px] font-medium text-ink-400 dark:text-ink-500">
                 <LockKeyhole className="h-3.5 w-3.5" />
-
                 Payments are securely handled by Paystack
               </div>
             </div>
@@ -3049,6 +3473,8 @@ export function PaymentPage() {
     </DashboardLayout>
   );
 }
+
+
 
 /* =========================================================
    REVIEW PAGE

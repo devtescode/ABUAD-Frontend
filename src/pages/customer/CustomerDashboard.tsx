@@ -93,64 +93,7 @@ export function CustomerDashboard() {
 
 
 
-export function CustomerBookings() {
-  const { bookings } = useBookings();
-  const [filter, setFilter] = useState<string>('all');
-  const filtered = filter === 'all' ? bookings : bookings.filter((b) => b.status === filter);
-  const tabs = ['all', 'pending', 'accepted', 'payment_pending', 'paid', 'completed', 'cancelled'];
 
-  return (
-    <DashboardLayout role="customer" navItems={navItems}>
-      <DashboardHeader title="My Bookings" subtitle="View and manage all your bookings" />
-      <div className="mb-4 flex gap-2 overflow-x-auto no-scrollbar">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            onClick={() => setFilter(t)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium capitalize ${filter === t ? 'bg-primary-600 text-white' : 'bg-ink-100 text-ink-600'}`}
-          >
-            {t.replace('_', ' ')}
-          </button>
-        ))}
-      </div>
-      {filtered.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-20 text-center">
-          <Calendar className="h-12 w-12 text-ink-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No bookings found</h3>
-          <p className="mt-1 text-sm text-ink-500">Book a service to see it here.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((booking) => (
-            <div key={booking.id} className="card flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-              <img src={booking.providerAvatar} alt="" className="h-14 w-14 rounded-xl object-cover" />
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold text-ink-900">{booking.serviceName}</h3>
-                  <StatusBadge status={booking.status} />
-                </div>
-                <p className="mt-0.5 text-sm text-ink-500">{booking.providerName}</p>
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-400">
-                  <span>{booking.date} at {booking.time}</span>
-                  <span>{booking.location}</span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 sm:flex-col sm:items-end">
-                <span className="font-bold text-ink-900">{formatNaira(booking.price)}</span>
-                {booking.status === 'payment_pending' && (
-                  <Link to={`/payment/${booking.id}`} className="btn-primary btn-sm">Pay Now</Link>
-                )}
-                {booking.status === 'completed' && (
-                  <Link to={`/review/${booking.id}`} className="btn-outline btn-sm">Leave Review</Link>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </DashboardLayout>
-  );
-}
 
 export function CustomerReviews() {
   const { bookings } = useBookings();
