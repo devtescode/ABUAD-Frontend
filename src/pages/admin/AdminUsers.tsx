@@ -13,6 +13,7 @@ import {
   Hash,
   Search,
   LoaderCircle,
+  User2Icon,
 } from 'lucide-react';
 
 import {
@@ -26,7 +27,10 @@ interface User {
   _id: string;
   name: string;
   email: string;
+  phoneNumber: string;
+  avatar?: string;
   role: 'customer' | 'provider';
+  gender: 'male' | 'female' | 'other';
   status?: 'active' | 'pending' | 'suspended';
   createdAt: string;
 }
@@ -223,9 +227,8 @@ export function AdminUsers() {
             {loading
               ? 'Loading users...'
               : searchQuery
-              ? `${filteredUsers.length} of ${users.length} users`
-              : `${users.length} user${
-                  users.length !== 1 ? 's' : ''
+                ? `${filteredUsers.length} of ${users.length} users`
+                : `${users.length} user${users.length !== 1 ? 's' : ''
                 }`}
           </p>
         </div>
@@ -283,9 +286,8 @@ export function AdminUsers() {
             className="btn-ghost btn-sm flex h-10 items-center justify-center gap-2"
           >
             <RefreshCw
-              className={`h-4 w-4 ${
-                refreshing ? 'animate-spin' : ''
-              }`}
+              className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''
+                }`}
             />
 
             <span className="hidden sm:inline">
@@ -432,8 +434,32 @@ export function AdminUsers() {
                       className="transition-colors hover:bg-ink-50 dark:hover:bg-ink-800/50"
                     >
                       <td className="p-4">
-                        <div className="font-medium text-ink-900 dark:text-ink-50">
-                          {user.name}
+                        <div className="flex items-center gap-3">
+                          {/* Profile Image */}
+                          {user.avatar ? (
+                            <img
+                              src={user.avatar}
+                              alt={user.name}
+                              className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-ink-100 dark:ring-ink-700"
+                              onError={(event) => {
+                                event.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700 dark:bg-primary-950/40 dark:text-primary-300">
+                              {user.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <div className="truncate font-medium text-ink-900 dark:text-ink-50">
+                              {user.name}
+                            </div>
+
+                            <div className="text-xs capitalize text-ink-400">
+                              {user.role}
+                            </div>
+                          </div>
                         </div>
                       </td>
 
@@ -619,47 +645,106 @@ export function AdminUsers() {
               }
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between border-b border-ink-100 px-6 py-5 dark:border-ink-800">
-                <div className="flex items-center gap-3">
-                  <motion.div
-                    initial={{
-                      scale: 0.8,
-                      opacity: 0,
-                    }}
-                    animate={{
-                      scale: 1,
-                      opacity: 1,
-                    }}
-                    transition={{
-                      delay: 0.08,
-                      duration: 0.2,
-                    }}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-100 text-primary-700"
-                  >
-                    <UserRound className="h-5 w-5" />
-                  </motion.div>
+              <div className="relative overflow-hidden border-b border-ink-100 bg-white px-6 py-5 dark:border-ink-800 dark:bg-ink-900">
+                {/* Subtle background decoration */}
+                <div className="pointer-events-none absolute -right-10 -top-16 h-32 w-32 rounded-full bg-primary-500/5 blur-2xl" />
 
-                  <div>
-                    <h2
-                      id="user-details-title"
-                      className="text-lg font-semibold text-ink-900 dark:text-ink-50"
+                <div className="relative flex items-center justify-between gap-4">
+                  {/* User information */}
+                  <div className="flex min-w-0 items-center gap-4">
+                    {/* Profile image */}
+                    <motion.div
+                      initial={{
+                        scale: 0.8,
+                        opacity: 0,
+                      }}
+                      animate={{
+                        scale: 1,
+                        opacity: 1,
+                      }}
+                      transition={{
+                        delay: 0.05,
+                        duration: 0.25,
+                        ease: "easeOut",
+                      }}
+                      className="relative shrink-0"
                     >
-                      User Details
-                    </h2>
+                      {selectedUser.avatar ? (
+                        <img
+                          src={selectedUser.avatar}
+                          alt={selectedUser.name}
+                          className="h-14 w-14 rounded-full object-cover ring-2 ring-white shadow-md dark:ring-ink-900"
+                        />
+                      ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 text-primary-700 shadow-sm dark:bg-primary-950/50 dark:text-primary-300">
+                          <UserRound className="h-6 w-6" />
+                        </div>
+                      )}
 
-                    <p className="text-sm text-ink-500">
-                      Account information
-                    </p>
+                      {/* Online/active indicator */}
+                      {getStatus(selectedUser) === "active" && (
+                        <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-primary-500 dark:border-ink-900" />
+                      )}
+                    </motion.div>
+
+                    {/* Name + details */}
+                    <motion.div
+                      initial={{
+                        opacity: 0,
+                        x: -8,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        x: 0,
+                      }}
+                      transition={{
+                        delay: 0.1,
+                        duration: 0.25,
+                      }}
+                      className="min-w-0"
+                    >
+                      <h2
+                        id="user-details-title"
+                        className="truncate text-lg font-semibold text-ink-900 dark:text-ink-50"
+                      >
+                        {selectedUser.name}
+                      </h2>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-sm text-ink-500 dark:text-ink-400">
+                          User Details
+                        </span>
+
+                        <span className="h-1 w-1 rounded-full bg-ink-300 dark:bg-ink-600" />
+
+                        <span className="text-sm capitalize text-ink-500 dark:text-ink-400">
+                          {selectedUser.role}
+                        </span>
+
+                        <span
+                          className={`badge ${getStatus(selectedUser) === "active"
+                              ? "bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300"
+                              : getStatusClasses(getStatus(selectedUser))
+                            }`}
+                        >
+                          {getStatus(selectedUser)}
+                        </span>
+                      </div>
+                    </motion.div>
                   </div>
-                </div>
 
-                <button
-                  onClick={closeUserModal}
-                  className="btn-ghost btn-sm"
-                  aria-label="Close user details"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+                  {/* Close button */}
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={closeUserModal}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800 dark:hover:text-ink-100"
+                    aria-label="Close user details"
+                  >
+                    <X className="h-5 w-5" />
+                  </motion.button>
+                </div>
               </div>
 
               {/* Modal Content */}
@@ -725,6 +810,64 @@ export function AdminUsers() {
 
                     <p className="break-all text-sm font-medium text-ink-800 dark:text-ink-100">
                       {selectedUser.email}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Number */}
+                <motion.div
+                  variants={{
+                    hidden: {
+                      opacity: 0,
+                      y: 8,
+                    },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                    },
+                  }}
+                  className="flex items-start gap-3"
+                >
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                    <Mail className="h-4 w-4" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-xs text-ink-400">
+                      Phone Number
+                    </p>
+
+                    <p className="break-all text-sm font-medium text-ink-800 dark:text-ink-100">
+                      {selectedUser.phoneNumber}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Role */}
+                <motion.div
+                  variants={{
+                    hidden: {
+                      opacity: 0,
+                      y: 8,
+                    },
+                    visible: {
+                      opacity: 1,
+                      y: 0,
+                    },
+                  }}
+                  className="flex items-start gap-3"
+                >
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300">
+                    <User2Icon className="h-4 w-4" />
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-ink-400">
+                      Gender
+                    </p>
+
+                    <p className="text-sm font-medium capitalize text-ink-800 dark:text-ink-100">
+                      {selectedUser.gender}
                     </p>
                   </div>
                 </motion.div>
