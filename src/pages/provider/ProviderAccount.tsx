@@ -53,6 +53,7 @@ export function ProviderAccount() {
   const [loading, setLoading] = useState(true);
   const [banksLoading, setBanksLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -62,7 +63,8 @@ export function ProviderAccount() {
   const selectedBank = useMemo(
     () =>
       banks.find(
-        (bank) => String(bank.code) === String(account.bankCode)
+        (bank) =>
+          String(bank.code) === String(account.bankCode)
       ),
     [banks, account.bankCode]
   );
@@ -78,7 +80,9 @@ export function ProviderAccount() {
       setError("");
 
       if (!token) {
-        setError("Your session has expired. Please login again.");
+        setError(
+          "Your session has expired. Please login again."
+        );
         return;
       }
 
@@ -96,21 +100,31 @@ export function ProviderAccount() {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.message || "Failed to load payment account"
+          data.message ||
+            "Failed to load payment account"
         );
       }
 
       setAccount({
-        accountName: data.account?.accountName || "",
-        accountNumber: data.account?.accountNumber || "",
-        bankCode: data.account?.bankCode || "",
-        bankName: data.account?.bankName || "",
-        isVerified: Boolean(data.account?.isVerified),
-        hasSubaccount: Boolean(data.account?.hasSubaccount),
+        accountName:
+          data.account?.accountName || "",
+        accountNumber:
+          data.account?.accountNumber || "",
+        bankCode:
+          data.account?.bankCode || "",
+        bankName:
+          data.account?.bankName || "",
+        isVerified: Boolean(
+          data.account?.isVerified
+        ),
+        hasSubaccount: Boolean(
+          data.account?.hasSubaccount
+        ),
       });
     } catch (err: any) {
       setError(
-        err.message || "Failed to load payment account"
+        err.message ||
+          "Failed to load payment account"
       );
     } finally {
       setLoading(false);
@@ -137,17 +151,110 @@ export function ProviderAccount() {
 
       if (!response.ok || !data.success) {
         throw new Error(
-          data.message || "Failed to load banks"
+          data.message ||
+            "Failed to load banks"
         );
       }
 
       setBanks(data.banks || []);
     } catch (err: any) {
       setError(
-        err.message || "Failed to load supported banks"
+        err.message ||
+          "Failed to load supported banks"
       );
     } finally {
       setBanksLoading(false);
+    }
+  };
+
+  /**
+   * Refresh Paystack verification status
+   *
+   * This asks the backend to check the provider's
+   * actual Paystack subaccount and synchronize
+   * isVerified into MongoDB.
+   */
+  const refreshPaystackStatus = async () => {
+    try {
+      setRefreshing(true);
+      setError("");
+      setSuccess("");
+
+      if (!token) {
+        setError(
+          "Your session has expired. Please login again."
+        );
+        return;
+      }
+
+      const response = await fetch(
+        `${API_URL}/provider-account/refresh-paystack-status`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      console.log(
+        "REFRESH PAYSTACK STATUS:",
+        data
+      );
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message ||
+            "Unable to refresh Paystack verification status."
+        );
+      }
+
+      setAccount((previous) => ({
+        ...previous,
+        accountName:
+          data.account?.accountName ||
+          previous.accountName,
+        accountNumber:
+          data.account?.accountNumber ||
+          previous.accountNumber,
+        bankName:
+          data.account?.bankName ||
+          previous.bankName,
+        isVerified: Boolean(
+          data.account?.isVerified
+        ),
+        hasSubaccount: Boolean(
+          data.account?.subaccountCode
+        ),
+      }));
+
+      if (data.account?.isVerified) {
+        setSuccess(
+          "Your Paystack account is now verified and ready to receive payments."
+        );
+      } else {
+        setSuccess(
+          "Your Paystack account is connected, but verification is still pending."
+        );
+      }
+
+      setTimeout(() => {
+        setSuccess("");
+      }, 5000);
+    } catch (err: any) {
+      console.error(
+        "REFRESH PAYSTACK STATUS ERROR:",
+        err
+      );
+
+      setError(
+        err.message ||
+          "Unable to refresh Paystack verification status."
+      );
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -238,12 +345,18 @@ export function ProviderAccount() {
             bankName:
               selectedBank?.name ||
               account.bankName,
-            accountNumber: account.accountNumber,
+            accountNumber:
+              account.accountNumber,
           }),
         }
       );
 
       const data = await response.json();
+
+      console.log(
+        "SAVE PROVIDER ACCOUNT RESPONSE:",
+        data
+      );
 
       if (!response.ok || !data.success) {
         throw new Error(
@@ -252,21 +365,40 @@ export function ProviderAccount() {
         );
       }
 
+      /**
+       * Do not force isVerified to true here.
+       *
+       * Paystack may create the subaccount successfully
+       * while verification is still pending.
+       */
       setAccount((previous) => ({
         ...previous,
         accountName:
           data.account?.accountName ||
           previous.accountName,
+        accountNumber:
+          data.account?.accountNumber ||
+          previous.accountNumber,
         bankName:
           data.account?.bankName ||
           previous.bankName,
-        isVerified: true,
-        hasSubaccount: true,
+        isVerified: Boolean(
+          data.account?.isVerified
+        ),
+        hasSubaccount: Boolean(
+          data.account?.hasSubaccount
+        ),
       }));
 
-      setSuccess(
-        "Your payout account has been verified successfully."
-      );
+      if (data.account?.isVerified) {
+        setSuccess(
+          "Your payout account has been verified successfully."
+        );
+      } else {
+        setSuccess(
+          "Your payout account has been saved. Paystack verification is still pending."
+        );
+      }
 
       setTimeout(() => {
         setSuccess("");
@@ -291,7 +423,10 @@ export function ProviderAccount() {
     }
 
     return `${"•".repeat(
-      Math.max(0, accountNumber.length - 4)
+      Math.max(
+        0,
+        accountNumber.length - 4
+      )
     )}${accountNumber.slice(-4)}`;
   };
 
@@ -309,6 +444,7 @@ export function ProviderAccount() {
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="card animate-pulse p-6">
             <div className="h-7 w-48 rounded-lg bg-ink-100 dark:bg-ink-800" />
+
             <div className="mt-3 h-4 w-72 rounded bg-ink-100 dark:bg-ink-800" />
 
             <div className="mt-8 space-y-5">
@@ -320,6 +456,7 @@ export function ProviderAccount() {
 
           <div className="card animate-pulse p-6">
             <div className="h-6 w-40 rounded bg-ink-100 dark:bg-ink-800" />
+
             <div className="mt-5 h-28 rounded-2xl bg-ink-100 dark:bg-ink-800" />
           </div>
         </div>
@@ -366,6 +503,11 @@ export function ProviderAccount() {
                   <Check className="h-4 w-4" />
                   Account verified
                 </div>
+              ) : account.hasSubaccount ? (
+                <div className="inline-flex w-fit items-center gap-2 rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                  <AlertCircle className="h-4 w-4" />
+                  Verification pending
+                </div>
               ) : (
                 <div className="inline-flex w-fit items-center gap-2 rounded-full bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
                   <AlertCircle className="h-4 w-4" />
@@ -403,7 +545,7 @@ export function ProviderAccount() {
 
                 <div>
                   <p className="font-semibold">
-                    Payment account ready
+                    Payment account update
                   </p>
 
                   <p className="mt-1">
@@ -518,6 +660,7 @@ export function ProviderAccount() {
                 type="submit"
                 disabled={
                   saving ||
+                  refreshing ||
                   banksLoading ||
                   !account.bankCode ||
                   account.accountNumber.length !== 10
@@ -582,7 +725,7 @@ export function ProviderAccount() {
                         </p>
 
                         <p className="mt-1 text-xs text-ink-500">
-                          Your payout account is connected.
+                          Your payout account is connected and verified.
                         </p>
                       </div>
                     </div>
@@ -602,6 +745,71 @@ export function ProviderAccount() {
                         )}
                       </p>
                     </div>
+
+                    {/* REFRESH VERIFIED STATUS */}
+                    <button
+                      type="button"
+                      onClick={refreshPaystackStatus}
+                      disabled={refreshing}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm font-semibold text-ink-700 transition hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+                    >
+                      {refreshing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Checking Paystack...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4" />
+                          Refresh verification
+                        </>
+                      )}
+                    </button>
+                  </>
+                ) : account.hasSubaccount ? (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
+                        <AlertCircle className="h-5 w-5" />
+                      </div>
+
+                      <div>
+                        <p className="font-semibold text-ink-900 dark:text-ink-50">
+                          Verification pending
+                        </p>
+
+                        <p className="mt-1 text-xs leading-5 text-ink-500">
+                          Your Paystack account is connected,
+                          but Paystack verification has not yet
+                          been synchronized.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={refreshPaystackStatus}
+                      disabled={refreshing}
+                      className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {refreshing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Checking Paystack...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4" />
+                          Refresh verification
+                        </>
+                      )}
+                    </button>
+
+                    <p className="mt-3 text-center text-xs leading-5 text-ink-400">
+                      If you have already completed verification
+                      on Paystack, click the button above to sync
+                      the latest status.
+                    </p>
                   </>
                 ) : (
                   <>
