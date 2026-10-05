@@ -18,6 +18,7 @@ import {
     XCircle,
     CircleDollarSign,
     Image as ImageIcon,
+    User2Icon,
 } from "lucide-react";
 
 import {
@@ -873,7 +874,7 @@ export function ProviderBookings() {
                                                         </div>
 
                                                         <div className="flex items-start gap-2">
-                                                            <Phone className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
+                                                            <User2Icon className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
 
                                                             <div>
                                                                 <p className="text-xs text-ink-400">
