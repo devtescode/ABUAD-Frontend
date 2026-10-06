@@ -509,7 +509,6 @@ export function ProviderRequests() {
           }}
           className="relative"
         >
-          {/* Blurred background layer */}
           <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden opacity-60 blur-3xl">
             <div className="absolute left-1/4 top-10 h-40 w-40 rounded-full bg-primary-400/20" />
             <div className="absolute right-1/4 top-32 h-32 w-32 rounded-full bg-accent-400/20" />
@@ -517,37 +516,7 @@ export function ProviderRequests() {
 
           <BookingSkeleton />
 
-          {/* <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.9,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-              }}
-              className="rounded-2xl border border-white/60 bg-white/80 px-5 py-4 shadow-xl backdrop-blur-xl dark:border-ink-700/60 dark:bg-ink-900/80"
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary-100 dark:bg-primary-950/40">
-                  <LoaderCircle className="h-5 w-5 animate-spin text-primary-600 dark:text-primary-400" />
-
-                  <span className="absolute inset-0 rounded-xl border border-primary-400/20 animate-pulse" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-semibold text-ink-800 dark:text-ink-100">
-                    Loading bookings
-                  </p>
-
-                  <p className="text-xs text-ink-400">
-                    Fetching your latest paid bookings...
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          </div> */}
+          
         </motion.div>
       ) : activeBookings.length === 0 ? (
         /* =======================================================

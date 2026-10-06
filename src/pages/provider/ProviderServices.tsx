@@ -463,10 +463,34 @@ export function ProviderServices() {
 
             {/* LOADING */}
             {loading ? (
-                <div className="flex min-h-[300px] items-center justify-center">
-                    <div className="flex items-center gap-3 text-ink-500">
-                        <LoaderCircle className="h-6 w-6 animate-spin" />
-                        <span>Loading your services...</span>
+                <div className="card min-h-[300px] p-5">
+                    <div className="animate-pulse">
+                        {/* Header skeleton */}
+                        <div className="flex items-center gap-4">
+                            <div className="h-14 w-14 rounded-2xl bg-ink-200 blur-[1px] dark:bg-ink-700" />
+
+                            <div className="flex-1 space-y-2">
+                                <div className="h-4 w-40 rounded-lg bg-ink-200 blur-[1px] dark:bg-ink-700" />
+                                <div className="h-3 w-24 rounded-lg bg-ink-100 blur-[1px] dark:bg-ink-800" />
+                            </div>
+                        </div>
+
+                        {/* Portfolio cards skeleton */}
+                        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            {[1, 2, 3, 4].map((item) => (
+                                <div
+                                    key={item}
+                                    className="overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800"
+                                >
+                                    <div className="h-40 w-full bg-ink-200 blur-[2px] dark:bg-ink-700" />
+
+                                    <div className="space-y-3 p-4">
+                                        <div className="h-4 w-3/4 rounded-lg bg-ink-200 blur-[1px] dark:bg-ink-700" />
+                                        <div className="h-3 w-1/2 rounded-lg bg-ink-100 blur-[1px] dark:bg-ink-800" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
             ) : services.length === 0 ? (
