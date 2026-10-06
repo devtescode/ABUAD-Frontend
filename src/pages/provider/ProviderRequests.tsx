@@ -517,7 +517,7 @@ export function ProviderRequests() {
 
           <BookingSkeleton />
 
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          {/* <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <motion.div
               initial={{
                 opacity: 0,
@@ -547,7 +547,7 @@ export function ProviderRequests() {
                 </div>
               </div>
             </motion.div>
-          </div>
+          </div> */}
         </motion.div>
       ) : activeBookings.length === 0 ? (
         /* =======================================================
@@ -818,7 +818,7 @@ export function ProviderRequests() {
     SERVICE PREVIEW
 ====================================== */}
 
-                          <div className="mb-6 overflow-hidden rounded-2xl border border-ink-100 bg-ink-50/50 dark:border-ink-800 dark:bg-ink-800/20">
+                          <div className="mb-6 p-3 overflow-hidden rounded-2xl border border-ink-100 bg-ink-50/50 dark:border-ink-800 dark:bg-ink-800/20">
                             <div className="flex flex-col sm:flex-row">
                               {/* Service image */}
                               <div className="relative h-52 w-full shrink-0 overflow-hidden sm:h-auto sm:w-56">
