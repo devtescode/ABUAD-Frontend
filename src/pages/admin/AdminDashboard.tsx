@@ -98,42 +98,7 @@ export function AdminCategories() {
   );
 }
 
-export function AdminBookings() {
-  const [filter, setFilter] = useState('all');
-  const tabs = ['all', 'pending', 'accepted', 'paid', 'completed', 'cancelled', 'disputed'];
-  const filtered = filter === 'all' ? sampleBookings : sampleBookings.filter((b) => b.status === filter);
 
-  return (
-    <DashboardLayout role="admin" navItems={navItems}>
-      <DashboardHeader title="Booking Management" subtitle="Monitor all platform bookings" />
-      <div className="mb-4 flex gap-2 overflow-x-auto no-scrollbar">
-        {tabs.map((t) => (
-          <button key={t} onClick={() => setFilter(t)} className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium capitalize ${filter === t ? 'bg-primary-600 text-white' : 'bg-ink-100 text-ink-600'}`}>
-            {t}
-          </button>
-        ))}
-      </div>
-      <div className="card overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-ink-100 bg-ink-50 text-xs uppercase text-ink-500">
-            <tr><th className="p-4">Service</th><th className="p-4">Provider</th><th className="p-4">Date</th><th className="p-4">Price</th><th className="p-4">Status</th></tr>
-          </thead>
-          <tbody className="divide-y divide-ink-100">
-            {filtered.map((booking) => (
-              <tr key={booking.id} className="hover:bg-ink-50">
-                <td className="p-4 font-medium text-ink-900">{booking.serviceName}</td>
-                <td className="p-4 text-ink-600">{booking.providerName}</td>
-                <td className="p-4 text-ink-400">{booking.date}</td>
-                <td className="p-4 font-medium text-ink-900">{formatNaira(booking.price)}</td>
-                <td className="p-4"><StatusBadge status={booking.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </DashboardLayout>
-  );
-}
 
 export function AdminPayments() {
   return (
