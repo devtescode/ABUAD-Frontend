@@ -36,38 +36,38 @@ import {
 } from "react";
 
 type Booking = {
-  id: string;
+    id: string;
 
-  serviceName: string;
-  serviceCategory?: string;
-  serviceDescription?: string;
-  serviceImage?: string;
+    serviceName: string;
+    serviceCategory?: string;
+    serviceDescription?: string;
+    serviceImage?: string;
 
-  providerName: string;
-  providerEmail?: string;
-  providerId?: string;
+    providerName: string;
+    providerEmail?: string;
+    providerId?: string;
 
-  customerName: string;
-  customerEmail?: string;
-  customerId?: string;
+    customerName: string;
+    customerEmail?: string;
+    customerId?: string;
 
-  date: string;
-  time: string;
-  location?: string;
-  notes?: string;
+    date: string;
+    time: string;
+    location?: string;
+    notes?: string;
 
-  price: number;
+    price: number;
 
-  status: string;
-  paymentStatus: string;
+    status: string;
+    paymentStatus: string;
 
-  paymentReference?: string | null;
+    paymentReference?: string | null;
 
-  platformFee?: number;
-  providerAmount?: number;
+    platformFee?: number;
+    providerAmount?: number;
 
-  createdAt?: string;
-  updatedAt?: string;
+    createdAt?: string;
+    updatedAt?: string;
 };
 
 type Filter =
@@ -582,8 +582,8 @@ export function AdminBookings() {
 
                         <RefreshCw
                             className={`h-4 w-4 ${refreshing
-                                    ? "animate-spin"
-                                    : ""
+                                ? "animate-spin"
+                                : ""
                                 }`}
                         />
 
@@ -636,8 +636,8 @@ export function AdminBookings() {
                                     setFilter(tab.value)
                                 }
                                 className={`shrink-0 rounded-xl px-4 py-2 text-xs font-semibold transition ${active
-                                        ? "bg-primary-600 text-white shadow-sm"
-                                        : "bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
+                                    ? "bg-primary-600 text-white shadow-sm"
+                                    : "bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
                                     }`}
                             >
                                 {tab.label}
@@ -680,8 +680,8 @@ export function AdminBookings() {
                                 >
                                     <RefreshCw
                                         className={`h-3.5 w-3.5 ${refreshing
-                                                ? "animate-spin"
-                                                : ""
+                                            ? "animate-spin"
+                                            : ""
                                             }`}
                                     />
                                     Try Again
@@ -888,13 +888,9 @@ export function AdminBookings() {
                                                 {/* PAYMENT */}
 
                                                 <td className="px-5 py-4">
-
-                                                    <PaymentStatus
-                                                        status={
-                                                            booking.paymentStatus
-                                                        }
-                                                    />
-
+                                                    <div className="flex min-w-[125px] items-center">
+                                                        <PaymentStatus status={booking.paymentStatus} />
+                                                    </div>
                                                 </td>
 
                                                 {/* BOOKING STATUS */}
