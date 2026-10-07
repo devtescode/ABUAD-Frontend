@@ -1589,7 +1589,7 @@ export function BookingFlow() {
                           )
                         }
                         placeholder="Add any instructions, preferences, requirements, or other information..."
-                        className="w-full resize-none rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white"
+                        className="w-full resize-none rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-base text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white sm:text-sm"
                       />
                     </label>
 
