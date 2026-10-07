@@ -743,7 +743,7 @@ export function SignupPage() {
 
               <input
                 type="tel"
-                className="input min-w-0 flex-1 rounded-l-none"
+                className="input min-w-0 flex-1 rounded-l-none text-base sm:text-sm"
                 placeholder="8012345678"
                 value={phoneNumber}
                 onChange={(e) =>
