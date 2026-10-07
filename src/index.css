@@ -4,6 +4,13 @@
 @tailwind components;
 @tailwind utilities;
 
+
+@layer components {
+  .form-input {
+    @apply w-full h-12 rounded-xl border border-slate-200 text-base outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 sm:text-sm;
+  }
+}
+
 @keyframes toastEnter {
     from {
         opacity: 0;
