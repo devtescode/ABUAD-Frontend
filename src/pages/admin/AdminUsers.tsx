@@ -246,7 +246,7 @@ export function AdminUsers() {
                 setSearchQuery(event.target.value)
               }
               placeholder="Search users..."
-              className="h-10 w-full rounded-lg border border-ink-200 bg-white pl-10 pr-10 text-base text-ink-900 outline-none transition-all placeholder:text-ink-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 sm:text-sm dark:border-ink-700 dark:bg-ink-900 dark:text-ink-50"
+              className="search-input"
             />
 
             {/* Clear search */}
