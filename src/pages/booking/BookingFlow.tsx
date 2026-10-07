@@ -1244,7 +1244,7 @@ export function BookingFlow() {
                   }}
                   className="min-w-0 space-y-5"
                 >
-                  <div className="w-full min-w-0 rounded-3xl border border-ink-100 bg-white p-4 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
+                  <div className="w-full min-w-0 overflow-hidden rounded-3xl border border-ink-100 bg-white p-4 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
                     <div className="mb-6 flex min-w-0 items-start gap-3 sm:gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-400">
                         <Calendar className="h-5 w-5" />
@@ -1287,6 +1287,7 @@ export function BookingFlow() {
         w-full
         min-w-0
         max-w-full
+        appearance-none
         cursor-pointer
         rounded-xl
         border
@@ -1350,7 +1351,6 @@ export function BookingFlow() {
                       </div>
                     )}
                   </div>
-
                   <div className="rounded-3xl border border-ink-100 bg-white p-5 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
                     <div className="mb-6 flex items-start gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-400">
