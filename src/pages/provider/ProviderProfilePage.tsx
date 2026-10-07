@@ -203,15 +203,6 @@ interface ProviderReviewsResponse {
   reviews?: Review[];
 }
 
-interface ProviderProfileResponse {
-  success: boolean;
-  message?: string;
-
-  provider?: Provider;
-  services?: Service[];
-  reviews?: Review[];
-}
-
 interface PortfolioResponse {
   success?: boolean;
   message?: string;
@@ -392,6 +383,9 @@ export default function ProviderProfilePage() {
   const [reviews, setReviews] =
     useState<Review[]>([]);
 
+  const [reviewsLoading, setReviewsLoading] =
+    useState(false);
+
   const [portfolioItems, setPortfolioItems] =
     useState<PortfolioItem[]>([]);
 
@@ -461,6 +455,17 @@ export default function ProviderProfilePage() {
 
   /* =========================================================
      FETCH PROVIDER PROFILE
+     
+     IMPORTANT:
+     
+     This effect ONLY fetches the provider profile and their
+     services. It does NOT touch reviews.
+     
+     Previously, calling setReviews([]) here would race with
+     the dedicated reviews effect below and overwrite the
+     real reviews with an empty array. That race condition
+     was the reason reviews would sometimes disappear right
+     after the loader stopped.
   ========================================================= */
 
   useEffect(() => {
@@ -549,11 +554,15 @@ export default function ProviderProfilePage() {
             : routeServices
         );
 
-        setReviews(
-          Array.isArray(result.reviews)
-            ? result.reviews
-            : []
-        );
+        /*
+         * IMPORTANT:
+         *
+         * We intentionally DO NOT call setReviews() here.
+         *
+         * Reviews are owned exclusively by the reviews
+         * effect below. This prevents the race condition
+         * that was wiping out reviews.
+         */
       } catch (err) {
         if (cancelled) return;
 
@@ -582,29 +591,40 @@ export default function ProviderProfilePage() {
   }, [id, navigate, routeServices]);
 
 
-    /* =========================================================
-     FETCH PROVIDER REVIEWS
-     
-     IMPORTANT:
-     
-     Reviews are fetched separately from the provider
-     profile because reviews have their own public endpoint:
-     
-       /reviews/provider/:providerId
-     
-     This allows every customer to see reviews left by
-     previous customers.
-  ========================================================= */
-
+  /* =========================================================
+   FETCH PROVIDER REVIEWS
+   
+   IMPORTANT:
+   
+   Reviews are fetched separately from the provider
+   profile because reviews have their own public endpoint:
+   
+     /reviews/provider/:providerId
+   
+   This allows every customer to see reviews left by
+   previous customers.
+   
+   The reviews state is ONLY set here. No other effect
+   touches it. This ensures reviews stay visible the
+   moment the loader stops.
+========================================================= */
   useEffect(() => {
+    if (!id) {
+      setReviewsLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     const fetchProviderReviews = async () => {
-      if (!id) {
-        return;
-      }
-
       try {
+        setReviewsLoading(true);
+
+        const token =
+          sessionStorage.getItem(
+            "servicely_token"
+          );
+
         const response = await fetch(
           `${API_URL}/reviews/provider/${encodeURIComponent(
             id
@@ -613,50 +633,54 @@ export default function ProviderProfilePage() {
             method: "GET",
             headers: {
               Accept: "application/json",
+              ...(token
+                ? {
+                  Authorization: `Bearer ${token}`,
+                }
+                : {}),
             },
+            cache: "no-store",
           }
         );
 
-        let result: ProviderReviewsResponse;
+        const result: ProviderReviewsResponse =
+          await response.json();
 
-        try {
-          result = await response.json();
-        } catch {
-          throw new Error(
-            "The reviews server returned an invalid response."
-          );
-        }
+        console.log("Review API result:", result);
+        console.log(
+          "Review API reviews:",
+          result.reviews
+        );
 
         if (
           !response.ok ||
-          !result.success
+          result.success === false
         ) {
           throw new Error(
             result.message ||
-              `Failed to load provider reviews. (${response.status})`
+            "Unable to load provider reviews."
           );
         }
 
-        if (cancelled) {
-          return;
+        if (!cancelled) {
+          setReviews(
+            Array.isArray(result.reviews)
+              ? result.reviews
+              : []
+          );
         }
-
-        setReviews(
-          Array.isArray(result.reviews)
-            ? result.reviews
-            : []
-        );
-      } catch (err) {
-        if (cancelled) {
-          return;
+      } catch (error) {
+        if (!cancelled) {
+          console.error(
+            "Fetch provider reviews error:",
+            error
+          );
+          setReviews([]);
         }
-
-        console.error(
-          "Fetch provider reviews error:",
-          err
-        );
-
-        setReviews([]);
+      } finally {
+        if (!cancelled) {
+          setReviewsLoading(false);
+        }
       }
     };
 
@@ -843,9 +867,9 @@ export default function ProviderProfilePage() {
   const availability =
     provider?.availability || [];
 
-    const availableDaysCount = availability.filter(
-  (slot) => slot.available !== false
-).length;
+  const availableDaysCount = availability.filter(
+    (slot) => slot.available !== false
+  ).length;
 
   const providerIsActive =
     provider?.status === "active" ||
@@ -1527,7 +1551,7 @@ export default function ProviderProfilePage() {
                   {sharing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Share2 className="h-4 w-4" />
+                         <Share2 className="h-4 w-4" />
                   )}
 
                   Share
@@ -1633,8 +1657,8 @@ export default function ProviderProfilePage() {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`relative flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${isActive
-                        ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
-                        : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
+                      ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
+                      : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
                       }`}
                   >
                     {tab.icon}
@@ -1688,7 +1712,7 @@ export default function ProviderProfilePage() {
         ================================================= */}
 
         <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="sync">
 
             {/* =================================================
                 SERVICES
@@ -1903,7 +1927,7 @@ export default function ProviderProfilePage() {
                                   className="flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-950/10 transition-all duration-300 hover:bg-primary-600 hover:shadow-xl hover:shadow-primary-600/20 active:scale-[0.98] dark:bg-white dark:text-ink-900 dark:hover:bg-primary-400"
                                 >
                                   <span>
-                                    Book this 
+                                    Book this
                                   </span>
 
                                   <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
@@ -1941,7 +1965,7 @@ export default function ProviderProfilePage() {
               </motion.div>
             )}
 
-            <AnimatePresence>
+            <AnimatePresence key="service-image-presence">
               {selectedServiceImage && (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -2384,449 +2408,415 @@ export default function ProviderProfilePage() {
                 REVIEWS
             ================================================= */}
 
-          {activeTab === "reviews" && (
-  <motion.div
-    key="reviews"
-    initial={{
-      opacity: 0,
-      y: 10,
-    }}
-    animate={{
-      opacity: 1,
-      y: 0,
-    }}
-    exit={{
-      opacity: 0,
-      y: -10,
-    }}
-  >
-    {(() => {
-      // Calculate the rating directly from the reviews
-      const totalReviews = reviews.length;
+            {activeTab === "reviews" && (
+              <motion.div
+                key="reviews"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25 }}
+              >
+                {(() => {
+                  const totalReviews = reviews.length;
 
-      const totalRating = reviews.reduce(
-        (sum, review) =>
-          sum + Number(review.rating || 0),
-        0
-      );
+                  const totalRating = reviews.reduce(
+                    (sum, review) =>
+                      sum + Number(review.rating || 0),
+                    0
+                  );
 
-      const averageRating =
-        totalReviews > 0
-          ? totalRating / totalReviews
-          : 0;
+                  const averageRating =
+                    totalReviews > 0
+                      ? totalRating / totalReviews
+                      : 0;
 
-      // ==========================================
-      // NO REVIEWS
-      // ==========================================
-      if (totalReviews === 0) {
-        return (
-          <motion.div
-            initial={{
-              opacity: 0,
-              scale: 0.98,
-            }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-            }}
-            transition={{
-              duration: 0.25,
-            }}
-            className="
+                  // REVIEWS LOADING
+                  if (reviewsLoading) {
+                    return (
+                                           <div className="space-y-4">
+                        <div className="animate-pulse rounded-2xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
+                          <div className="h-6 w-32 rounded bg-ink-100 dark:bg-ink-800" />
+                          <div className="mt-4 h-10 w-24 rounded bg-ink-100 dark:bg-ink-800" />
+                        </div>
+
+                        {[1, 2, 3].map((item) => (
+                          <div
+                            key={item}
+                            className="animate-pulse rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-11 w-11 rounded-full bg-ink-100 dark:bg-ink-800" />
+
+                              <div className="flex-1">
+                                <div className="h-4 w-32 rounded bg-ink-100 dark:bg-ink-800" />
+                                <div className="mt-2 h-3 w-20 rounded bg-ink-100 dark:bg-ink-800" />
+                              </div>
+                            </div>
+
+                            <div className="mt-4 h-16 rounded-xl bg-ink-100 dark:bg-ink-800" />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  // NO REVIEWS
+                  if (totalReviews === 0) {
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="
+          flex
+          min-h-[360px]
+          items-center
+          justify-center
+          rounded-2xl
+          border
+          border-dashed
+          border-ink-200
+          bg-white
+          px-6
+          py-12
+          dark:border-ink-700
+          dark:bg-ink-900
+        "
+                      >
+                        <div className="flex max-w-md flex-col items-center text-center">
+                          <div
+                            className="
               flex
-              min-h-[360px]
+              h-16
+              w-16
               items-center
               justify-center
               rounded-2xl
-              border
-              border-dashed
-              border-ink-200
-              bg-white
-              px-6
-              py-12
-              dark:border-ink-700
-              dark:bg-ink-900
+              bg-ink-50
+              text-ink-400
+              dark:bg-ink-800
+              dark:text-ink-500
             "
-          >
-            <div className="flex max-w-md flex-col items-center text-center">
-              {/* Icon */}
-              <div
-                className="
-                  flex
-                  h-16
-                  w-16
-                  items-center
-                  justify-center
-                  rounded-2xl
-                  bg-ink-50
-                  text-ink-400
-                  dark:bg-ink-800
-                  dark:text-ink-500
-                "
-              >
-                <Star className="h-7 w-7" />
-              </div>
+                          >
+                            <Star className="h-7 w-7" />
+                          </div>
 
-              {/* Text */}
-              <h3 className="mt-5 text-lg font-bold text-ink-900 dark:text-white">
-                No reviews yet
-              </h3>
+                          <h3 className="mt-5 text-lg font-bold text-ink-900 dark:text-white">
+                            No reviews yet
+                          </h3>
 
-              <p className="mt-2 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
-                Reviews from customers will appear here
-                after they complete a booking with{" "}
-                {providerName}.
-              </p>
+                          <p className="mt-2 max-w-sm text-sm leading-6 text-ink-500 dark:text-ink-400">
+                            Reviews from customers will appear here after they
+                            complete a booking with {providerName}.
+                          </p>
 
-              {/* Status */}
-              <div
-                className="
-                  mt-5
-                  inline-flex
-                  items-center
-                  gap-2
-                  rounded-full
-                  bg-ink-50
-                  px-3
-                  py-1.5
-                  text-xs
-                  font-medium
-                  text-ink-500
-                  dark:bg-ink-800
-                  dark:text-ink-400
-                "
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-ink-300 dark:bg-ink-600" />
-                No customer reviews yet
-              </div>
-            </div>
-          </motion.div>
-        );
-      }
-
-      // ==========================================
-      // REVIEWS EXIST
-      // ==========================================
-      return (
-        <>
-          {/* ==========================================
-              REVIEW SUMMARY
-          ========================================== */}
-          <div
-            className="
-              mb-5
-              overflow-hidden
-              rounded-2xl
-              border
-              border-ink-100
-              bg-white
-              dark:border-ink-800
-              dark:bg-ink-900
-            "
-          >
-            <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-              {/* Rating */}
-              <div className="flex items-center gap-4">
-                <div
-                  className="
-                    flex
-                    h-14
-                    w-14
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-2xl
-                    bg-yellow-50
-                    text-yellow-500
-                    dark:bg-yellow-950/30
-                  "
-                >
-                  <Star className="h-7 w-7 fill-current" />
-                </div>
-
-                <div>
-                  <div className="flex items-end gap-2">
-                    <span className="text-3xl font-black tracking-tight text-ink-900 dark:text-white sm:text-4xl">
-                      {averageRating.toFixed(1)}
-                    </span>
-
-                    <span className="pb-1 text-sm text-ink-400">
-                      / 5
-                    </span>
-                  </div>
-
-                  <div className="mt-1 flex items-center gap-1">
-                    {[1, 2, 3, 4, 5].map(
-                      (star) => (
-                        <Star
-                          key={star}
-                          className={`h-4 w-4 ${
-                            star <=
-                            Math.round(
-                              averageRating
-                            )
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-ink-200 dark:text-ink-700"
-                          }`}
-                        />
-                      )
-                    )}
-                  </div>
-
-                  <p className="mt-1 text-xs text-ink-400">
-                    Based on{" "}
-                    <span className="font-semibold">
-                      {totalReviews}
-                    </span>{" "}
-                    {totalReviews === 1
-                      ? "review"
-                      : "reviews"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Right side */}
-              <div
-                className="
-                  inline-flex
-                  w-fit
-                  items-center
-                  gap-2
-                  rounded-full
-                  bg-emerald-50
-                  px-3
-                  py-1.5
-                  text-xs
-                  font-semibold
-                  text-emerald-600
-                  dark:bg-emerald-950/30
-                  dark:text-emerald-300
-                "
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-
-                {totalReviews}{" "}
-                {totalReviews === 1
-                  ? "customer review"
-                  : "customer reviews"}
-              </div>
-            </div>
-
-            {/* Accent */}
-            <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-primary-400 to-transparent" />
-          </div>
-
-          {/* ==========================================
-              REVIEWS HEADER
-          ========================================== */}
-          <div
-            className="
-              mb-4
-              flex
+                          <div
+                            className="
+              mt-5
+              inline-flex
               items-center
-              justify-between
-              gap-3
+              gap-2
+              rounded-full
+              bg-ink-50
+              px-3
+              py-1.5
+              text-xs
+              font-medium
+              text-ink-500
+              dark:bg-ink-800
+              dark:text-ink-400
             "
-          >
-            <div>
-              <h3 className="text-lg font-bold text-ink-900 dark:text-white">
-                Customer Reviews
-              </h3>
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-ink-300 dark:bg-ink-600" />
+                            No customer reviews yet
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  }
 
-              <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-                See what customers say about{" "}
-                {providerName}.
-              </p>
-            </div>
-
-            <div
-              className="
+                  // REVIEWS EXIST
+                  return (
+                    <>
+                      {/* REVIEW SUMMARY */}
+                      <div
+                        className="
+          mb-5
+          overflow-hidden
+          rounded-2xl
+          border
+          border-ink-100
+          bg-white
+          dark:border-ink-800
+          dark:bg-ink-900
+        "
+                      >
+                        <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                          <div className="flex items-center gap-4">
+                            <div
+                              className="
                 flex
-                h-10
-                w-10
+                h-14
+                w-14
                 shrink-0
                 items-center
                 justify-center
-                rounded-xl
-                bg-primary-50
-                text-primary-600
-                dark:bg-primary-950
-                dark:text-primary-400
+                rounded-2xl
+                bg-yellow-50
+                text-yellow-500
+                dark:bg-yellow-950/30
               "
-            >
-              <MessageCircle className="h-5 w-5" />
-            </div>
-          </div>
+                            >
+                              <Star className="h-7 w-7 fill-current" />
+                            </div>
 
-          {/* ==========================================
-              REVIEW CARDS
-          ========================================== */}
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={{
-              hidden: {},
-              visible: {
-                transition: {
-                  staggerChildren: 0.07,
-                },
-              },
-            }}
-            className="space-y-4"
-          >
-            {reviews.map((review) => {
-              const customerName =
-                review.customer?.fullName ||
-                review.customer?.name ||
-                "Customer";
+                            <div>
+                              <div className="flex items-end gap-2">
+                                <span className="text-3xl font-black tracking-tight text-ink-900 dark:text-white sm:text-4xl">
+                                  {averageRating.toFixed(1)}
+                                </span>
 
-              const customerImage =
-                review.customer?.avatar ||
-                review.customer?.profileImage ||
-                "/images/default-avatar.png";
+                                <span className="pb-1 text-sm text-ink-400">
+                                  / 5
+                                </span>
+                              </div>
 
-              return (
-                <motion.div
-                  key={review._id}
-                  variants={{
-                    hidden: {
-                      opacity: 0,
-                      y: 12,
-                    },
-                    visible: {
-                      opacity: 1,
-                      y: 0,
-                    },
-                  }}
-                  className="
-                    group
-                    rounded-2xl
-                    border
-                    border-ink-100
-                    bg-white
-                    p-5
-                    transition-all
-                    duration-200
-                    hover:-translate-y-0.5
-                    hover:border-primary-200
-                    hover:shadow-md
-                    dark:border-ink-800
-                    dark:bg-ink-900
-                    dark:hover:border-primary-900
-                  "
-                >
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      {/* Customer avatar */}
-                      <img
-                        src={customerImage}
-                        alt={customerName}
-                        onError={(event) => {
-                          event.currentTarget.src =
-                            "/images/default-avatar.png";
-                        }}
-                        className="
-                          h-11
-                          w-11
-                          shrink-0
-                          rounded-full
-                          object-cover
-                          ring-2
-                          ring-ink-100
-                          dark:ring-ink-800
-                        "
-                      />
+                              <div className="mt-1 flex items-center gap-1">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`h-4 w-4 ${star <= Math.round(averageRating)
+                                      ? "fill-yellow-400 text-yellow-400"
+                                      : "text-ink-200 dark:text-ink-700"
+                                      }`}
+                                  />
+                                ))}
+                              </div>
 
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-bold text-ink-900 dark:text-white">
-                          {customerName}
-                        </p>
+                              <p className="mt-1 text-xs text-ink-400">
+                                Based on{" "}
+                                <span className="font-semibold">
+                                  {totalReviews}
+                                </span>{" "}
+                                {totalReviews === 1 ? "review" : "reviews"}
+                              </p>
+                            </div>
+                          </div>
 
-                        {review.createdAt && (
-                          <p className="mt-0.5 text-xs text-ink-400">
-                            {formatDate(
-                              review.createdAt
-                            )}
-                          </p>
-                        )}
+                          <div
+                            className="
+              inline-flex
+              w-fit
+              items-center
+              gap-2
+              rounded-full
+              bg-emerald-50
+              px-3
+              py-1.5
+              text-xs
+              font-semibold
+              text-emerald-600
+              dark:bg-emerald-950/30
+              dark:text-emerald-300
+            "
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+
+                            {totalReviews}{" "}
+                            {totalReviews === 1
+                              ? "customer review"
+                              : "customer reviews"}
+                          </div>
+                        </div>
+
+                        <div className="h-1 w-full bg-gradient-to-r from-yellow-400 via-primary-400 to-transparent" />
                       </div>
-                    </div>
 
-                    {/* Rating badge */}
-                    <div
-                      className="
-                        inline-flex
-                        shrink-0
-                        items-center
-                        gap-1.5
-                        rounded-full
-                        bg-yellow-50
-                        px-2.5
-                        py-1.5
-                        dark:bg-yellow-950/30
-                      "
-                    >
-                      <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                      {/* REVIEWS HEADER */}
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-bold text-ink-900 dark:text-white">
+                            Customer Reviews
+                          </h3>
 
-                      <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">
-                        {review.rating}.0
-                      </span>
-                    </div>
-                  </div>
+                          <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                            See what customers say about {providerName}.
+                          </p>
+                        </div>
 
-                  {/* Stars */}
-                  <div className="mt-3 flex items-center gap-0.5">
-                    {[1, 2, 3, 4, 5].map(
-                      (star) => (
-                        <Star
-                          key={star}
-                          className={`h-4 w-4 ${
-                            star <=
-                            Number(review.rating)
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-ink-200 dark:text-ink-700"
-                          }`}
-                        />
-                      )
-                    )}
-                  </div>
+                        <div
+                          className="
+            flex
+            h-10
+            w-10
+            shrink-0
+            items-center
+            justify-center
+            rounded-xl
+            bg-primary-50
+            text-primary-600
+            dark:bg-primary-950
+            dark:text-primary-400
+          "
+                        >
+                          <MessageCircle className="h-5 w-5" />
+                        </div>
+                      </div>
 
-                  {/* Comment */}
-                  {review.comment ? (
-                    <div
-                      className="
-                        mt-4
-                        rounded-xl
-                        bg-ink-50
-                        px-4
-                        py-3
-                        dark:bg-ink-800/60
-                      "
-                    >
-                      <p className="text-sm leading-6 text-ink-600 dark:text-ink-300">
-                        "{review.comment}"
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="mt-4 text-sm italic text-ink-400">
-                      Customer left a rating without a
-                      written comment.
-                    </p>
-                  )}
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        </>
-      );
-    })()}
-  </motion.div>
-)}
+                      {/* REVIEW CARDS */}
+                      <motion.div
+                        initial="hidden"
+                        animate="visible"
+                        variants={{
+                          hidden: {},
+                          visible: {
+                            transition: {
+                              staggerChildren: 0.07,
+                            },
+                          },
+                        }}
+                        className="space-y-4"
+                      >
+                        {reviews.map((review) => {
+                          const customerName =
+                            review.customer?.fullName ||
+                            review.customer?.name ||
+                            "Customer";
+
+                          const customerImage =
+                            review.customer?.avatar ||
+                            review.customer?.profileImage ||
+                            "/images/default-avatar.png";
+
+                          return (
+                            <motion.div
+                              key={review._id}
+                              variants={{
+                                hidden: {
+                                  opacity: 0,
+                                  y: 12,
+                                },
+                                visible: {
+                                  opacity: 1,
+                                  y: 0,
+                                },
+                              }}
+                              className="
+                group
+                rounded-2xl
+                border
+                border-ink-100
+                bg-white
+                p-5
+                transition-all
+                duration-200
+                hover:-translate-y-0.5
+                hover:border-primary-200
+                hover:shadow-md
+                dark:border-ink-800
+                dark:bg-ink-900
+                dark:hover:border-primary-900
+              "
+                            >
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex min-w-0 items-center gap-3">
+                                  <img
+                                    src={customerImage}
+                                    alt={customerName}
+                                    onError={(event) => {
+                                      event.currentTarget.src =
+                                        "/images/default-avatar.png";
+                                    }}
+                                    className="
+                      h-11
+                      w-11
+                      shrink-0
+                      rounded-full
+                      object-cover
+                      ring-2
+                      ring-ink-100
+                      dark:ring-ink-800
+                    "
+                                  />
+
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold text-ink-900 dark:text-white">
+                                      {customerName}
+                                    </p>
+
+                                    {review.createdAt && (
+                                      <p className="mt-0.5 text-xs text-ink-400">
+                                        {formatDate(review.createdAt)}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div
+                                  className="
+                    inline-flex
+                    shrink-0
+                    items-center
+                    gap-1.5
+                    rounded-full
+                    bg-yellow-50
+                    px-2.5
+                    py-1.5
+                    dark:bg-yellow-950/30
+                  "
+                                >
+                                  <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+
+                                  <span className="text-xs font-bold text-yellow-700 dark:text-yellow-300">
+                                    {review.rating}.0
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="mt-3 flex items-center gap-0.5">
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <Star
+                                    key={star}
+                                    className={`h-4 w-4 ${star <= Number(review.rating)
+                                      ? "fill-yellow-400 text-yellow-400"
+                                      : "text-ink-200 dark:text-ink-700"
+                                      }`}
+                                  />
+                                ))}
+                              </div>
+
+                              {review.comment ? (
+                                <div
+                                  className="
+                    mt-4
+                    rounded-xl
+                    bg-ink-50
+                    px-4
+                    py-3
+                    dark:bg-ink-800/60
+                  "
+                                >
+                                  <p className="text-sm leading-6 text-ink-600 dark:text-ink-300">
+                                    "{review.comment}"
+                                  </p>
+                                </div>
+                              ) : (
+                                <p className="mt-4 text-sm italic text-ink-400">
+                                  Customer left a rating without a written comment.
+                                </p>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </motion.div>
+                    </>
+                  );
+                })()}
+              </motion.div>
+            )}
+
             {/* =================================================
                 AVAILABILITY
             ================================================= */}
-
 
             {activeTab === "availability" && (
               <motion.div
@@ -3176,9 +3166,6 @@ export default function ProviderProfilePage() {
                 })()}
               </motion.div>
             )}
-
-
-
 
           </AnimatePresence>
         </main>
