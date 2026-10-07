@@ -80,7 +80,7 @@ export default function AdminAuth() {
         if (!response.ok) {
           throw new Error(
             data?.message ||
-              "Unable to check admin status."
+            "Unable to check admin status."
           );
         }
 
@@ -100,7 +100,7 @@ export default function AdminAuth() {
 
         setError(
           err?.message ||
-            "Unable to connect to the server."
+          "Unable to connect to the server."
         );
       } finally {
         setCheckingAdmin(false);
@@ -172,7 +172,7 @@ export default function AdminAuth() {
       if (!response.ok) {
         throw new Error(
           data?.message ||
-            "Unable to create admin account."
+          "Unable to create admin account."
         );
       }
 
@@ -200,7 +200,7 @@ export default function AdminAuth() {
 
       setError(
         err?.message ||
-          "Something went wrong while creating the account."
+        "Something went wrong while creating the account."
       );
     } finally {
       setLoading(false);
@@ -251,7 +251,7 @@ export default function AdminAuth() {
       if (!response.ok) {
         throw new Error(
           data?.message ||
-            "Invalid admin credentials."
+          "Invalid admin credentials."
         );
       }
 
@@ -288,7 +288,7 @@ export default function AdminAuth() {
 
       setError(
         err?.message ||
-          "Something went wrong while logging in."
+        "Something went wrong while logging in."
       );
     } finally {
       setLoading(false);
@@ -481,7 +481,6 @@ export default function AdminAuth() {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Password
               </label>
-
               <div className="relative">
 
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -502,7 +501,7 @@ export default function AdminAuth() {
                       ? "new-password"
                       : "current-password"
                   }
-                  className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-12 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 text-base sm:text-sm"
+                  className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-12 text-base outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 sm:text-sm"
                 />
 
                 <button
