@@ -1244,24 +1244,24 @@ export function BookingFlow() {
                   }}
                   className="space-y-5"
                 >
-                  <div className="rounded-3xl border border-ink-100 bg-white p-5 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
-                    <div className="mb-6 flex items-start gap-4">
+                  <div className="w-full min-w-0 rounded-3xl border border-ink-100 bg-white p-4 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
+                    <div className="mb-6 flex min-w-0 items-start gap-3 sm:gap-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-400">
                         <Calendar className="h-5 w-5" />
                       </div>
 
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <h2 className="text-lg font-bold text-ink-900 dark:text-white">
                           Choose a date
                         </h2>
 
-                        <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                        <p className="mt-1 text-sm leading-5 text-ink-500 dark:text-ink-400">
                           Select a date when the provider is available.
                         </p>
                       </div>
                     </div>
 
-                    <div className="block">
+                    <div className="w-full min-w-0">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <label
                           htmlFor="booking-date"
@@ -1270,102 +1270,78 @@ export function BookingFlow() {
                           Booking date
                         </label>
 
-                        <span className="text-[11px] font-medium text-ink-400 dark:text-ink-500">
+                        <span className="shrink-0 text-[11px] font-medium text-ink-400 dark:text-ink-500">
                           Required
                         </span>
                       </div>
 
-                      <div className="w-full min-w-0">
-                        <div className="group relative w-full min-w-0">
-                          {/* Calendar icon */}
-                          <div className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center sm:left-4">
-                            <CalendarDays
-                              className="
-          h-[18px] w-[18px]
-          text-ink-400
-          transition-colors
-          group-focus-within:text-primary-500
-          dark:text-ink-500
-          sm:h-5 sm:w-5
-        "
-                            />
-                          </div>
-
-                          <input
-                            id="booking-date"
-                            type="date"
-                            min={getMinimumDate()}
-                            value={data.date || ""}
-                            onChange={(event) => handleDateChange(event.target.value)}
-                            className="
+                      <input
+                        id="booking-date"
+                        type="date"
+                        min={getMinimumDate()}
+                        value={data.date || ""}
+                        onChange={(event) => handleDateChange(event.target.value)}
+                        className="
         block
-        h-[52px]
+        h-12
         w-full
         min-w-0
+        max-w-full
         cursor-pointer
         rounded-xl
         border
         border-ink-200
         bg-white
-        pl-10
-        pr-2
+        px-3
         text-sm
         font-medium
         text-ink-900
         outline-none
         transition-all
-        duration-200
-
         focus:border-primary-500
         focus:ring-4
         focus:ring-primary-500/10
-
         dark:border-ink-700
         dark:bg-ink-950
         dark:text-white
 
         sm:h-14
         sm:rounded-2xl
-        sm:pl-12
-        sm:pr-4
+        sm:px-4
       "
-                          />
-                        </div>
+                      />
 
-                        <p className="mt-1.5 text-[11px] leading-4 text-ink-400 dark:text-ink-500 sm:text-xs">
-                          Choose the date for your service.
-                        </p>
-                      </div>
+                      <p className="mt-1.5 text-[11px] leading-4 text-ink-400 dark:text-ink-500 sm:text-xs">
+                        Choose the date for your service.
+                      </p>
                     </div>
 
                     {data.date && (
                       <div
                         className={[
-                          "mt-4 rounded-2xl border px-4 py-3",
+                          "mt-4 w-full min-w-0 rounded-2xl border px-3 py-3 sm:px-4",
                           isSelectedDateAvailable
                             ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20"
                             : "border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20",
                         ].join(" ")}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex min-w-0 items-start gap-2">
                           {isSelectedDateAvailable ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                           ) : (
-                            <X className="h-4 w-4 text-red-500" />
+                            <X className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
                           )}
 
                           <p
                             className={[
-                              "text-sm font-semibold",
+                              "min-w-0 break-words text-sm font-semibold leading-5",
                               isSelectedDateAvailable
                                 ? "text-emerald-700 dark:text-emerald-300"
                                 : "text-red-700 dark:text-red-300",
                             ].join(" ")}
                           >
                             {isSelectedDateAvailable
-                              ? `${formatDate(
-                                data.date
-                              )} is available`
+                              ? `${formatDate(data.date)} is available`
                               : `${providerName} is not available on ${formatDate(
                                 data.date
                               )}`}
