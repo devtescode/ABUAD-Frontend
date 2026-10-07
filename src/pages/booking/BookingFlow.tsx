@@ -537,9 +537,7 @@ export function BookingFlow() {
      DATE CHANGE
   ======================================================= */
 
-  const handleDateChange = (
-    value: string
-  ) => {
+  const handleDateChange = (value: string) => {
     if (!value) {
       setData((previous) => ({
         ...previous,
@@ -550,7 +548,16 @@ export function BookingFlow() {
       return;
     }
 
-    if (isDateInPast(value)) {
+    // Prevent dates before today.
+    // Compare date strings only, not Date objects with timezones.
+    const today = new Date();
+    const todayString = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    if (value < todayString) {
       return;
     }
 
@@ -563,15 +570,13 @@ export function BookingFlow() {
         provider.availability
       );
 
-      if (!available) {
-        setData((previous) => ({
-          ...previous,
-          date: value,
-          time: "",
-        }));
+      setData((previous) => ({
+        ...previous,
+        date: value,
+        time: "",
+      }));
 
-        return;
-      }
+      return;
     }
 
     setData((previous) => ({
@@ -1264,20 +1269,9 @@ export function BookingFlow() {
                         <input
                           type="date"
                           min={getMinimumDate()}
-                          value={data.date}
+                          value={data.date || ""}
                           onChange={(event) => handleDateChange(event.target.value)}
-                          onClick={(event) => {
-                            const input = event.currentTarget;
-
-                            if ("showPicker" in input) {
-                              try {
-                                input.showPicker();
-                              } catch {
-                                // Browser may already have opened the picker
-                              }
-                            }
-                          }}
-                          className="relative z-10 block min-h-[54px] w-full cursor-pointer appearance-none rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-sm font-medium text-ink-900 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white"
+                          className="block min-h-[54px] w-full cursor-pointer rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-sm font-medium text-ink-900 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white"
                         />
                       </div>
                     </label>
