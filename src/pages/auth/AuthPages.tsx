@@ -164,7 +164,7 @@ function AuthShell({
             transition={{ duration: 0.4 }}
             className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-ink-300"
           >
-            <Sparkles className="h-3.5 w-3.5 text-primary-400" />
+            {/* <Sparkles className="h-3.5 w-3.5 text-primary-400" /> */}
             Built for ABUAD students
           </motion.div>
 
@@ -214,7 +214,7 @@ function AuthShell({
         </div>
 
         <p className="relative z-10 text-xs text-ink-600">
-          © 2026 Servicely. All rights reserved.
+           Servicely
         </p>
       </div>
 
@@ -620,7 +620,7 @@ export function SignupPage() {
             <UserCircle className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
 
             <input
-              className="input pl-10"
+              className="input pl-10 text-base sm:text-sm"
               placeholder="Enter your full name"
               value={name}
               onChange={(e) =>
