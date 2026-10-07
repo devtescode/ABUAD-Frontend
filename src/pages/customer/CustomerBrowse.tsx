@@ -544,7 +544,7 @@ export function CustomerBrowse() {
                 )
               }
               placeholder="Search services, categories or providers..."
-              className="w-full rounded-xl border border-ink-200 bg-white py-3 pl-11 pr-10 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white"
+              className="search-input"
             />
 
             {search && (
