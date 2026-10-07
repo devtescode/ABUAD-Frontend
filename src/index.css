@@ -9,42 +9,46 @@
   .form-input {
     @apply w-full h-12 rounded-xl border border-slate-200 text-base outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 sm:text-sm;
   }
+
+  .form-textarea {
+    @apply w-full rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-base text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white sm:text-sm resize-none;
+  }
 }
 
 @keyframes toastEnter {
-    from {
-        opacity: 0;
-        transform: translate(-50%, -20px);
-    }
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
 
-    to {
-        opacity: 1;
-        transform: translate(-50%, 0);
-    }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 @keyframes toastProgress {
-    from {
-        width: 100%;
-    }
+  from {
+    width: 100%;
+  }
 
-    to {
-        width: 0%;
-    }
+  to {
+    width: 0%;
+  }
 }
 
 @media (min-width: 640px) {
-    @keyframes toastEnter {
-        from {
-            opacity: 0;
-            transform: translate(20px, 0);
-        }
-
-        to {
-            opacity: 1;
-            transform: translate(0, 0);
-        }
+  @keyframes toastEnter {
+    from {
+      opacity: 0;
+      transform: translate(20px, 0);
     }
+
+    to {
+      opacity: 1;
+      transform: translate(0, 0);
+    }
+  }
 }
 
 
@@ -52,18 +56,21 @@
   * {
     -webkit-tap-highlight-color: transparent;
   }
+
   html {
     scroll-behavior: smooth;
     /* Smooth color transition for theme switching */
     @apply transition-colors duration-300;
   }
+
   body {
     @apply bg-ink-50 dark:bg-ink-950 text-ink-900 dark:text-ink-50 font-sans antialiased;
   }
+
   ::selection {
     @apply bg-primary-100 dark:bg-primary-900 text-primary-900 dark:text-primary-100;
   }
-  
+
   /* Smooth transitions for all color properties */
   * {
     @apply transition-colors duration-300 ease-in-out;
@@ -74,42 +81,55 @@
   .btn {
     @apply inline-flex items-center justify-center gap-2 font-semibold rounded-xl transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none;
   }
+
   .btn-primary {
     @apply btn bg-ink-900 dark:bg-ink-50 text-white dark:text-ink-900 hover:bg-ink-800 dark:hover:bg-ink-200 px-5 py-2.5 text-sm;
   }
+
   .btn-accent {
     @apply btn bg-primary-600 text-white hover:bg-primary-700 px-5 py-2.5 text-sm;
   }
+
   .btn-outline {
     @apply btn border border-ink-200 dark:border-ink-700 text-ink-700 dark:text-ink-300 hover:border-ink-300 dark:hover:border-ink-600 hover:bg-ink-50 dark:hover:bg-ink-800 bg-white dark:bg-transparent px-5 py-2.5 text-sm;
   }
+
   .btn-ghost {
     @apply btn text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-ink-50 hover:bg-ink-100 dark:hover:bg-ink-800 px-4 py-2 text-sm;
   }
+
   .btn-sm {
     @apply px-3.5 py-2 text-xs;
   }
+
   .btn-lg {
     @apply px-7 py-3.5 text-base;
   }
+
   .card {
     @apply bg-white dark:bg-ink-900 rounded-xl border border-ink-100 dark:border-ink-800;
   }
+
   .card-hover {
     @apply card transition-all duration-200 hover:border-ink-200 dark:hover:border-ink-700 hover:shadow-sm;
   }
+
   .input {
     @apply w-full rounded-xl border border-ink-200 dark:border-ink-700 bg-white dark:bg-ink-800 px-4 py-2.5 text-sm text-ink-900 dark:text-ink-50 placeholder-ink-400 dark:placeholder-ink-500 outline-none transition-all duration-300 focus:border-ink-400 dark:focus:border-ink-600;
   }
+
   .input::placeholder {
     @apply text-ink-400 dark:text-ink-500;
   }
+
   .label {
     @apply block text-sm font-medium text-ink-700 dark:text-ink-300 mb-1.5;
   }
+
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium;
   }
+
   .skeleton {
     @apply bg-gradient-to-r from-ink-100 dark:from-ink-800 via-ink-200 dark:via-ink-700 to-ink-100 dark:to-ink-800 bg-[length:1000px_100%] animate-shimmer rounded-lg;
   }
@@ -120,12 +140,15 @@
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   @apply bg-ink-300 dark:bg-ink-700 rounded-full;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-ink-400 dark:bg-ink-600;
 }
@@ -134,6 +157,7 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -148,7 +172,15 @@
 .page-enter {
   animation: pageEnter 0.3s ease-out;
 }
+
 @keyframes pageEnter {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
