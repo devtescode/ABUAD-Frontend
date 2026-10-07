@@ -553,7 +553,7 @@ export function AdminBookings() {
                                 setSearch(event.target.value)
                             }
                             placeholder="Search customer or provider name, email, service..."
-                            className="w-full rounded-xl border border-ink-200 bg-white py-3 pl-10 pr-4 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-900 dark:text-white"
+                            className="search-input"
                         />
 
                         {search && (
