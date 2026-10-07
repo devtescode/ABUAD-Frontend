@@ -1216,12 +1216,12 @@ export function BookingFlow() {
           )}
         </AnimatePresence>
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           {/* =================================================
               LEFT CONTENT
           ================================================= */}
 
-          <div>
+          <div className="min-w-0">
             <AnimatePresence mode="wait">
               {/* =============================================
                   STEP 1
@@ -1242,7 +1242,7 @@ export function BookingFlow() {
                     opacity: 0,
                     x: -20,
                   }}
-                  className="space-y-5"
+                  className="min-w-0 space-y-5"
                 >
                   <div className="w-full min-w-0 rounded-3xl border border-ink-100 bg-white p-4 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-7">
                     <div className="mb-6 flex min-w-0 items-start gap-3 sm:gap-4">
