@@ -275,7 +275,7 @@ function PasswordInput({
 
       <input
         type={show ? 'text' : 'password'}
-        className="input pl-10 pr-11"
+        className="input pl-10 text-base sm:text-sm pr-11"
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -648,7 +648,7 @@ export function SignupPage() {
               <GraduationCap className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
 
               <input
-                className="input pl-10 uppercase"
+                className="input pl-10 text-base sm:text-sm uppercase"
                 placeholder="e.g. EU/20/1234"
                 value={matricNo}
                 onChange={(e) =>
@@ -714,7 +714,7 @@ export function SignupPage() {
 
               <input
                 type="email"
-                className="input pl-10"
+                className="input pl-10 text-base sm:text-sm"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) =>
@@ -1142,7 +1142,7 @@ export function RoleLoginPage() {
 
             <input
               type="email"
-              className="input pl-10"
+              className="input pl-10 text-base sm:text-sm"
               placeholder="you@example.com"
               value={email}
               onChange={(e) =>
@@ -1350,7 +1350,7 @@ export function ForgotPasswordPage() {
 
               <input
                 type="email"
-                className="input pl-10"
+                className="input pl-10 text-base sm:text-sm"
                 placeholder="you@example.com"
                 required
               />
