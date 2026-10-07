@@ -8,15 +8,17 @@ import ProviderProfilePage from '@/pages/provider/ProviderProfilePage';
 import { ProvidersPage, HowItWorksPage, AboutPage } from '@/pages/public/StaticPages';
 import { SignupRolePage, SignupPage, LoginPage, RoleLoginPage, ForgotPasswordPage } from '@/pages/auth/AuthPages';
 import {
-  CustomerDashboard,
+  // CustomerDashboard,
   CustomerReviews,
   CustomerProfile,
   CustomerSettings,
 } from '@/pages/customer/CustomerDashboard';
 
+
 import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
 import { CustomerSaved } from '@/pages/customer/CustomerSaved';
 import { CustomerBookings } from '@/pages/customer/CustomerBookings';
+import { CustomersDashboard } from '@/pages/customer/CustomersDashboard';
 
 
 
@@ -162,7 +164,7 @@ function AppRoutes() {
       <Route path="/review/:id" element={<ReviewPage />} />
 
       {/* Customer */}
-      <Route path="/customer" element={<ProtectedRoute role="customer"><CustomerDashboard /></ProtectedRoute>} />
+      <Route path="/customer" element={<ProtectedRoute role="customer"><CustomersDashboard /></ProtectedRoute>} />
       <Route path="/customer/browse" element={<ProtectedRoute role="customer"><CustomerBrowse /></ProtectedRoute>} />
       <Route path="/customer/saved" element={<ProtectedRoute role="customer"><CustomerSaved /></ProtectedRoute>} />
       <Route path="/customer/bookings" element={<ProtectedRoute role="customer"><CustomerBookings /></ProtectedRoute>} />

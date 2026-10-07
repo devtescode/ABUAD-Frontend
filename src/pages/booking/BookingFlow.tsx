@@ -27,12 +27,14 @@ import {
   LockKeyhole,
   Sparkles,
   CalendarDays,
+  Star
 
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { customerNavItems } from "@/data/customerNavItems";
-import { formatNaira, type Booking } from "@/data/mockData";
+import { formatNaira } from "@/data/mockData";
+import type { Booking } from "@/data/mockData";
 import { useBookings } from "@/context/AppContext";
 
 const API_URL =
@@ -41,6 +43,22 @@ const API_URL =
 /* =========================================================
    TYPES
 ========================================================= */
+
+
+// type Booking = {
+//   id: string;
+//   serviceId?: string;
+//   serviceName?: string;
+//   providerId?: string;
+//   providerName?: string;
+//   providerAvatar?: string;
+//   date?: string;
+//   time?: string;
+//   location?: string;
+//   price?: number;
+//   status?: string;
+//   paymentStatus?: string;
+// };
 
 type Provider = {
   _id: string;
@@ -3521,41 +3539,291 @@ export function PaymentPage() {
    REVIEW PAGE
 ========================================================= */
 
+
+
+
 export function ReviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { bookings } = useBookings();
+  const [booking, setBooking] =
+    useState<Booking | null>(null);
 
-  const booking = bookings.find(
-    (item: any) =>
-      String(item.id) === String(id)
-  );
+  const [loadingBooking, setLoadingBooking] =
+    useState(true);
 
-  const [rating, setRating] =
-    useState(0);
+  const [rating, setRating] = useState(0);
+  const [review, setReview] = useState("");
 
-  const [review, setReview] =
-    useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const [submitted, setSubmitted] =
-    useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = () => {
-    if (!rating) return;
+  // =====================================================
+  // FETCH BOOKING
+  // =====================================================
+  useEffect(() => {
+    if (!id) {
+      setError("Booking ID is missing.");
+      setLoadingBooking(false);
+      return;
+    }
 
-    /*
-     * Review API can be connected here later.
-     */
-    setSubmitted(true);
+    const fetchBooking = async () => {
+      try {
+        setLoadingBooking(true);
+        setError("");
+
+        const token =
+          sessionStorage.getItem("servicely_token");
+
+        if (!token) {
+          setError(
+            "Your session has expired. Please log in again."
+          );
+          return;
+        }
+
+        /*
+         * Get customer's bookings from the backend.
+         *
+         * This uses the same endpoint your existing
+         * customer bookings system uses.
+         */
+        const response = await fetch(
+          `${API_URL}/bookings/my-bookings`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+            "Unable to load booking."
+          );
+        }
+
+        const bookings =
+          data.bookings || [];
+
+        const foundBooking = bookings.find(
+          (item: any) =>
+            String(item.id) === String(id)
+        );
+
+        if (!foundBooking) {
+          setError(
+            "Booking could not be found."
+          );
+          return;
+        }
+
+        setBooking(foundBooking);
+      } catch (error: any) {
+        console.error(
+          "FETCH REVIEW BOOKING ERROR:",
+          error
+        );
+
+        setError(
+          error.message ||
+          "Unable to load booking."
+        );
+      } finally {
+        setLoadingBooking(false);
+      }
+    };
+
+    fetchBooking();
+  }, [id]);
+
+
+  // =====================================================
+  // SUBMIT REVIEW
+  // =====================================================
+  const handleSubmit = async () => {
+    if (!booking) {
+      setError("Booking could not be found.");
+      return;
+    }
+
+    if (!rating) {
+      setError("Please select a rating.");
+      return;
+    }
+
+    if (booking.status !== "completed") {
+      setError(
+        "You can only review a completed booking."
+      );
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError("");
+
+      const token =
+        sessionStorage.getItem("servicely_token");
+
+      if (!token) {
+        setError(
+          "Your session has expired. Please log in again."
+        );
+        return;
+      }
+
+      const response = await fetch(
+        `${API_URL}/reviews/addreviews`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+
+          body: JSON.stringify({
+            bookingId: booking.id,
+            rating,
+            comment: review.trim(),
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+          "Unable to submit review."
+        );
+      }
+
+      setSubmitted(true);
+    } catch (error: any) {
+      console.error(
+        "REVIEW SUBMISSION ERROR:",
+        error
+      );
+
+      setError(
+        error.message ||
+        "Unable to submit review."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
+
+  // =====================================================
+  // LOADING
+  // =====================================================
+  if (loadingBooking) {
+    return (
+      <DashboardLayout
+        role="customer"
+        navItems={customerNavItems}
+      >
+        <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-primary-600"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+
+          <div className="rounded-3xl border border-ink-100 bg-white p-6 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-8">
+
+            <div className="animate-pulse">
+
+              <div className="h-14 w-14 rounded-2xl bg-ink-100 dark:bg-ink-800" />
+
+              <div className="mt-5 h-7 w-48 rounded bg-ink-100 dark:bg-ink-800" />
+
+              <div className="mt-3 h-4 w-72 rounded bg-ink-100 dark:bg-ink-800" />
+
+              <div className="mt-6 h-20 rounded-2xl bg-ink-100 dark:bg-ink-800" />
+
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+
+  // =====================================================
+  // BOOKING ERROR
+  // =====================================================
+  if (!booking) {
+    return (
+      <DashboardLayout
+        role="customer"
+        navItems={customerNavItems}
+      >
+        <div className="mx-auto w-full max-w-2xl px-4 py-8 sm:px-6">
+
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="mb-6 inline-flex items-center gap-2 text-sm font-semibold text-ink-500 hover:text-primary-600"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+
+          <div className="rounded-3xl border border-red-200 bg-white p-6 shadow-sm dark:border-red-900/40 dark:bg-ink-900 sm:p-8">
+
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500 dark:bg-red-950/30">
+              <CheckCircle2 className="h-6 w-6" />
+            </div>
+
+            <h1 className="mt-5 text-xl font-black text-ink-900 dark:text-white">
+              Unable to load booking
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
+              {error ||
+                "Booking could not be found."}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="mt-6 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white dark:bg-white dark:text-ink-900"
+            >
+              Go Back
+            </button>
+
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+
+  // =====================================================
+  // MAIN PAGE
+  // =====================================================
   return (
     <DashboardLayout
       role="customer"
       navItems={customerNavItems}
     >
-      <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+      <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6 sm:py-8">
+
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -3565,9 +3833,11 @@ export function ReviewPage() {
           Back
         </button>
 
-        <div className="rounded-3xl border border-ink-100 bg-white p-6 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-8">
+        <div className="rounded-3xl border border-ink-100 bg-white p-5 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-8">
+
           {!submitted ? (
             <>
+              {/* Header */}
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-400">
                 <CheckCircle2 className="h-6 w-6" />
               </div>
@@ -3580,28 +3850,36 @@ export function ReviewPage() {
                 Share your experience with the provider.
               </p>
 
-              {booking && (
-                <div className="mt-6 rounded-2xl bg-ink-50 p-4 dark:bg-ink-950/50">
-                  <p className="text-xs text-ink-400">
-                    Service
-                  </p>
 
-                  <p className="mt-1 font-bold text-ink-900 dark:text-white">
-                    {booking.serviceName}
-                  </p>
+              {/* Booking */}
+              <div className="mt-6 rounded-2xl bg-ink-50 p-4 dark:bg-ink-950/50">
 
-                  <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                    {booking.providerName}
-                  </p>
-                </div>
-              )}
+                <p className="text-xs font-medium text-ink-400">
+                  Service
+                </p>
 
+                <p className="mt-1 font-bold text-ink-900 dark:text-white">
+                  {booking.serviceName ||
+                    "Service"}
+                </p>
+
+                <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                  {booking.providerName ||
+                    "Provider"}
+                </p>
+
+              </div>
+
+
+              {/* Rating */}
               <div className="mt-7">
+
                 <p className="text-sm font-bold text-ink-800 dark:text-ink-200">
                   Your rating
                 </p>
 
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
+
                   {[1, 2, 3, 4, 5].map(
                     (value) => (
                       <button
@@ -3610,21 +3888,48 @@ export function ReviewPage() {
                         onClick={() =>
                           setRating(value)
                         }
+                        aria-label={`${value} star`}
                         className={[
-                          "flex h-11 w-11 items-center justify-center rounded-xl border text-xl transition",
+                          "flex h-12 w-12 items-center justify-center rounded-xl border transition",
                           rating >= value
-                            ? "border-primary-500 bg-primary-50 text-primary-600 dark:bg-primary-950/30"
-                            : "border-ink-200 text-ink-300 dark:border-ink-700 dark:text-ink-600",
+                            ? "border-primary-500 bg-primary-50 text-primary-500 dark:bg-primary-950/30 dark:text-primary-400"
+                            : "border-ink-200 text-ink-300 hover:border-primary-300 hover:text-primary-400 dark:border-ink-700 dark:text-ink-600",
                         ].join(" ")}
                       >
-                        ★
+                        <Star
+                          className="h-6 w-6"
+                          fill={
+                            rating >= value
+                              ? "currentColor"
+                              : "none"
+                          }
+                        />
                       </button>
                     )
                   )}
+
                 </div>
+
+                {rating > 0 && (
+                  <p className="mt-2 text-sm font-semibold text-primary-600 dark:text-primary-400">
+                    {rating === 5
+                      ? "Excellent"
+                      : rating === 4
+                        ? "Very good"
+                        : rating === 3
+                          ? "Good"
+                          : rating === 2
+                            ? "Fair"
+                            : "Poor"}
+                  </p>
+                )}
+
               </div>
 
+
+              {/* Comment */}
               <div className="mt-6">
+
                 <label className="block text-sm font-bold text-ink-800 dark:text-ink-200">
                   Review
                 </label>
@@ -3632,27 +3937,55 @@ export function ReviewPage() {
                 <textarea
                   value={review}
                   onChange={(event) =>
-                    setReview(
-                      event.target.value
-                    )
+                    setReview(event.target.value)
                   }
                   rows={5}
+                  maxLength={2000}
                   placeholder="Tell us about your experience..."
-                  className="mt-2 w-full resize-none rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-sm text-ink-900 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white"
+                  className="form-textarea mt-2 box-border"
                 />
+
+                <div className="mt-1 text-right text-xs text-ink-400">
+                  {review.length}/2000
+                </div>
+
               </div>
 
+
+              {/* Error */}
+              {error && (
+                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
+                  {error}
+                </div>
+              )}
+
+
+              {/* Submit */}
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={!rating}
-                className="mt-6 w-full rounded-2xl bg-primary-600 px-5 py-4 text-sm font-bold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={
+                  !rating ||
+                  submitting
+                }
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-5 py-4 text-sm font-bold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Submit Review
+                {submitting ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    Submitting...
+                  </>
+                ) : (
+                  "Submit Review"
+                )}
               </button>
+
             </>
           ) : (
+
+            /* Success */
             <div className="py-8 text-center">
+
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/30">
                 <Check className="h-8 w-8 text-emerald-500" />
               </div>
@@ -3662,7 +3995,7 @@ export function ReviewPage() {
               </h2>
 
               <p className="mt-2 text-sm text-ink-500 dark:text-ink-400">
-                Your feedback has been recorded.
+                Your feedback has been recorded successfully.
               </p>
 
               <button
@@ -3674,8 +4007,10 @@ export function ReviewPage() {
               >
                 Back to Dashboard
               </button>
+
             </div>
           )}
+
         </div>
       </div>
     </DashboardLayout>

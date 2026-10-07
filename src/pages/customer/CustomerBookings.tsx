@@ -109,10 +109,10 @@ function getInvalidBookingIds(): string[] {
 
     return Array.isArray(parsed)
       ? parsed.filter(
-          (id): id is string =>
-            typeof id === "string" &&
-            id.trim().length > 0
-        )
+        (id): id is string =>
+          typeof id === "string" &&
+          id.trim().length > 0
+      )
       : [];
   } catch {
     return [];
@@ -215,7 +215,7 @@ export function CustomerBookings() {
         if (!response.ok) {
           throw new Error(
             data?.message ||
-              "Unable to load bookings."
+            "Unable to load bookings."
           );
         }
 
@@ -257,7 +257,7 @@ export function CustomerBookings() {
                 (booking.paymentStatus ===
                   "unpaid" ||
                   booking.paymentStatus ===
-                    "pending") &&
+                  "pending") &&
                 !booking.serviceId
               ) {
                 return false;
@@ -404,7 +404,7 @@ export function CustomerBookings() {
           (booking.paymentStatus ===
             "unpaid" ||
             booking.paymentStatus ===
-              "pending") &&
+            "pending") &&
           !booking.serviceId
         ) {
           return false;
@@ -433,7 +433,7 @@ export function CustomerBookings() {
           (booking.paymentStatus ===
             "unpaid" ||
             booking.paymentStatus ===
-              "pending") &&
+            "pending") &&
           Boolean(booking.id) &&
           Boolean(booking.serviceId)
       );
@@ -508,7 +508,7 @@ export function CustomerBookings() {
             (booking.paymentStatus ===
               "unpaid" ||
               booking.paymentStatus ===
-                "pending") &&
+              "pending") &&
             Boolean(booking.id) &&
             Boolean(booking.serviceId)
         ).length,
@@ -545,31 +545,31 @@ export function CustomerBookings() {
     id: Filter;
     label: string;
   }[] = [
-    {
-      id: "all",
-      label: "All",
-    },
-    {
-      id: "pending",
-      label: "Pending",
-    },
-    {
-      id: "payment_pending",
-      label: "Payment Pending",
-    },
-    {
-      id: "paid",
-      label: "Paid",
-    },
-    {
-      id: "completed",
-      label: "Completed",
-    },
-    {
-      id: "cancelled",
-      label: "Cancelled",
-    },
-  ];
+      {
+        id: "all",
+        label: "All",
+      },
+      {
+        id: "pending",
+        label: "Pending",
+      },
+      {
+        id: "payment_pending",
+        label: "Payment Pending",
+      },
+      {
+        id: "paid",
+        label: "Paid",
+      },
+      {
+        id: "completed",
+        label: "Completed",
+      },
+      {
+        id: "cancelled",
+        label: "Cancelled",
+      },
+    ];
 
   return (
     <DashboardLayout
@@ -632,20 +632,18 @@ export function CustomerBookings() {
                   onClick={() =>
                     setFilter(tab.id)
                   }
-                  className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
-                    active
+                  className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${active
                       ? "bg-primary-600 text-white shadow-sm"
                       : "bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
-                  }`}
+                    }`}
                 >
                   {tab.label}
 
                   <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                      active
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${active
                         ? "bg-white/20 text-white"
                         : "bg-white/70 text-ink-500 dark:bg-ink-700 dark:text-ink-300"
-                    }`}
+                      }`}
                   >
                     {count}
                   </span>
@@ -664,11 +662,10 @@ export function CustomerBookings() {
             title="Refresh bookings"
           >
             <RefreshCw
-              className={`h-4 w-4 ${
-                refreshing
+              className={`h-4 w-4 ${refreshing
                   ? "animate-spin"
                   : ""
-              }`}
+                }`}
             />
           </button>
         </div>
@@ -733,12 +730,12 @@ export function CustomerBookings() {
               {filter === "all"
                 ? "Book a service to see your bookings and payment details here."
                 : filter ===
-                    "payment_pending"
+                  "payment_pending"
                   ? "You don't have any payments waiting to be completed."
                   : `You don't have any ${filter.replace(
-                      "_",
-                      " "
-                    )} bookings.`}
+                    "_",
+                    " "
+                  )} bookings.`}
             </p>
           </div>
         ) : (
@@ -796,9 +793,9 @@ function BookingCard({
 
   const needsPayment =
     booking.paymentStatus ===
-      "unpaid" ||
+    "unpaid" ||
     booking.paymentStatus ===
-      "pending";
+    "pending";
 
   const isCompleted =
     booking.bookingStatus ===
@@ -899,7 +896,7 @@ function BookingCard({
               {isCompleted && (
                 <Link
                   to={`/review/${booking.id}`}
-                  className="hidden rounded-xl border border-ink-200 px-3.5 py-2 text-xs font-bold text-ink-700 sm:block"
+                  className="inline-flex items-center justify-center rounded-xl border border-ink-200 px-3.5 py-2 text-xs font-bold text-ink-700 transition hover:border-primary-300 hover:text-primary-600 dark:border-ink-700 dark:text-ink-200 dark:hover:border-primary-500 dark:hover:text-primary-400"
                 >
                   Review
                 </Link>
@@ -1002,24 +999,24 @@ function BookingDetailsModal({
 
                 {booking.serviceDetails
                   .category && (
-                  <span className="rounded-full bg-primary-50 px-2.5 py-1 text-[10px] font-bold text-primary-700 dark:bg-primary-950/30 dark:text-primary-400">
-                    {
-                      booking.serviceDetails
-                        .category
-                    }
-                  </span>
-                )}
+                    <span className="rounded-full bg-primary-50 px-2.5 py-1 text-[10px] font-bold text-primary-700 dark:bg-primary-950/30 dark:text-primary-400">
+                      {
+                        booking.serviceDetails
+                          .category
+                      }
+                    </span>
+                  )}
               </div>
 
               {booking.serviceDetails
                 .description && (
-                <p className="mt-2 text-sm leading-6 text-ink-500">
-                  {
-                    booking.serviceDetails
-                      .description
-                  }
-                </p>
-              )}
+                  <p className="mt-2 text-sm leading-6 text-ink-500">
+                    {
+                      booking.serviceDetails
+                        .description
+                    }
+                  </p>
+                )}
             </div>
           </section>
 
@@ -1110,18 +1107,16 @@ function BookingDetailsModal({
             />
 
             <div
-              className={`mt-3 overflow-hidden rounded-2xl border ${
-                isPaid
+              className={`mt-3 overflow-hidden rounded-2xl border ${isPaid
                   ? "border-emerald-200 dark:border-emerald-900/50"
                   : "border-ink-200 dark:border-ink-700"
-              }`}
+                }`}
             >
               <div
-                className={`flex items-center justify-between px-4 py-4 ${
-                  isPaid
+                className={`flex items-center justify-between px-4 py-4 ${isPaid
                     ? "bg-emerald-50 dark:bg-emerald-950/20"
                     : "bg-ink-50 dark:bg-ink-800/50"
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-2">
                   {isPaid ? (
@@ -1134,8 +1129,8 @@ function BookingDetailsModal({
                     {isPaid
                       ? "Payment successful"
                       : formatStatus(
-                          booking.paymentStatus
-                        )}
+                        booking.paymentStatus
+                      )}
                   </span>
                 </div>
 
@@ -1152,9 +1147,9 @@ function BookingDetailsModal({
                       .amount !== null &&
                       booking.payment
                         .amount !==
-                        undefined
+                      undefined
                       ? booking.payment
-                          .amount
+                        .amount
                       : booking.price
                   )}
                   strong
@@ -1162,49 +1157,49 @@ function BookingDetailsModal({
 
                 {booking.payment
                   .reference && (
-                  <PaymentRow
-                    label="Payment reference"
-                    value={
-                      booking.payment
-                        .reference
-                    }
-                    mono
-                  />
-                )}
+                    <PaymentRow
+                      label="Payment reference"
+                      value={
+                        booking.payment
+                          .reference
+                      }
+                      mono
+                    />
+                  )}
 
                 {booking.payment
                   .transactionId && (
-                  <PaymentRow
-                    label="Transaction ID"
-                    value={
-                      booking.payment
-                        .transactionId
-                    }
-                    mono
-                  />
-                )}
+                    <PaymentRow
+                      label="Transaction ID"
+                      value={
+                        booking.payment
+                          .transactionId
+                      }
+                      mono
+                    />
+                  )}
 
                 {booking.payment
                   .channel && (
-                  <PaymentRow
-                    label="Payment channel"
-                    value={formatStatus(
-                      booking.payment
-                        .channel
-                    )}
-                  />
-                )}
+                    <PaymentRow
+                      label="Payment channel"
+                      value={formatStatus(
+                        booking.payment
+                          .channel
+                      )}
+                    />
+                  )}
 
                 {booking.payment
                   .paidAt && (
-                  <PaymentRow
-                    label="Paid on"
-                    value={formatDateTime(
-                      booking.payment
-                        .paidAt
-                    )}
-                  />
-                )}
+                    <PaymentRow
+                      label="Paid on"
+                      value={formatDateTime(
+                        booking.payment
+                          .paidAt
+                      )}
+                    />
+                  )}
 
                 <PaymentRow
                   label="Servicely fee"
@@ -1229,7 +1224,7 @@ function BookingDetailsModal({
               (booking.paymentStatus ===
                 "unpaid" ||
                 booking.paymentStatus ===
-                  "pending") && (
+                "pending") && (
                 <Link
                   to={`/payment/${booking.id}`}
                   onClick={onClose}
@@ -1432,13 +1427,11 @@ function PaymentRow({
       </span>
 
       <span
-        className={`break-all text-right text-xs ${
-          mono ? "font-mono" : ""
-        } ${
-          strong
+        className={`break-all text-right text-xs ${mono ? "font-mono" : ""
+          } ${strong
             ? "font-black text-ink-900 dark:text-white"
             : "font-semibold text-ink-700 dark:text-ink-300"
-        }`}
+          }`}
       >
         {value}
       </span>
