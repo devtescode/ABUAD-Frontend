@@ -95,36 +95,7 @@ export function CustomerDashboard() {
 
 
 
-export function CustomerReviews() {
-  const { bookings } = useBookings();
-  const reviewed = bookings.filter((b) => b.status === 'reviewed' || b.status === 'completed');
-  return (
-    <DashboardLayout role="customer" navItems={navItems}>
-      <DashboardHeader title="My Reviews" subtitle="Reviews you've left for providers" />
-      {reviewed.length === 0 ? (
-        <div className="card flex flex-col items-center justify-center py-20 text-center">
-          <Star className="h-12 w-12 text-ink-300" />
-          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">No reviews yet</h3>
-          <p className="mt-1 text-sm text-ink-500">Complete a booking to leave a review.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {reviewed.map((booking) => (
-            <div key={booking.id} className="card p-4">
-              <div className="flex items-center gap-3">
-                <img src={booking.providerAvatar} alt="" className="h-10 w-10 rounded-full object-cover" />
-                <div>
-                  <h3 className="font-semibold text-ink-900">{booking.providerName}</h3>
-                  <p className="text-xs text-ink-400">{booking.serviceName}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </DashboardLayout>
-  );
-}
+
 
 export function CustomerProfile() {
   const { user } = useAuth();

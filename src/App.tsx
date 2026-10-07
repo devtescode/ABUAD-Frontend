@@ -8,8 +8,6 @@ import ProviderProfilePage from '@/pages/provider/ProviderProfilePage';
 import { ProvidersPage, HowItWorksPage, AboutPage } from '@/pages/public/StaticPages';
 import { SignupRolePage, SignupPage, LoginPage, RoleLoginPage, ForgotPasswordPage } from '@/pages/auth/AuthPages';
 import {
-  // CustomerDashboard,
-  CustomerReviews,
   CustomerProfile,
   CustomerSettings,
 } from '@/pages/customer/CustomerDashboard';
@@ -19,6 +17,7 @@ import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
 import { CustomerSaved } from '@/pages/customer/CustomerSaved';
 import { CustomerBookings } from '@/pages/customer/CustomerBookings';
 import { CustomersDashboard } from '@/pages/customer/CustomersDashboard';
+import { CustomerReviews } from '@/pages/customer/CustomerReviews';
 
 
 
