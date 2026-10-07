@@ -439,7 +439,7 @@ export default function AdminAuth() {
                     }
                     placeholder="Enter your full name"
                     autoComplete="name"
-                    className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                    className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 text-base sm:text-sm"
                   />
 
                 </div>
@@ -467,7 +467,7 @@ export default function AdminAuth() {
                   }
                   placeholder="admin@example.com"
                   autoComplete="email"
-                  className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                  className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 text-base sm:text-sm"
                 />
 
               </div>
@@ -502,7 +502,7 @@ export default function AdminAuth() {
                       ? "new-password"
                       : "current-password"
                   }
-                  className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-12 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                  className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-12 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 text-base sm:text-sm"
                 />
 
                 <button
@@ -552,7 +552,7 @@ export default function AdminAuth() {
                     }
                     placeholder="Confirm your password"
                     autoComplete="new-password"
-                    className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-12 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                    className="w-full h-12 rounded-xl border border-slate-200 pl-11 pr-12 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 text-base sm:text-sm"
                   />
 
                   <button
