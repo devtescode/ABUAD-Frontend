@@ -26,6 +26,7 @@ import {
   RefreshCcw,
   LockKeyhole,
   Sparkles,
+  CalendarDays,
 
 } from "lucide-react";
 
@@ -1261,18 +1262,60 @@ export function BookingFlow() {
                     </div>
 
                     <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-ink-700 dark:text-ink-200">
-                        Booking date
-                      </span>
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <label className="text-sm font-semibold text-ink-800 dark:text-ink-100">
+                          Booking date
+                        </label>
 
-                      <div className="relative w-full">
-                        <input
-                          type="date"
-                          min={getMinimumDate()}
-                          value={data.date || ""}
-                          onChange={(event) => handleDateChange(event.target.value)}
-                          className="block min-h-[54px] w-full cursor-pointer rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-sm font-medium text-ink-900 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white"
-                        />
+                        <span className="text-[11px] font-medium text-ink-400 dark:text-ink-500">
+                          Required
+                        </span>
+                      </div>
+                      <div className="w-full">
+
+                        <div className="group relative">
+                          <div className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center sm:left-4">
+                            <CalendarDays className="h-[18px] w-[18px] text-ink-400 transition-colors group-focus-within:text-primary-500 sm:h-5 sm:w-5 dark:text-ink-500" />
+                          </div>
+
+                          <input
+                            type="date"
+                            min={getMinimumDate()}
+                            value={data.date || ""}
+                            onChange={(event) =>
+                              handleDateChange(event.target.value)
+                            }
+                            className="
+                                        block min-h-[52px] w-full
+                                        appearance-none
+                                        rounded-xl border border-ink-200
+                                        bg-white
+                                        pl-11 pr-3
+                                        text-sm font-medium text-ink-900
+                                        shadow-sm
+                                        outline-none
+                                        transition-all duration-200
+                                
+                                        hover:border-ink-300
+                                        focus:border-primary-500
+                                        focus:ring-4 focus:ring-primary-500/10
+                                
+                                        dark:border-ink-700
+                                        dark:bg-ink-950
+                                        dark:text-white
+                                        dark:hover:border-ink-600
+                                
+                                        sm:min-h-[56px]
+                                        sm:rounded-2xl
+                                        sm:pl-12
+                                        sm:pr-4
+                                      "
+                          />
+                        </div>
+
+                        <p className="mt-1.5 text-[11px] leading-4 text-ink-400 dark:text-ink-500 sm:text-xs">
+                          Choose the date for your service.
+                        </p>
                       </div>
                     </label>
 
