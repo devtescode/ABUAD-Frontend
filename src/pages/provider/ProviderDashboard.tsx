@@ -208,47 +208,7 @@ export function ProviderEarnings() {
   );
 }
 
-export function ProviderReviews() {
-  const providerReviews = reviews.filter((r) => r.providerId === currentProvider.id);
-  return (
-    <DashboardLayout role="provider" navItems={navItems}>
-      <DashboardHeader title="Reviews" subtitle="What customers are saying about you" />
-      <div className="card mb-6 flex items-center gap-6 p-6">
-        <div className="text-center">
-          <p className="text-4xl font-bold text-ink-900">{currentProvider.rating}</p>
-          <StarRating rating={currentProvider.rating} size={18} />
-          <p className="mt-1 text-xs text-ink-500">{currentProvider.reviewCount} reviews</p>
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <VerifiedBadge />
-            <span className="text-sm text-ink-600">Highly rated provider</span>
-          </div>
-          <p className="mt-2 text-sm text-ink-500">Keep delivering great service to maintain your rating.</p>
-        </div>
-      </div>
-      <div className="space-y-3">
-        {providerReviews.map((review) => (
-          <div key={review.id} className="card p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
-                  {review.customerName[0]}
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-ink-900">{review.customerName}</p>
-                  <p className="text-xs text-ink-400">{review.date}</p>
-                </div>
-              </div>
-              <StarRating rating={review.rating} />
-            </div>
-            <p className="mt-3 text-sm text-ink-600">{review.comment}</p>
-          </div>
-        ))}
-      </div>
-    </DashboardLayout>
-  );
-}
+
 
 
 

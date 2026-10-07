@@ -24,7 +24,6 @@ import { CustomerReviews } from '@/pages/customer/CustomerReviews';
 import {
   ProviderOnboarding,
   ProviderEarnings,
-  ProviderReviews,
   ProviderSettings,
 } from '@/pages/provider/ProviderDashboard';
 import { ProvidersDashboard} from '@/pages/provider/ProvidersDashboard';
@@ -36,6 +35,7 @@ import { ProviderAvailability } from '@/pages/provider/ProviderAvailability';
 import { ProviderAccount } from '@/pages/provider/ProviderAccount';
 import { ProviderRequests } from '@/pages/provider/ProviderRequests';
 import { ProviderBookings } from '@/pages/provider/ProviderBookings';
+import { ProviderReviews } from '@/pages/provider/ProviderReviews';
 
 import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
 import {
