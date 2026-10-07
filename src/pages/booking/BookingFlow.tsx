@@ -1275,11 +1275,20 @@ export function BookingFlow() {
                         </span>
                       </div>
 
-                      <div className="w-full">
-                        <div className="group relative">
+                      <div className="w-full min-w-0">
+                        <div className="group relative w-full min-w-0">
                           {/* Calendar icon */}
-                          <div className="pointer-events-none absolute inset-y-0 left-3.5 z-10 flex items-center sm:left-4">
-                            <CalendarDays className="h-[18px] w-[18px] text-ink-400 transition-colors group-focus-within:text-primary-500 sm:h-5 sm:w-5 dark:text-ink-500" />
+                          <div className="pointer-events-none absolute inset-y-0 left-3 z-10 flex items-center sm:left-4">
+                            <CalendarDays
+                              className="
+          h-[18px] w-[18px]
+          text-ink-400
+          transition-colors
+          group-focus-within:text-primary-500
+          dark:text-ink-500
+          sm:h-5 sm:w-5
+        "
+                            />
                           </div>
 
                           <input
@@ -1289,40 +1298,37 @@ export function BookingFlow() {
                             value={data.date || ""}
                             onChange={(event) => handleDateChange(event.target.value)}
                             className="
-          block
-          min-h-[52px]
-          w-full
-          cursor-pointer
-          rounded-xl
-          border border-ink-200
-          bg-white
-          px-4
-          py-3
-          pl-11
-          text-sm
-          font-medium
-          leading-normal
-          text-ink-900
-          shadow-sm
-          outline-none
-          transition-all
-          duration-200
+        block
+        h-[52px]
+        w-full
+        min-w-0
+        cursor-pointer
+        rounded-xl
+        border
+        border-ink-200
+        bg-white
+        pl-10
+        pr-2
+        text-sm
+        font-medium
+        text-ink-900
+        outline-none
+        transition-all
+        duration-200
 
-          hover:border-ink-300
-          focus:border-primary-500
-          focus:ring-4
-          focus:ring-primary-500/10
+        focus:border-primary-500
+        focus:ring-4
+        focus:ring-primary-500/10
 
-          dark:border-ink-700
-          dark:bg-ink-950
-          dark:text-white
-          dark:hover:border-ink-600
+        dark:border-ink-700
+        dark:bg-ink-950
+        dark:text-white
 
-          sm:min-h-[56px]
-          sm:rounded-2xl
-          sm:pl-12
-          sm:pr-4
-        "
+        sm:h-14
+        sm:rounded-2xl
+        sm:pl-12
+        sm:pr-4
+      "
                           />
                         </div>
 
