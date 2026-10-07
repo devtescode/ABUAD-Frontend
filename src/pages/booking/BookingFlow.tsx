@@ -22,11 +22,11 @@ import {
   ShieldCheck,
   User,
   X,
-   AlertCircle,
+  AlertCircle,
   RefreshCcw,
   LockKeyhole,
   Sparkles,
-  
+
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -676,287 +676,287 @@ export function BookingFlow() {
      SUBMIT BOOKING
   ======================================================= */
 
- /* =======================================================
-   SUBMIT BOOKING — REAL DATABASE
-======================================================= */
+  /* =======================================================
+    SUBMIT BOOKING — REAL DATABASE
+ ======================================================= */
 
-const handleConfirmBooking = async () => {
-  if (!provider || !selectedService) {
-    return;
-  }
-
-  const validationError =
-    validateCurrentStep();
-
-  if (validationError) {
-    setError(validationError);
-    return;
-  }
-
-  try {
-    setSubmitting(true);
-    setError("");
-
-    // ==========================================
-    // AUTH TOKEN
-    // ==========================================
-
-    const token =
-      sessionStorage.getItem(
-        "servicely_token"
-      );
-
-    if (!token) {
-      navigate(
-        "/login/customer",
-        {
-          replace: true,
-        }
-      );
-
+  const handleConfirmBooking = async () => {
+    if (!provider || !selectedService) {
       return;
     }
 
-    // ==========================================
-    // CREATE REAL MONGODB BOOKING
-    // ==========================================
+    const validationError =
+      validateCurrentStep();
 
-    const response =
-      await fetch(
-        `${API_URL}/bookings/createbookings`,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Authorization:
-              `Bearer ${token}`,
-
-            Accept:
-              "application/json",
-          },
-
-          body: JSON.stringify({
-            serviceId:
-              selectedService._id,
-
-            date:
-              data.date,
-
-            time:
-              data.time,
-
-            location:
-              data.location.trim(),
-
-            note:
-              data.notes.trim(),
-          }),
-        }
-      );
-
-    let result: any = {};
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     try {
-      result =
-        await response.json();
-    } catch {
-      throw new Error(
-        `Server returned an invalid response (${response.status}).`
-      );
-    }
+      setSubmitting(true);
+      setError("");
 
-    console.log(
-      "Booking creation response:",
-      result
-    );
+      // ==========================================
+      // AUTH TOKEN
+      // ==========================================
 
-    if (!response.ok) {
-      throw new Error(
-        result?.message ||
-          result?.error ||
-          `Unable to create booking (${response.status}).`
-      );
-    }
+      const token =
+        sessionStorage.getItem(
+          "servicely_token"
+        );
 
-    if (!result?.success) {
-      throw new Error(
-        result?.message ||
-          "Unable to create booking."
-      );
-    }
+      if (!token) {
+        navigate(
+          "/login/customer",
+          {
+            replace: true,
+          }
+        );
 
-    // ==========================================
-    // GET REAL MONGODB BOOKING
-    // ==========================================
+        return;
+      }
 
-    const backendBooking =
-      result?.booking ||
-      result?.data?.booking;
+      // ==========================================
+      // CREATE REAL MONGODB BOOKING
+      // ==========================================
 
-    if (!backendBooking) {
-      console.error(
-        "No booking returned:",
+      const response =
+        await fetch(
+          `${API_URL}/bookings/createbookings`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${token}`,
+
+              Accept:
+                "application/json",
+            },
+
+            body: JSON.stringify({
+              serviceId:
+                selectedService._id,
+
+              date:
+                data.date,
+
+              time:
+                data.time,
+
+              location:
+                data.location.trim(),
+
+              note:
+                data.notes.trim(),
+            }),
+          }
+        );
+
+      let result: any = {};
+
+      try {
+        result =
+          await response.json();
+      } catch {
+        throw new Error(
+          `Server returned an invalid response (${response.status}).`
+        );
+      }
+
+      console.log(
+        "Booking creation response:",
         result
       );
 
-      throw new Error(
-        "Booking was created, but no booking information was returned."
+      if (!response.ok) {
+        throw new Error(
+          result?.message ||
+          result?.error ||
+          `Unable to create booking (${response.status}).`
+        );
+      }
+
+      if (!result?.success) {
+        throw new Error(
+          result?.message ||
+          "Unable to create booking."
+        );
+      }
+
+      // ==========================================
+      // GET REAL MONGODB BOOKING
+      // ==========================================
+
+      const backendBooking =
+        result?.booking ||
+        result?.data?.booking;
+
+      if (!backendBooking) {
+        console.error(
+          "No booking returned:",
+          result
+        );
+
+        throw new Error(
+          "Booking was created, but no booking information was returned."
+        );
+      }
+
+      // ==========================================
+      // REAL MONGODB ID
+      // ==========================================
+
+      const mongoBookingId =
+        backendBooking?._id ||
+        backendBooking?.id;
+
+      if (!mongoBookingId) {
+        console.error(
+          "No MongoDB booking ID:",
+          backendBooking
+        );
+
+        throw new Error(
+          "The booking was created but no valid booking ID was returned."
+        );
+      }
+
+      console.log(
+        "REAL MONGODB BOOKING ID:",
+        mongoBookingId
       );
-    }
 
-    // ==========================================
-    // REAL MONGODB ID
-    // ==========================================
+      // ==========================================
+      // PRICE FROM BACKEND
+      // ==========================================
 
-    const mongoBookingId =
-      backendBooking?._id ||
-      backendBooking?.id;
-
-    if (!mongoBookingId) {
-      console.error(
-        "No MongoDB booking ID:",
-        backendBooking
-      );
-
-      throw new Error(
-        "The booking was created but no valid booking ID was returned."
-      );
-    }
-
-    console.log(
-      "REAL MONGODB BOOKING ID:",
-      mongoBookingId
-    );
-
-    // ==========================================
-    // PRICE FROM BACKEND
-    // ==========================================
-
-    const bookingPrice =
-      Number(
-        backendBooking?.amount ??
+      const bookingPrice =
+        Number(
+          backendBooking?.amount ??
           backendBooking?.price ??
           getServicePrice(
             selectedService
           )
-      ) || 0;
+        ) || 0;
 
-    // ==========================================
-    // MAP BACKEND → FRONTEND BOOKING
-    // ==========================================
+      // ==========================================
+      // MAP BACKEND → FRONTEND BOOKING
+      // ==========================================
 
-    const booking: Booking = {
-      id: String(
-        mongoBookingId
-      ),
+      const booking: Booking = {
+        id: String(
+          mongoBookingId
+        ),
 
-      serviceId: String(
-        backendBooking?.service?._id ||
+        serviceId: String(
+          backendBooking?.service?._id ||
           backendBooking?.service ||
           selectedService._id
-      ),
-
-      serviceName:
-        backendBooking?.service?.title ||
-        backendBooking?.serviceName ||
-        getServiceName(
-          selectedService
         ),
 
-      providerId: String(
-        backendBooking?.provider?._id ||
+        serviceName:
+          backendBooking?.service?.title ||
+          backendBooking?.serviceName ||
+          getServiceName(
+            selectedService
+          ),
+
+        providerId: String(
+          backendBooking?.provider?._id ||
           backendBooking?.provider ||
           provider._id
-      ),
-
-      providerName:
-        backendBooking?.provider?.name ||
-        backendBooking?.providerName ||
-        getProviderName(
-          provider
         ),
 
-      providerAvatar:
-        backendBooking?.provider?.avatar ||
-        backendBooking?.provider?.profileImage ||
-        backendBooking?.providerAvatar ||
-        getProviderImage(
-          provider
-        ),
+        providerName:
+          backendBooking?.provider?.name ||
+          backendBooking?.providerName ||
+          getProviderName(
+            provider
+          ),
 
-      customerName:
-        backendBooking?.customer?.name ||
-        backendBooking?.customerName ||
-        "You",
+        providerAvatar:
+          backendBooking?.provider?.avatar ||
+          backendBooking?.provider?.profileImage ||
+          backendBooking?.providerAvatar ||
+          getProviderImage(
+            provider
+          ),
 
-      date:
-        backendBooking?.date ||
-        data.date,
+        customerName:
+          backendBooking?.customer?.name ||
+          backendBooking?.customerName ||
+          "You",
 
-      time:
-        backendBooking?.time ||
-        data.time,
+        date:
+          backendBooking?.date ||
+          data.date,
 
-      location:
-        backendBooking?.location ||
-        data.location,
+        time:
+          backendBooking?.time ||
+          data.time,
 
-      price:
-        bookingPrice,
+        location:
+          backendBooking?.location ||
+          data.location,
 
-      notes:
-        backendBooking?.note ||
-        backendBooking?.notes ||
-        data.notes,
+        price:
+          bookingPrice,
 
-      // Frontend status
-      status:
-        "payment_pending",
+        notes:
+          backendBooking?.note ||
+          backendBooking?.notes ||
+          data.notes,
 
-      createdAt:
-        backendBooking?.createdAt ||
-        new Date().toISOString(),
-    };
+        // Frontend status
+        status:
+          "payment_pending",
 
-    // ==========================================
-    // SAVE IN YOUR EXISTING CONTEXT
-    // ==========================================
+        createdAt:
+          backendBooking?.createdAt ||
+          new Date().toISOString(),
+      };
 
-    addBooking(
-      booking
-    );
+      // ==========================================
+      // SAVE IN YOUR EXISTING CONTEXT
+      // ==========================================
 
-    console.log(
-      "Booking saved with real MongoDB ID:",
-      booking.id
-    );
+      addBooking(
+        booking
+      );
 
-    // ==========================================
-    // GO TO PAYMENT
-    // ==========================================
-
-    navigate(
-      `/payment/${encodeURIComponent(
+      console.log(
+        "Booking saved with real MongoDB ID:",
         booking.id
-      )}`
-    );
-  } catch (error: any) {
-    console.error(
-      "Create booking error:",
-      error
-    );
+      );
 
-    setError(
-      error?.message ||
+      // ==========================================
+      // GO TO PAYMENT
+      // ==========================================
+
+      navigate(
+        `/payment/${encodeURIComponent(
+          booking.id
+        )}`
+      );
+    } catch (error: any) {
+      console.error(
+        "Create booking error:",
+        error
+      );
+
+      setError(
+        error?.message ||
         "Unable to create your booking. Please try again."
-    );
-  } finally {
-    setSubmitting(false);
-  }
-};
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   /* =======================================================
      LOADING
@@ -1260,17 +1260,26 @@ const handleConfirmBooking = async () => {
                         Booking date
                       </span>
 
-                      <input
-                        type="date"
-                        min={getMinimumDate()}
-                        value={data.date}
-                        onChange={(event) =>
-                          handleDateChange(
-                            event.target.value
-                          )
-                        }
-                        className="w-full rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-sm font-medium text-ink-900 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white"
-                      />
+                      <div className="relative w-full">
+                        <input
+                          type="date"
+                          min={getMinimumDate()}
+                          value={data.date}
+                          onChange={(event) => handleDateChange(event.target.value)}
+                          onClick={(event) => {
+                            const input = event.currentTarget;
+
+                            if ("showPicker" in input) {
+                              try {
+                                input.showPicker();
+                              } catch {
+                                // Browser may already have opened the picker
+                              }
+                            }
+                          }}
+                          className="relative z-10 block min-h-[54px] w-full cursor-pointer appearance-none rounded-2xl border border-ink-200 bg-white px-4 py-3.5 text-sm font-medium text-ink-900 outline-none transition focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white"
+                        />
+                      </div>
                     </label>
 
                     {data.date && (
@@ -2369,7 +2378,7 @@ export function PaymentPage() {
         if (!response.ok) {
           throw new Error(
             result?.message ||
-              `Unable to load booking (${response.status}).`
+            `Unable to load booking (${response.status}).`
           );
         }
 
@@ -2545,7 +2554,7 @@ export function PaymentPage() {
           if (!response.ok) {
             throw new Error(
               result?.message ||
-                `Unable to verify payment (${response.status}).`
+              `Unable to verify payment (${response.status}).`
             );
           }
 
@@ -2555,7 +2564,7 @@ export function PaymentPage() {
           ) {
             throw new Error(
               result?.message ||
-                "Payment could not be verified."
+              "Payment could not be verified."
             );
           }
 
@@ -2573,7 +2582,7 @@ export function PaymentPage() {
 
           setVerificationMessage(
             result?.message ||
-              "Your payment has been verified successfully."
+            "Your payment has been verified successfully."
           );
 
           // ==========================================
@@ -2601,7 +2610,7 @@ export function PaymentPage() {
 
           setVerificationMessage(
             error?.message ||
-              "Unable to verify your payment. Please try again."
+            "Unable to verify your payment. Please try again."
           );
         } finally {
           if (!cancelled) {
@@ -2763,8 +2772,8 @@ export function PaymentPage() {
         /booking/i.test(
           String(
             result?.message ||
-              result?.error ||
-              ""
+            result?.error ||
+            ""
           )
         )
       ) {
@@ -2790,15 +2799,15 @@ export function PaymentPage() {
       if (!response.ok) {
         throw new Error(
           result?.message ||
-            result?.error ||
-            `Unable to initialize payment (${response.status}).`
+          result?.error ||
+          `Unable to initialize payment (${response.status}).`
         );
       }
 
       if (!result?.success) {
         throw new Error(
           result?.message ||
-            "Unable to initialize payment."
+          "Unable to initialize payment."
         );
       }
 
@@ -2842,7 +2851,7 @@ export function PaymentPage() {
 
       setPaymentError(
         error?.message ||
-          "Unable to start payment. Please try again."
+        "Unable to start payment. Please try again."
       );
     } finally {
       setPaying(false);
