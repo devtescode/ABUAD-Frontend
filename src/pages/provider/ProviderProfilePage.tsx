@@ -806,10 +806,10 @@ export default function ProviderProfilePage() {
           );
         }
 
-        console.log(
-          "Provider portfolio response:",
-          result
-        );
+        // console.log(
+        //   "Provider portfolio response:",
+        //   result
+        // );
 
         if (
           !response.ok ||
