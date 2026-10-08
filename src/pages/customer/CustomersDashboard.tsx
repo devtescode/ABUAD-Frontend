@@ -316,10 +316,10 @@ export function CustomersDashboard() {
          */
         const url = `${API_URL}/reviews/recommended?limit=4`;
 
-        console.log(
-          "Fetching recommended from:",
-          url
-        );
+        // console.log(
+        //   "Fetching recommended from:",
+        //   url
+        // );
 
         const response = await fetch(url, {
           method: "GET",
@@ -336,10 +336,10 @@ export function CustomersDashboard() {
 
         const result = await response.json();
 
-        console.log(
-          "Recommended response:",
-          result
-        );
+        // console.log(
+        //   "Recommended response:",
+        //   result
+        // );
 
         if (!response.ok) {
           throw new Error(
@@ -354,16 +354,16 @@ export function CustomersDashboard() {
           ? result.providers
           : [];
 
-        console.log(
-          "Recommended providers (raw):",
-          list
-        );
+        // console.log(
+        //   "Recommended providers (raw):",
+        //   list
+        // );
 
         if (list[0]) {
-          console.log(
-            "🔍 First provider object:",
-            JSON.stringify(list[0], null, 2)
-          );
+          // console.log(
+          //   "🔍 First provider object:",
+          //   JSON.stringify(list[0], null, 2)
+          // );
         }
 
         /*
@@ -415,14 +415,14 @@ export function CustomersDashboard() {
           }
         );
 
-        console.log(
-          "🔍 Sorted by rating:",
-          sortedByRating.map((p) => ({
-            name: p.fullName || p.name,
-            rating: p.rating,
-            startingPrice: p.startingPrice,
-          }))
-        );
+        // console.log(
+        //   "🔍 Sorted by rating:",
+        //   sortedByRating.map((p) => ({
+        //     name: p.fullName || p.name,
+        //     rating: p.rating,
+        //     startingPrice: p.startingPrice,
+        //   }))
+        // );
 
         setRecommended(sortedByRating);
       } catch (err) {
