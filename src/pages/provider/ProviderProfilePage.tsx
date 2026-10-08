@@ -182,6 +182,21 @@ interface Review {
     price?: number;
   };
 
+  /*
+   * Admin moderation flags.
+   *
+   * If any of these indicate the review is hidden, the
+   * customer-facing provider profile page will NOT render
+   * it. This keeps the customer view in sync with the
+   * admin panel's Hide/Unhide action.
+   *
+   * Multiple field names are accepted so this works
+   * regardless of how the backend names the flag.
+   */
+  isHidden?: boolean;
+  hidden?: boolean;
+  status?: string;
+
   createdAt?: string;
   updatedAt?: string;
 }
@@ -308,6 +323,32 @@ const getPortfolioImages = (
   }
 
   return images;
+};
+
+/*
+ * Determine whether a review is hidden by an admin.
+ *
+ * Handles multiple possible backend field names so this
+ * works no matter how the admin API represents the flag:
+ *
+ *   - { isHidden: true }
+ *   - { hidden: true }
+ *   - { status: "hidden" }
+ */
+const isReviewHidden = (review: Review) => {
+  if (typeof review.isHidden === "boolean") {
+    return review.isHidden;
+  }
+
+  if (typeof review.hidden === "boolean") {
+    return review.hidden;
+  }
+
+  if (typeof review.status === "string") {
+    return review.status.toLowerCase() === "hidden";
+  }
+
+  return false;
 };
 
 /* =========================================================
@@ -461,11 +502,8 @@ export default function ProviderProfilePage() {
      This effect ONLY fetches the provider profile and their
      services. It does NOT touch reviews.
      
-     Previously, calling setReviews([]) here would race with
-     the dedicated reviews effect below and overwrite the
-     real reviews with an empty array. That race condition
-     was the reason reviews would sometimes disappear right
-     after the loader stopped.
+     Reviews are owned exclusively by the dedicated reviews
+     effect below, which also filters out hidden reviews.
   ========================================================= */
 
   useEffect(() => {
@@ -553,16 +591,6 @@ export default function ProviderProfilePage() {
             ? profileServices
             : routeServices
         );
-
-        /*
-         * IMPORTANT:
-         *
-         * We intentionally DO NOT call setReviews() here.
-         *
-         * Reviews are owned exclusively by the reviews
-         * effect below. This prevents the race condition
-         * that was wiping out reviews.
-         */
       } catch (err) {
         if (cancelled) return;
 
@@ -592,22 +620,27 @@ export default function ProviderProfilePage() {
 
 
   /* =========================================================
-   FETCH PROVIDER REVIEWS
-   
-   IMPORTANT:
-   
-   Reviews are fetched separately from the provider
-   profile because reviews have their own public endpoint:
-   
-     /reviews/provider/:providerId
-   
-   This allows every customer to see reviews left by
-   previous customers.
-   
-   The reviews state is ONLY set here. No other effect
-   touches it. This ensures reviews stay visible the
-   moment the loader stops.
-========================================================= */
+     FETCH PROVIDER REVIEWS
+     
+     IMPORTANT:
+     
+     Reviews are fetched separately from the provider profile
+     because reviews have their own public endpoint:
+     
+       /reviews/provider/:providerId
+     
+     This allows every customer to see reviews left by
+     previous customers.
+     
+     HIDDEN REVIEWS:
+     
+     Any review marked as hidden by an admin is filtered out
+     BEFORE being stored in state. This guarantees hidden
+     reviews never appear anywhere in the customer view —
+     not in the count, not in the average rating, not in
+     the list.
+  ========================================================= */
+
   useEffect(() => {
     if (!id) {
       setReviewsLoading(false);
@@ -663,11 +696,27 @@ export default function ProviderProfilePage() {
         }
 
         if (!cancelled) {
-          setReviews(
-            Array.isArray(result.reviews)
-              ? result.reviews
-              : []
+          const allReviews = Array.isArray(
+            result.reviews
+          )
+            ? result.reviews
+            : [];
+
+          /*
+           * Filter out any reviews that were hidden by an
+           * admin. This keeps the customer view in sync with
+           * the admin panel's Hide/Unhide action.
+           */
+          const visibleReviews = allReviews.filter(
+            (review) => !isReviewHidden(review)
           );
+
+          console.log(
+            "Visible reviews after filtering:",
+            visibleReviews
+          );
+
+          setReviews(visibleReviews);
         }
       } catch (error) {
         if (!cancelled) {
@@ -858,11 +907,16 @@ export default function ProviderProfilePage() {
     provider?.rating || 0
   );
 
-  const reviewCount = Number(
-    provider?.reviewCount ||
-    reviews.length ||
-    0
-  );
+  /*
+   * The backend's reviewCount may include hidden reviews.
+   * While reviews are still loading, fall back to the
+   * provider's count so the badge doesn't flash to 0.
+   * Once the filtered reviews list is ready, use its
+   * length so the count always matches what customers see.
+   */
+  const reviewCount = reviewsLoading
+    ? Number(provider?.reviewCount || 0)
+    : reviews.length;
 
   const availability =
     provider?.availability || [];
@@ -1551,7 +1605,7 @@ export default function ProviderProfilePage() {
                   {sharing ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                         <Share2 className="h-4 w-4" />
+                    <Share2 className="h-4 w-4" />
                   )}
 
                   Share
@@ -2433,7 +2487,7 @@ export default function ProviderProfilePage() {
                   // REVIEWS LOADING
                   if (reviewsLoading) {
                     return (
-                                           <div className="space-y-4">
+                      <div className="space-y-4">
                         <div className="animate-pulse rounded-2xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
                           <div className="h-6 w-32 rounded bg-ink-100 dark:bg-ink-800" />
                           <div className="mt-4 h-10 w-24 rounded bg-ink-100 dark:bg-ink-800" />
