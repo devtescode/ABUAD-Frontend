@@ -5,6 +5,7 @@ import {
   EyeOff,
   Loader2,
   MessageSquare,
+  Phone,
   RefreshCw,
   Search,
   Star,
@@ -26,6 +27,8 @@ interface Customer {
   name?: string;
   fullName?: string;
   email?: string;
+  phone?: string;
+  phoneNumber?: string;
   avatar?: string;
   profileImage?: string;
 }
@@ -35,6 +38,8 @@ interface Provider {
   name?: string;
   fullName?: string;
   email?: string;
+  phone?: string;
+  phoneNumber?: string;
   avatar?: string;
   profileImage?: string;
 }
@@ -106,6 +111,20 @@ const getProviderName = (provider?: Provider) => {
     provider?.fullName ||
     provider?.email ||
     "Provider"
+  );
+};
+
+/*
+ * Extract a phone number from a customer or provider.
+ * Handles multiple possible backend field names.
+ */
+const getPersonPhone = (
+  person?: Customer | Provider
+) => {
+  return (
+    person?.phone ||
+    person?.phoneNumber ||
+    ""
   );
 };
 
@@ -411,8 +430,10 @@ export function AdminReviews() {
    * Searches through:
    * - Customer name
    * - Customer email
+   * - Customer phone
    * - Provider name
    * - Provider email
+   * - Provider phone
    * - Service title
    * - Service category
    * - Review comment
@@ -435,6 +456,11 @@ export function AdminReviews() {
         review.customer?.email?.toLowerCase() ||
         "";
 
+      const customerPhone =
+        getPersonPhone(
+          review.customer
+        ).toLowerCase();
+
       const providerName =
         getProviderName(
           review.provider
@@ -443,6 +469,11 @@ export function AdminReviews() {
       const providerEmail =
         review.provider?.email?.toLowerCase() ||
         "";
+
+      const providerPhone =
+        getPersonPhone(
+          review.provider
+        ).toLowerCase();
 
       const serviceName =
         review.service?.title?.toLowerCase() ||
@@ -458,8 +489,10 @@ export function AdminReviews() {
       return (
         customerName.includes(query) ||
         customerEmail.includes(query) ||
+        customerPhone.includes(query) ||
         providerName.includes(query) ||
         providerEmail.includes(query) ||
+        providerPhone.includes(query) ||
         serviceName.includes(query) ||
         serviceCategory.includes(query) ||
         comment.includes(query)
@@ -870,6 +903,12 @@ export function AdminReviews() {
               const customerImage =
                 getImage(review.customer);
 
+              const customerPhone =
+                getPersonPhone(review.customer);
+
+              const providerPhone =
+                getPersonPhone(review.provider);
+
               const hidden = isReviewHidden(review);
               const isToggling = togglingIds.has(
                 review._id
@@ -933,6 +972,13 @@ export function AdminReviews() {
                           </p>
                         )}
 
+                        {customerPhone && (
+                          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-400 dark:text-ink-500">
+                            <Phone className="h-3 w-3 shrink-0" />
+                            {customerPhone}
+                          </p>
+                        )}
+
                         <p className="mt-0.5 text-xs text-ink-400 dark:text-ink-500">
                           {formatDate(
                             review.createdAt
@@ -983,6 +1029,16 @@ export function AdminReviews() {
                       ?.category && (
                       <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
                         {review.service.category}
+                      </p>
+                    )}
+
+                    {providerPhone && (
+                      <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
+                        <Phone className="h-3 w-3 shrink-0" />
+                        Provider phone:{" "}
+                        <span className="font-semibold text-ink-700 dark:text-ink-200">
+                          {providerPhone}
+                        </span>
                       </p>
                     )}
                   </div>
@@ -1170,7 +1226,7 @@ export function AdminReviews() {
                       </div>
                     )}
 
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold text-ink-900 dark:text-white">
                         {getCustomerName(
                           selectedReview.customer
@@ -1184,6 +1240,17 @@ export function AdminReviews() {
                             selectedReview
                               .customer.email
                           }
+                        </p>
+                      )}
+
+                      {getPersonPhone(
+                        selectedReview.customer
+                      ) && (
+                        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500 dark:text-ink-400">
+                          <Phone className="h-3.5 w-3.5 shrink-0" />
+                          {getPersonPhone(
+                            selectedReview.customer
+                          )}
                         </p>
                       )}
                     </div>
@@ -1232,7 +1299,7 @@ export function AdminReviews() {
                       </div>
                     )}
 
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold text-ink-900 dark:text-white">
                         {getProviderName(
                           selectedReview.provider
@@ -1246,6 +1313,17 @@ export function AdminReviews() {
                             selectedReview
                               .provider.email
                           }
+                        </p>
+                      )}
+
+                      {getPersonPhone(
+                        selectedReview.provider
+                      ) && (
+                        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500 dark:text-ink-400">
+                          <Phone className="h-3.5 w-3.5 shrink-0" />
+                          {getPersonPhone(
+                            selectedReview.provider
+                          )}
                         </p>
                       )}
                     </div>
