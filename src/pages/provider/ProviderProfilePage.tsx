@@ -679,11 +679,11 @@ export default function ProviderProfilePage() {
         const result: ProviderReviewsResponse =
           await response.json();
 
-        console.log("Review API result:", result);
-        console.log(
-          "Review API reviews:",
-          result.reviews
-        );
+        // console.log("Review API result:", result);
+        // console.log(
+        //   "Review API reviews:",
+        //   result.reviews
+        // );
 
         if (
           !response.ok ||
