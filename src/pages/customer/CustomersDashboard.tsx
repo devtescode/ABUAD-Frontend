@@ -851,7 +851,7 @@ export function CustomersDashboard() {
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-amber-500" />
+            {/* <Sparkles className="h-5 w-5 text-amber-500" /> */}
 
             <h2 className="font-display text-lg font-bold text-ink-900 dark:text-ink-50">
               Recommended for you
