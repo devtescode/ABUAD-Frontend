@@ -709,7 +709,7 @@ export function CustomersDashboard() {
           icon={MessageSquare}
           label="Messages"
           color="sky"
-        />
+          />
         <QuickAction
           to="/customer/profile"
           icon={User}
