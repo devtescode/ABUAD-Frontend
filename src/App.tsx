@@ -42,7 +42,6 @@ import {
   AdminDashboard,
   AdminCategories,
   AdminPayments,
-  AdminReviews,
   AdminDisputes,
   AdminFeatured,
   AdminAnalytics,
@@ -54,6 +53,7 @@ import { AdminVerification } from './pages/admin/AdminVerification';
 import { AdminProviders } from './pages/admin/Provider';
 import { AdminProviderProfile } from './pages/admin/AdminProviderProfile';
 import { AdminBookings } from './pages/admin/AdminBookings';
+import { AdminReviews } from './pages/admin/AdminReviews';
 
 // function ProtectedRoute({ role, children }: { role: 'customer' | 'provider' | 'admin'; children: React.ReactNode }) {
 //   const { user } = useAuth();
