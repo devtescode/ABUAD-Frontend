@@ -1,15 +1,16 @@
 import {
+  Component,
   useCallback,
   useEffect,
   useMemo,
   useState,
+  type ReactNode,
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   ArrowUpRight,
-  Bell,
   BookOpen,
   Calendar,
   CalendarClock,
@@ -17,13 +18,11 @@ import {
   Clock,
   Compass,
   Heart,
-  Loader2,
   MessageSquare,
   RefreshCw,
   Search,
   Sparkles,
   Star,
-  TrendingUp,
   User,
   Users,
   Wallet,
@@ -93,13 +92,52 @@ const getProviderImage = (provider: any) => {
   );
 };
 
-const getProviderRating = (provider: any) => {
-  return Number(provider?.rating || 0);
-};
+/* =========================================================
+   ERROR BOUNDARY
+========================================================= */
 
-const getProviderReviewCount = (provider: any) => {
-  return Number(provider?.reviewCount || 0);
-};
+class CardErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(
+    error: Error
+  ) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: any) {
+    console.error(
+      "🔴 ProviderCard CRASH:",
+      error,
+      info
+    );
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="rounded-2xl border-2 border-red-500 bg-red-50 p-4 text-xs text-red-700 dark:bg-red-500/10 dark:text-red-300">
+          <p className="font-bold">
+            ProviderCard crashed
+          </p>
+          <p className="mt-1 font-mono">
+            {this.state.error.message}
+          </p>
+          <pre className="mt-2 overflow-auto text-[10px] leading-tight">
+            {this.state.error.stack?.slice(
+              0,
+              500
+            )}
+          </pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /* =========================================================
    TYPES
@@ -145,6 +183,8 @@ interface Provider {
   status?: string;
   hourlyRate?: number;
   price?: number;
+  startingPrice?: number;
+  totalServices?: number;
 }
 
 interface Stats {
@@ -165,13 +205,9 @@ export function CustomersDashboard() {
   const { user } = useAuth();
   const { savedProviders } = useBookings();
 
-  /* =========================================================
-     STATE
-  ========================================================= */
-
-  const [bookings, setBookings] = useState<Booking[]>(
-    []
-  );
+  const [bookings, setBookings] = useState<
+    Booking[]
+  >([]);
   const [recommended, setRecommended] = useState<
     Provider[]
   >([]);
@@ -224,15 +260,15 @@ export function CustomersDashboard() {
         ) {
           throw new Error(
             result.message ||
-              "Unable to load bookings."
+            "Unable to load bookings."
           );
         }
 
         const list = Array.isArray(result.bookings)
           ? result.bookings
           : Array.isArray(result.data)
-          ? result.data
-          : [];
+            ? result.data
+            : [];
 
         setBookings(list);
       } catch (err) {
@@ -257,77 +293,146 @@ export function CustomersDashboard() {
 
   /* =========================================================
      FETCH RECOMMENDED PROVIDERS
+     
+     Endpoint: GET /provider/recommended?limit=4
+     
+     Backend returns providers sorted by rating (highest
+     first) and includes `startingPrice` (the lowest
+     active service price for each provider).
   ========================================================= */
 
   const fetchRecommended = useCallback(
     async (silent = false) => {
       try {
-        if (!silent)
-          setRecommendedLoading(true);
+        if (!silent) setRecommendedLoading(true);
 
         const token =
           sessionStorage.getItem(
             "servicely_token"
           );
 
-        const response = await fetch(
-          `${API_URL}/provider/allproviders`,
-          {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              ...(token
-                ? {
-                    Authorization: `Bearer ${token}`,
-                  }
-                : {}),
-            },
-            cache: "no-store",
-          }
+        /*
+         * Endpoint: /provider/recommended (NOT /reviews/...)
+         */
+        const url = `${API_URL}/reviews/recommended?limit=4`;
+
+        console.log(
+          "Fetching recommended from:",
+          url
         );
 
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            ...(token
+              ? {
+                Authorization: `Bearer ${token}`,
+              }
+              : {}),
+          },
+          cache: "no-store",
+        });
+
         const result = await response.json();
+
+        console.log(
+          "Recommended response:",
+          result
+        );
 
         if (!response.ok) {
           throw new Error(
             result.message ||
-              "Unable to load providers."
+            "Unable to load providers."
           );
         }
 
-        const list = Array.isArray(result.providers)
+        const list = Array.isArray(
+          result.providers
+        )
           ? result.providers
-          : Array.isArray(result.data)
-          ? result.data
           : [];
 
+        console.log(
+          "Recommended providers (raw):",
+          list
+        );
+
+        if (list[0]) {
+          console.log(
+            "🔍 First provider object:",
+            JSON.stringify(list[0], null, 2)
+          );
+        }
+
         /*
-         * Pick the top-rated verified providers first,
-         * then fill with the rest, and cap at 4.
+         * ⭐ Client-side sort — HIGHEST RATING FIRST.
          */
-        const sorted = [...list].sort(
-          (a: Provider, b: Provider) => {
-            const aScore =
-              (a.verified ? 100 : 0) +
-              getProviderRating(a) * 10 +
-              getProviderReviewCount(a) * 0.1;
-            const bScore =
-              (b.verified ? 100 : 0) +
-              getProviderRating(b) * 10 +
-              getProviderReviewCount(b) * 0.1;
-            return bScore - aScore;
+        const sortedByRating = [...list].sort(
+          (a, b) => {
+            const aRating = Number(
+              a?.rating ?? a?.averageRating ?? 0
+            );
+            const bRating = Number(
+              b?.rating ?? b?.averageRating ?? 0
+            );
+
+            if (bRating !== aRating) {
+              return bRating - aRating;
+            }
+
+            const aVerified = a?.verified ? 1 : 0;
+            const bVerified = b?.verified ? 1 : 0;
+
+            if (bVerified !== aVerified) {
+              return bVerified - aVerified;
+            }
+
+            const aReviews = Number(
+              a?.reviewCount ??
+              a?.totalReviews ??
+              0
+            );
+            const bReviews = Number(
+              b?.reviewCount ??
+              b?.totalReviews ??
+              0
+            );
+
+            if (bReviews !== aReviews) {
+              return bReviews - aReviews;
+            }
+
+            const aCompleted = Number(
+              a?.completedBookings ?? 0
+            );
+            const bCompleted = Number(
+              b?.completedBookings ?? 0
+            );
+
+            return bCompleted - aCompleted;
           }
         );
 
-        setRecommended(sorted.slice(0, 4));
+        console.log(
+          "🔍 Sorted by rating:",
+          sortedByRating.map((p) => ({
+            name: p.fullName || p.name,
+            rating: p.rating,
+            startingPrice: p.startingPrice,
+          }))
+        );
+
+        setRecommended(sortedByRating);
       } catch (err) {
         console.error(
           "Fetch recommended providers error:",
           err
         );
+        setRecommended([]);
       } finally {
-        if (!silent)
-          setRecommendedLoading(false);
+        if (!silent) setRecommendedLoading(false);
       }
     },
     []
@@ -345,11 +450,6 @@ export function CustomersDashboard() {
 
   /* =========================================================
      REAL-TIME AUTO-REFRESH
-     
-     Polls the backend every 15 seconds to keep the
-     dashboard live. Also refreshes when the tab regains
-     focus so it's always up to date when the user
-     comes back.
   ========================================================= */
 
   useEffect(() => {
@@ -451,9 +551,7 @@ export function CustomersDashboard() {
   }, [bookings, savedProviders]);
 
   const firstName =
-    user?.name?.split(" ")[0] ||
-    // user?.fullName?.split(" ")[0] ||
-    "there";
+    user?.name?.split(" ")[0] || "there";
 
   /* =========================================================
      RENDER
@@ -477,9 +575,8 @@ export function CustomersDashboard() {
               aria-label="Refresh dashboard"
             >
               <RefreshCw
-                className={`h-4 w-4 ${
-                  refreshing ? "animate-spin" : ""
-                }`}
+                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""
+                  }`}
               />
               <span className="hidden sm:inline">
                 Refresh
@@ -497,9 +594,7 @@ export function CustomersDashboard() {
         }
       />
 
-      {/* =====================================================
-          LIVE STATUS BANNER
-      ===================================================== */}
+      {/* LIVE STATUS BANNER */}
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -535,9 +630,7 @@ export function CustomersDashboard() {
         </span>
       </motion.div>
 
-      {/* =====================================================
-          ERROR
-      ===================================================== */}
+      {/* ERROR */}
       {error && (
         <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -558,9 +651,7 @@ export function CustomersDashboard() {
         </div>
       )}
 
-      {/* =====================================================
-          HERO STATS
-      ===================================================== */}
+      {/* HERO STATS */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <LiveStatCard
           label="Upcoming"
@@ -599,9 +690,7 @@ export function CustomersDashboard() {
         />
       </div>
 
-      {/* =====================================================
-          QUICK ACTIONS
-      ===================================================== */}
+      {/* QUICK ACTIONS */}
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <QuickAction
           to="/customer/browse"
@@ -629,9 +718,7 @@ export function CustomersDashboard() {
         />
       </div>
 
-      {/* =====================================================
-          UPCOMING BOOKINGS
-      ===================================================== */}
+      {/* UPCOMING BOOKINGS */}
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -690,8 +777,8 @@ export function CustomersDashboard() {
             </h3>
 
             <p className="relative mt-1 max-w-sm text-sm text-ink-500 dark:text-ink-400">
-              When you book a service, it will show up
-              here with all the details.
+              When you book a service, it will show
+              up here with all the details.
             </p>
 
             <Link
@@ -708,9 +795,7 @@ export function CustomersDashboard() {
               {upcoming.map((booking, i) => (
                 <UpcomingBookingCard
                   key={
-                    booking._id ||
-                    booking.id ||
-                    i
+                    booking._id || booking.id || i
                   }
                   booking={booking}
                   index={i}
@@ -721,9 +806,7 @@ export function CustomersDashboard() {
         )}
       </div>
 
-      {/* =====================================================
-          SPENDING SUMMARY
-      ===================================================== */}
+      {/* SPENDING SUMMARY */}
       {!bookingsLoading && stats.totalBookings > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -764,9 +847,7 @@ export function CustomersDashboard() {
         </motion.div>
       )}
 
-      {/* =====================================================
-          RECOMMENDED PROVIDERS
-      ===================================================== */}
+      {/* RECOMMENDED PROVIDERS */}
       <div className="mt-8">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -814,19 +895,27 @@ export function CustomersDashboard() {
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {recommended.map((provider, i) => (
+              /*
+               * IMPORTANT: NO onClick on this wrapper.
+               *
+               * The inner <Link> inside ProviderCard handles
+               * navigation to /providers/:id. Adding an outer
+               * onClick causes a double-navigate that lands
+               * on the wrong page.
+               */
               <motion.div
-                key={provider._id}
+                key={
+                  provider._id || `rec-${i}`
+                }
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
-                onClick={() =>
-                  navigate(
-                    `/provider/${provider._id}`
-                  )
-                }
-                className="cursor-pointer"
               >
-                <LiveProviderCard provider={provider} />
+                <CardErrorBoundary>
+                  <LiveProviderCard
+                    provider={provider}
+                  />
+                </CardErrorBoundary>
               </motion.div>
             ))}
           </div>
@@ -851,11 +940,7 @@ function LiveStatCard({
   label: string;
   value: number;
   icon: any;
-  color:
-    | "primary"
-    | "accent"
-    | "sky"
-    | "rose";
+  color: "primary" | "accent" | "sky" | "rose";
   loading?: boolean;
   delay?: number;
 }) {
@@ -921,11 +1006,7 @@ function QuickAction({
   to: string;
   icon: any;
   label: string;
-  color:
-    | "primary"
-    | "accent"
-    | "sky"
-    | "rose";
+  color: "primary" | "accent" | "sky" | "rose";
 }) {
   const colorStyles = {
     primary:
@@ -996,7 +1077,7 @@ function UpcomingBookingCard({
       transition={{ delay: index * 0.05 }}
       onClick={() =>
         bookingId &&
-        navigate(`/customer/bookings/${bookingId}`)
+        navigate(`/customer/bookings?booking=${bookingId}`)
       }
       className="card group flex cursor-pointer items-center gap-4 p-4 transition-all hover:-translate-y-0.5 hover:shadow-lg"
     >
@@ -1051,45 +1132,232 @@ function UpcomingBookingCard({
 /* =========================================================
    LIVE PROVIDER CARD
    
-   Wraps the shared ProviderCard with a rank badge on
-   top so recommended providers feel more premium.
+   Defensive wrapper around shared ProviderCard.
 ========================================================= */
 
 function LiveProviderCard({
   provider,
 }: {
-  provider: Provider;
+  provider: any;
 }) {
-  const rating = getProviderRating(provider);
-  const reviewCount =
-    getProviderReviewCount(provider);
+  const id =
+    provider?._id ||
+    provider?.id ||
+    provider?.user?._id ||
+    provider?.provider?._id ||
+    "";
+
+  const name =
+    provider?.fullName ||
+    provider?.name ||
+    provider?.user?.fullName ||
+    provider?.user?.name ||
+    provider?.provider?.fullName ||
+    provider?.provider?.name ||
+    "Service Provider";
+
+  const avatar =
+    provider?.avatar ||
+    provider?.profileImage ||
+    provider?.user?.avatar ||
+    provider?.user?.profileImage ||
+    provider?.provider?.avatar ||
+    provider?.provider?.profileImage ||
+    "/images/default-avatar.png";
+
+  const categories = Array.isArray(
+    provider?.categories
+  )
+    ? provider.categories.filter(Boolean)
+    : Array.isArray(provider?.skills)
+      ? provider.skills.filter(Boolean)
+      : [];
+
+  const category =
+    provider?.category || categories[0] || "Service";
+
+  const rating = Number(
+    provider?.rating ??
+    provider?.averageRating ??
+    0
+  );
+
+  const reviewCount = Number(
+    provider?.reviewCount ??
+    provider?.totalReviews ??
+    0
+  );
+
+  const completedBookings = Number(
+    provider?.completedBookings ??
+    provider?.jobs ??
+    0
+  );
+
+  const location =
+    provider?.location ||
+    provider?.city ||
+    "Location not set";
 
   /*
-   * Transform the backend provider shape into the
-   * shape that the shared ProviderCard expects.
+   * =====================================================
+   * PRICING — Lowest service price from the provider
+   * =====================================================
+   *
+   * The backend computes `startingPrice` as the lowest
+   * active service price for each provider. We read it
+   * first, then fall back to other fields only if the
+   * backend didn't send one.
    */
+  const startingPrice = Number(
+    provider?.startingPrice ??
+    provider?.minServicePrice ??
+    provider?.lowestPrice ??
+    provider?.hourlyRate ??
+    provider?.price ??
+    0
+  );
+
+  const hourlyRate = Number(
+    provider?.hourlyRate ?? 0
+  );
+
   const providerForCard = {
-    id: provider._id,
-    _id: provider._id,
-    name: getProviderName(provider),
-    fullName: provider.fullName,
-    avatar: getProviderImage(provider),
-    profileImage: provider.profileImage,
-    category: provider.categories?.[0] || "Service",
-    categories: provider.categories || [],
-    location: provider.location || "Not specified",
+    id,
+    _id: id,
+    name,
+    fullName: name,
+    avatar,
+    profileImage: avatar,
+
+    category,
+    categories,
+    location,
+
     rating,
     reviewCount,
-    completedBookings:
-      provider.completedBookings || 0,
-    verified: provider.verified || false,
-    hourlyRate:
-      provider.hourlyRate || provider.price || 0,
+    completedBookings,
+
+    verified: Boolean(provider?.verified),
+
+    hourlyRate,
+    price: startingPrice,
+    startingPrice,
+    rate: hourlyRate,
+
+    description:
+      provider?.description ||
+      provider?.bio ||
+      provider?.about ||
+      "",
+
+    about:
+      provider?.about ||
+      provider?.bio ||
+      provider?.description ||
+      "",
+
+    bio:
+      provider?.bio ||
+      provider?.about ||
+      provider?.description ||
+      "",
+
+    experience:
+      completedBookings > 0
+        ? `${completedBookings}+ jobs`
+        : "New provider",
+
+    distance:
+      provider?.distance || "Nearby",
+
+    portfolio: Array.isArray(provider?.portfolio)
+      ? provider.portfolio
+      : Array.isArray(provider?.portfolioItems)
+        ? provider.portfolioItems
+        : [],
+
+    portfolioItems: Array.isArray(
+      provider?.portfolioItems
+    )
+      ? provider.portfolioItems
+      : Array.isArray(provider?.portfolio)
+        ? provider.portfolio
+        : [],
+
+    skills: categories,
+    subcategories: categories,
+    specialties: categories,
+
+    tags: Array.isArray(provider?.tags)
+      ? provider.tags
+      : [],
+
+    reviews: Array.isArray(provider?.reviews)
+      ? provider.reviews
+      : [],
+
+    images: Array.isArray(provider?.images)
+      ? provider.images
+      : [],
+
+    gallery: Array.isArray(provider?.gallery)
+      ? provider.gallery
+      : [],
+
+    services: Array.isArray(provider?.services)
+      ? provider.services
+      : [],
+
+    pricing: Array.isArray(provider?.pricing)
+      ? provider.pricing
+      : [],
+
+    badges: Array.isArray(provider?.badges)
+      ? provider.badges
+      : [],
+
+    testimonials: Array.isArray(
+      provider?.testimonials
+    )
+      ? provider.testimonials
+      : [],
+
+    faqs: Array.isArray(provider?.faqs)
+      ? provider.faqs
+      : [],
+
+    areas: Array.isArray(provider?.areas)
+      ? provider.areas
+      : [],
+
+    availability: Array.isArray(
+      provider?.availability
+    )
+      ? provider.availability
+      : [],
+
+    completedJobs: completedBookings,
+    jobCount: completedBookings,
+    totalJobs: completedBookings,
+
+    successRate: provider?.successRate ?? 100,
+
+    yearsOfExperience:
+      provider?.yearsOfExperience ?? 0,
+
+    experienceYears:
+      provider?.experienceYears ??
+      provider?.yearsOfExperience ??
+      0,
+
+    totalServices:
+      provider?.totalServices ?? 0,
   };
 
   return (
     <div className="relative">
-      {provider.verified && (
+      {providerForCard.verified && (
         <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-lg">
           <Star className="h-3 w-3 fill-current" />
           Top rated

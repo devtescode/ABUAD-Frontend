@@ -3,7 +3,6 @@ import { Home, Search, Heart, Calendar, Star, User, Settings} from 'lucide-react
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Home, Search, Heart, Calendar, Star, User, Settings, ArrowRight, TrendingUp, Clock, CheckCircle2, CalendarClock } from 'lucide-react';
 import { DashboardLayout, DashboardHeader, StatCard } from '@/components/DashboardLayout';
 import { ProviderCard, StatusBadge } from '@/components/shared';
 import { useAuth, useBookings } from '@/context/AppContext';

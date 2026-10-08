@@ -244,7 +244,8 @@ export function ProviderCard({ provider }: { provider: import('@/data/mockData')
     >
       <div className="relative h-40 overflow-hidden">
         <img
-          src={provider.portfolio[0]?.image || provider.avatar}
+          // src={provider.portfolio[0]?.image || provider.avatar}
+          src={provider.portfolio?.[0]?.image || provider.avatar}
           alt={provider.name}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
@@ -256,7 +257,10 @@ export function ProviderCard({ provider }: { provider: import('@/data/mockData')
               <span className="text-sm font-semibold">{provider.name}</span>
               {provider.verified && <VerifiedBadge />}
             </div>
-            <p className="text-xs text-white/80">{provider.categories.join(' • ')}</p>
+            {/* <p className="text-xs text-white/80">{provider.categories.join(' • ')}</p> */}
+            <p className="text-xs text-white/80">
+              {(provider.categories || []).join(' • ')}
+            </p>
           </div>
         </div>
       </div>
@@ -280,9 +284,7 @@ export function ProviderCard({ provider }: { provider: import('@/data/mockData')
           <Link to={`/providers/${provider.id}`} className="btn-outline btn-sm flex-1">
             View Profile
           </Link>
-          <Link to={`/book/${provider.id}`} className="btn-primary btn-sm flex-1">
-            Book Now
-          </Link>
+         
         </div>
       </div>
     </motion.div>
