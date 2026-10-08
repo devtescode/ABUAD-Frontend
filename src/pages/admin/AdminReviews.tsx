@@ -4,8 +4,8 @@ import {
 } from "@/components/DashboardLayout";
 import { Eye, Ban } from 'lucide-react';
 import { adminNavItems } from "@/data/adminNavItems";
-import { providers, sampleBookings, reviews, formatNaira, categories } from '@/data/mockData';
-import { StatusBadge, VerifiedBadge, StarRating } from '@/components/shared';
+import { providers, reviews } from '@/data/mockData';
+import { StarRating } from '@/components/shared';
 export function AdminReviews() {
   return (
     <DashboardLayout role="admin" navItems={adminNavItems}>
