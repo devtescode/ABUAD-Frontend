@@ -619,7 +619,7 @@ export function ProviderAccount() {
                     }
                     placeholder="Enter your 10-digit account number"
                     disabled={saving}
-                    className="w-full rounded-xl border border-ink-200 bg-white py-3.5 pl-12 pr-4 text-sm tracking-wide text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-100"
+                    className="w-full rounded-xl border border-ink-200 bg-white py-3.5 pl-12 pr-4 text-base sm:text-sm tracking-wide text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-100"
                   />
                 </div>
 

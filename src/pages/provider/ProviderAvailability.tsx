@@ -122,8 +122,8 @@ function AvailabilityToast({
                 {/* Icon */}
                 <div
                     className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${type === "success"
-                            ? "bg-green-100 text-green-600"
-                            : "bg-red-100 text-red-600"
+                        ? "bg-green-100 text-green-600"
+                        : "bg-red-100 text-red-600"
                         }`}
                 >
                     {type === "success" ? (
@@ -161,8 +161,8 @@ function AvailabilityToast({
             <div className="h-1 w-full bg-ink-100">
                 <div
                     className={`h-full animate-[toastProgress_4s_linear_forwards] ${type === "success"
-                            ? "bg-green-500"
-                            : "bg-red-500"
+                        ? "bg-green-500"
+                        : "bg-red-500"
                         }`}
                 />
             </div>
@@ -546,8 +546,8 @@ export function ProviderAvailability() {
 
                 <div
                     className={`card overflow-hidden transition-all duration-300 ${loading
-                            ? "pointer-events-none blur-[2px]"
-                            : ""
+                        ? "pointer-events-none blur-[2px]"
+                        : ""
                         }`}
                 >
                     {/* ==================================================
@@ -602,8 +602,8 @@ export function ProviderAvailability() {
                             <div
                                 key={day.day}
                                 className={`rounded-2xl border p-4 transition-all duration-200 ${day.available
-                                        ? "border-primary-200 bg-primary-50/40 dark:border-primary-900 dark:bg-primary-950/20"
-                                        : "border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900/40"
+                                    ? "border-primary-200 bg-primary-50/40 dark:border-primary-900 dark:bg-primary-950/20"
+                                    : "border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900/40"
                                     }`}
                             >
                                 {/* Day row */}
@@ -611,8 +611,8 @@ export function ProviderAvailability() {
                                     <div className="flex min-w-0 items-center gap-3">
                                         <div
                                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-[10px] font-bold ${day.available
-                                                    ? "bg-primary-600 text-white"
-                                                    : "bg-ink-100 text-ink-500 dark:bg-ink-800"
+                                                ? "bg-primary-600 text-white"
+                                                : "bg-ink-100 text-ink-500 dark:bg-ink-800"
                                                 }`}
                                         >
                                             {
@@ -648,14 +648,14 @@ export function ProviderAvailability() {
                                             day.available
                                         }
                                         className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${day.available
-                                                ? "bg-primary-600"
-                                                : "bg-ink-200 dark:bg-ink-700"
+                                            ? "bg-primary-600"
+                                            : "bg-ink-200 dark:bg-ink-700"
                                             }`}
                                     >
                                         <span
                                             className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-200 ${day.available
-                                                    ? "translate-x-5"
-                                                    : "translate-x-0"
+                                                ? "translate-x-5"
+                                                : "translate-x-0"
                                                 }`}
                                         />
                                     </button>
@@ -665,70 +665,70 @@ export function ProviderAvailability() {
                                     TIME INPUTS
                                 ================================================== */}
 
-                             {day.available && (
-  <div className="mt-4 border-t border-primary-100 pt-4 dark:border-primary-900">
-    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
-      {/* Start */}
-      <div className="min-w-0 max-w-full">
-        <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
-          Start time
-        </label>
+                                {day.available && (
+                                    <div className="mt-4 border-t border-primary-100 pt-4 dark:border-primary-900">
+                                        <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
+                                            {/* Start */}
+                                            <div className="min-w-0 max-w-full">
+                                                <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
+                                                    Start time
+                                                </label>
 
-        <input
-          type="time"
-          min="08:00"
-          max="18:00"
-          value={day.start}
-          onChange={(e) =>
-            updateTime(
-              day.day,
-              "start",
-              e.target.value
-            )
-          }
-          className="input block w-full min-w-0 max-w-full appearance-none text-base sm:text-sm"
-          style={{ minWidth: 0 }}
-        />
-      </div>
+                                                <input
+                                                    type="time"
+                                                    min="08:00"
+                                                    max="18:00"
+                                                    value={day.start}
+                                                    onChange={(e) =>
+                                                        updateTime(
+                                                            day.day,
+                                                            "start",
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="input block w-full min-w-0 max-w-full appearance-none text-base sm:text-sm"
+                                                    style={{ minWidth: 0 }}
+                                                />
+                                            </div>
 
-      {/* Separator */}
-      <div className="hidden pb-2 text-sm text-ink-400 sm:block">
-        —
-      </div>
+                                            {/* Separator */}
+                                            <div className="hidden pb-2 text-sm text-ink-400 sm:block">
+                                                —
+                                            </div>
 
-      {/* End */}
-      <div className="min-w-0 max-w-full">
-        <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
-          End time
-        </label>
+                                            {/* End */}
+                                            <div className="min-w-0 max-w-full">
+                                                <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
+                                                    End time
+                                                </label>
 
-        <input
-          type="time"
-          min="08:00"
-          max="18:00"
-          value={day.end}
-          onChange={(e) =>
-            updateTime(
-              day.day,
-              "end",
-              e.target.value
-            )
-          }
-          className="input block w-full min-w-0 max-w-full appearance-none text-base sm:text-sm"
-          style={{ minWidth: 0 }}
-        />
-      </div>
-    </div>
+                                                <input
+                                                    type="time"
+                                                    min="08:00"
+                                                    max="18:00"
+                                                    value={day.end}
+                                                    onChange={(e) =>
+                                                        updateTime(
+                                                            day.day,
+                                                            "end",
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    className="input block w-full min-w-0 max-w-full appearance-none text-base sm:text-sm"
+                                                    style={{ minWidth: 0 }}
+                                                />
+                                            </div>
+                                        </div>
 
-    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
-      <Clock className="h-3.5 w-3.5 shrink-0" />
+                                        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
+                                            <Clock className="h-3.5 w-3.5 shrink-0" />
 
-      <span>
-        Select a time between 8:00 AM and 6:00 PM.
-      </span>
-    </div>
-  </div>
-)}
+                                            <span>
+                                                Select a time between 8:00 AM and 6:00 PM.
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* ==================================================
                                     UNAVAILABLE
