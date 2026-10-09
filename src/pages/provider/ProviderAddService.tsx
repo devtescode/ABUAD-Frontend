@@ -235,7 +235,7 @@ export function ProviderAddService() {
                             name="title"
                             value={formData.title}
                             onChange={handleChange}
-                            className="input"
+                            className="input text-base sm:text-sm"
                             placeholder="e.g. Birthday Photography"
                             disabled={loading}
                         />
@@ -255,7 +255,7 @@ export function ProviderAddService() {
                             name="category"
                             value={formData.category}
                             onChange={handleChange}
-                            className="input"
+                            className="input text-base sm:text-sm"
                             disabled={loading}
                         >
                             {categories.map((category) => (
@@ -281,7 +281,7 @@ export function ProviderAddService() {
                                 name="price"
                                 value={formData.price}
                                 onChange={handleChange}
-                                className="input"
+                                className="input text-base sm:text-sm"
                                 placeholder="30000"
                                 min="0"
                                 disabled={loading}
@@ -298,7 +298,7 @@ export function ProviderAddService() {
                                 name="duration"
                                 value={formData.duration}
                                 onChange={handleChange}
-                                className="input"
+                                className="input text-base sm:text-sm"
                                 placeholder="e.g. 2 hours"
                                 disabled={loading}
                             />
@@ -315,7 +315,7 @@ export function ProviderAddService() {
                             name="description"
                             value={formData.description}
                             onChange={handleChange}
-                            className="input min-h-[120px] resize-none"
+                            className="input min-h-[120px] resize-none text-base sm:text-sm "
                             placeholder="Describe your service in detail..."
                             disabled={loading}
                         />
