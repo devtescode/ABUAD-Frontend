@@ -643,7 +643,7 @@ export function ProviderAccount() {
                     value={account.accountName}
                     readOnly
                     placeholder="Account name will appear after verification"
-                    className="w-full rounded-xl border border-ink-200 bg-ink-50 py-3.5 pl-12 pr-4 text-sm font-medium text-ink-800 outline-none dark:border-ink-700 dark:bg-ink-800/50 dark:text-ink-200"
+                    className="w-full rounded-xl border border-ink-200 bg-ink-50 py-3.5 pl-12 pr-4 text-base sm:text-sm font-medium text-ink-800 outline-none dark:border-ink-700 dark:bg-ink-800/50 dark:text-ink-200"
                   />
                 </div>
 
