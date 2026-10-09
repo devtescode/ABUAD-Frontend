@@ -1229,7 +1229,7 @@ export function ProviderServices() {
                                                                 })
                                                             }
                                                             placeholder="0"
-                                                            className="w-full rounded-xl border border-ink-200 bg-white py-3 pl-9 pr-4 text-sm text-ink-900 outline-none transition focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white"
+                                                            className="w-full rounded-xl border border-ink-200 bg-white py-3 pl-9 pr-4 text-base text-ink-900 outline-none transition focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 sm:text-sm dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white"
                                                         />
                                                     </div>
                                                 </div>
@@ -1253,7 +1253,7 @@ export function ProviderServices() {
                                                                 })
                                                             }
                                                             placeholder="e.g. 2 hours"
-                                                            className="w-full rounded-xl border border-ink-200 bg-white py-3 pl-11 pr-4 text-sm text-ink-900 outline-none transition focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white"
+                                                            className="w-full rounded-xl border border-ink-200 bg-white py-3 pl-9 pr-4 text-base text-ink-900 outline-none transition focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 sm:text-sm dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white"
                                                         />
                                                     </div>
                                                 </div>
@@ -1280,7 +1280,7 @@ export function ProviderServices() {
                                                     })
                                                 }
                                                 placeholder="Describe what customers will receive..."
-                                                className="w-full resize-none rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm leading-6 text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white"
+                                                className="w-full resize-none rounded-xl border border-ink-200 bg-white px-4 py-3 text-base leading-6 text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 sm:text-sm dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white"
                                             />
 
                                             <div className="mt-2 flex justify-end">
