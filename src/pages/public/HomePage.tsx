@@ -114,12 +114,12 @@ export function HomePage() {
               <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/95 p-2 shadow-2xl backdrop-blur-xl dark:bg-ink-900/95">
                 <Search className="ml-3 h-5 w-5 shrink-0 text-ink-400" />
 
-               <input
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-  placeholder="Search photography, makeup, design..."
-  className="min-w-0 flex-1 bg-transparent px-1 py-3 text-base text-ink-900 outline-none placeholder:text-ink-400 sm:text-sm dark:text-white"
-/>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search photography, makeup, design..."
+                  className="min-w-0 flex-1 bg-transparent px-1 py-3 text-base text-ink-900 outline-none placeholder:text-ink-400 sm:text-sm dark:text-white"
+                />
 
                 <Link
                   to={`/services?q=${encodeURIComponent(search)}`}

@@ -172,7 +172,7 @@ export function Footer() {
           ))}
         </div>
         <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-ink-100 dark:border-ink-800 pt-6 sm:flex-row">
-          <p className="text-sm text-ink-400 dark:text-ink-500">© 2025 Servicely. All rights reserved.</p>
+          <p className="text-sm text-ink-400 dark:text-ink-500">Servicely.</p>
           <p className="text-sm text-ink-400 dark:text-ink-500">Built for ABUAD students</p>
         </div>
       </div>
