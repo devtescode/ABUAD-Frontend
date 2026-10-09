@@ -100,7 +100,7 @@ export function HomePage() {
               className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/75 sm:text-lg"
             >
               Book verified photographers, videographers, designers, and makeup
-              artists. Compare portfolios, read reviews, and pay securely — all in
+              artists. Compare portfolios, read reviews, and pay securely all in
               one place.
             </motion.p>
 
