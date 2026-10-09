@@ -1181,7 +1181,7 @@ export function ProviderProfile() {
 
                                 <textarea
                                     className="
-                                        input
+                                        form-textarea
                                         min-h-[130px]
                                         resize-none
                                     "
