@@ -665,68 +665,70 @@ export function ProviderAvailability() {
                                     TIME INPUTS
                                 ================================================== */}
 
-                                {day.available && (
-                                    <div className="mt-4 border-t border-primary-100 pt-4 dark:border-primary-900">
-                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
-                                            {/* Start */}
-                                            <div className="min-w-0">
-                                                <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
-                                                    Start time
-                                                </label>
+                             {day.available && (
+  <div className="mt-4 border-t border-primary-100 pt-4 dark:border-primary-900">
+    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-end">
+      {/* Start */}
+      <div className="min-w-0 max-w-full">
+        <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
+          Start time
+        </label>
 
-                                                <input
-                                                    type="time"
-                                                    min="08:00"
-                                                    max="18:00"
-                                                    value={day.start}
-                                                    onChange={(e) =>
-                                                        updateTime(
-                                                            day.day,
-                                                            "start",
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    className="input w-full min-w-0 max-w-full text-base sm:text-sm"
-                                                />
-                                            </div>
+        <input
+          type="time"
+          min="08:00"
+          max="18:00"
+          value={day.start}
+          onChange={(e) =>
+            updateTime(
+              day.day,
+              "start",
+              e.target.value
+            )
+          }
+          className="input block w-full min-w-0 max-w-full appearance-none text-base sm:text-sm"
+          style={{ minWidth: 0 }}
+        />
+      </div>
 
-                                            {/* Separator */}
-                                            <div className="hidden pb-2 text-sm text-ink-400 sm:block">
-                                                —
-                                            </div>
+      {/* Separator */}
+      <div className="hidden pb-2 text-sm text-ink-400 sm:block">
+        —
+      </div>
 
-                                            {/* End */}
-                                            <div className="min-w-0">
-                                                <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
-                                                    End time
-                                                </label>
+      {/* End */}
+      <div className="min-w-0 max-w-full">
+        <label className="mb-1.5 block text-xs font-medium text-ink-600 dark:text-ink-300">
+          End time
+        </label>
 
-                                                <input
-                                                    type="time"
-                                                    min="08:00"
-                                                    max="18:00"
-                                                    value={day.end}
-                                                    onChange={(e) =>
-                                                        updateTime(
-                                                            day.day,
-                                                            "end",
-                                                            e.target.value
-                                                        )
-                                                    }
-                                                    className="input w-full min-w-0 max-w-full text-base sm:text-sm"
-                                                />
-                                            </div>
-                                        </div>
+        <input
+          type="time"
+          min="08:00"
+          max="18:00"
+          value={day.end}
+          onChange={(e) =>
+            updateTime(
+              day.day,
+              "end",
+              e.target.value
+            )
+          }
+          className="input block w-full min-w-0 max-w-full appearance-none text-base sm:text-sm"
+          style={{ minWidth: 0 }}
+        />
+      </div>
+    </div>
 
-                                        <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
-                                            <Clock className="h-3.5 w-3.5 shrink-0" />
+    <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
+      <Clock className="h-3.5 w-3.5 shrink-0" />
 
-                                            <span>
-                                                Select a time between 8:00 AM and 6:00 PM.
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
+      <span>
+        Select a time between 8:00 AM and 6:00 PM.
+      </span>
+    </div>
+  </div>
+)}
 
                                 {/* ==================================================
                                     UNAVAILABLE
