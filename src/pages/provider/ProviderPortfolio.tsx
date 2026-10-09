@@ -685,7 +685,7 @@ export function ProviderPortfolio() {
                                         }
                                         placeholder="e.g. ABUAD Event Photography"
                                         maxLength={100}
-                                        className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-ink-700 dark:bg-ink-800 dark:text-white"
+                                        className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-base outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 sm:text-sm dark:border-ink-700 dark:bg-ink-800 dark:text-white"
                                     />
                                 </div>
 
@@ -703,7 +703,7 @@ export function ProviderPortfolio() {
                                                 event.target.value
                                             )
                                         }
-                                        className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-ink-700 dark:bg-ink-800 dark:text-white"
+                                        className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 sm:text-sm outline-none transition text-base focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-ink-700 dark:bg-ink-800 dark:text-white"
                                     >
                                         <option value="">
                                             Select category
@@ -751,7 +751,7 @@ export function ProviderPortfolio() {
                                         placeholder="Tell customers briefly about this work..."
                                         rows={3}
                                         maxLength={500}
-                                        className="w-full resize-none rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-ink-700 dark:bg-ink-800 dark:text-white"
+                                        className="w-full resize-none rounded-xl border border-ink-200 bg-white px-4 py-3 text-base outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 sm:text-sm dark:border-ink-700 dark:bg-ink-800 dark:text-white"
                                     />
                                 </div>
 
