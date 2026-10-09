@@ -115,19 +115,19 @@ export function CustomerProfile() {
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="label">Full Name</label>
-            <input className="input" defaultValue={user?.name} />
+            <input className="input form-input" defaultValue={user?.name} />
           </div>
           <div>
             <label className="label">Email</label>
-            <input className="input" defaultValue={user?.email} disabled />
+            <input className="input form-input" defaultValue={user?.email} disabled />
           </div>
           <div>
             <label className="label">Phone</label>
-            <input className="input" placeholder="Enter phone number" />
+            <input className="input form-input" placeholder="Enter phone number" />
           </div>
           <div>
             <label className="label">University</label>
-            <input className="input" defaultValue="ABUAD" />
+            <input className="input form-input" defaultValue="ABUAD" />
           </div>
         </div>
         <button className="btn-primary mt-6">Save Changes</button>
