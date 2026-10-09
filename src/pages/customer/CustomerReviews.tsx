@@ -879,7 +879,7 @@ export function CustomerReviews() {
                     }
                     rows={5}
                     placeholder="Tell us about your experience..."
-                    className="mt-2 w-full resize-none rounded-2xl border border-ink-200 bg-white px-4 py-3 text-sm leading-6 text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-primary-400 focus:ring-4 focus:ring-primary-500/10 dark:border-ink-700 dark:bg-ink-950 dark:text-white dark:placeholder:text-ink-500"
+                    className="form-textarea"
                   />
                 </div>
 
