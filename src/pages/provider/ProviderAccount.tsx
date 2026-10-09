@@ -101,7 +101,7 @@ export function ProviderAccount() {
       if (!response.ok || !data.success) {
         throw new Error(
           data.message ||
-            "Failed to load payment account"
+          "Failed to load payment account"
         );
       }
 
@@ -124,7 +124,7 @@ export function ProviderAccount() {
     } catch (err: any) {
       setError(
         err.message ||
-          "Failed to load payment account"
+        "Failed to load payment account"
       );
     } finally {
       setLoading(false);
@@ -152,7 +152,7 @@ export function ProviderAccount() {
       if (!response.ok || !data.success) {
         throw new Error(
           data.message ||
-            "Failed to load banks"
+          "Failed to load banks"
         );
       }
 
@@ -160,7 +160,7 @@ export function ProviderAccount() {
     } catch (err: any) {
       setError(
         err.message ||
-          "Failed to load supported banks"
+        "Failed to load supported banks"
       );
     } finally {
       setBanksLoading(false);
@@ -207,7 +207,7 @@ export function ProviderAccount() {
       if (!response.ok || !data.success) {
         throw new Error(
           data.message ||
-            "Unable to refresh Paystack verification status."
+          "Unable to refresh Paystack verification status."
         );
       }
 
@@ -251,7 +251,7 @@ export function ProviderAccount() {
 
       setError(
         err.message ||
-          "Unable to refresh Paystack verification status."
+        "Unable to refresh Paystack verification status."
       );
     } finally {
       setRefreshing(false);
@@ -361,7 +361,7 @@ export function ProviderAccount() {
       if (!response.ok || !data.success) {
         throw new Error(
           data.message ||
-            "Unable to setup payment account"
+          "Unable to setup payment account"
         );
       }
 
@@ -406,7 +406,7 @@ export function ProviderAccount() {
     } catch (err: any) {
       setError(
         err.message ||
-          "Something went wrong while saving your account."
+        "Something went wrong while saving your account."
       );
     } finally {
       setSaving(false);
@@ -643,7 +643,7 @@ export function ProviderAccount() {
                     value={account.accountName}
                     readOnly
                     placeholder="Account name will appear after verification"
-                    className="w-full rounded-xl border border-ink-200 bg-ink-50 py-3.5 pl-12 pr-4 text-base sm:text-sm font-medium text-ink-800 outline-none dark:border-ink-700 dark:bg-ink-800/50 dark:text-ink-200"
+                    className="w-full rounded-xl border border-ink-200 bg-ink-50 py-3.5 pl-12 pr-4 text-base font-medium text-ink-800 outline-none sm:text-sm dark:border-ink-700 dark:bg-ink-800/50 dark:text-ink-200"
                   />
                 </div>
 
