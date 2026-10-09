@@ -1163,7 +1163,7 @@ export function ProviderServices() {
                                                         })
                                                     }
                                                     placeholder="e.g. Professional Event Photography"
-                                                    className="border border-ink-200 bg-white px-4 py-3 text-sm text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white dark:focus:ring-white/5 form-input"
+                                                    className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-base text-ink-900 outline-none transition placeholder:text-ink-400 focus:border-ink-900 focus:ring-4 focus:ring-ink-900/5 sm:text-sm dark:border-ink-700 dark:bg-ink-800 dark:text-white dark:focus:border-white dark:focus:ring-white/5"
                                                 />
                                             </div>
 
