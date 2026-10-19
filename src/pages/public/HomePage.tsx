@@ -449,7 +449,7 @@ export function HomePage() {
               <p className="mt-5 max-w-xl text-base leading-7 text-slate-500 sm:text-lg dark:text-ink-400">
                 Discover and book trusted student service providers for
                 photography, design, makeup, events, and more. Compare
-                portfolios, read genuine reviews, and pay securely —
+                portfolios, read genuine reviews, and pay securely 
                 all in one place.
               </p>
 
