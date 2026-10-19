@@ -5,6 +5,26 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Servicely brand — indigo/purple
+        brand: {
+          50: '#f1f0ff',
+          100: '#e5e2fd',
+          200: '#cdc8fa',
+          300: '#a9a1f5',
+          400: '#877aec',
+          500: '#6a5ce8',
+          600: '#5145e5',
+          700: '#4437ca',
+          800: '#382fa3',
+          900: '#302b80',
+          950: '#1e1a4d',
+        },
+        // Soft lavender surface
+        lavender: {
+          DEFAULT: '#f3f1ff',
+          dark: '#262342',
+        },
+        // Legacy palettes (kept for compatibility with existing pages)
         primary: {
           50: '#ecfdf5',
           100: '#d1fae5',
@@ -43,10 +63,40 @@ export default {
           900: '#18181b',
           950: '#09090b',
         },
+        // Status colors — soft, professional
+        success: {
+          50: '#ecfdf3',
+          100: '#d1fadf',
+          200: '#a6f4c5',
+          500: '#12b76a',
+          600: '#039855',
+          700: '#027a48',
+        },
+        warning: {
+          50: '#fffaeb',
+          100: '#fef0c7',
+          20: '#fedf89',
+          500: '#f79009',
+          600: '#dc6803',
+          700: '#b54708',
+        },
+        danger: {
+          50: '#fef3f2',
+          100: '#fee4e2',
+          200: '#fecdca',
+          500: '#f04438',
+          600: '#d92d20',
+          700: '#b42318',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        card: '0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08)',
+        'card-hover': '0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06)',
+        soft: '0 8px 24px -6px rgba(81, 69, 229, 0.16)',
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',

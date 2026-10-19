@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
+  AlertCircle,
   Calendar,
   CheckCircle2,
   Clock3,
@@ -8,21 +10,30 @@ import {
   Eye,
   FileText,
   MapPin,
-  RefreshCw,
   Receipt,
+  RefreshCw,
+  Search,
   ShieldCheck,
   UserRound,
-  X,
   XCircle,
-  AlertCircle,
 } from "lucide-react";
 
 import { customerNavItems } from "@/data/customerNavItems";
 import {
   DashboardLayout,
   DashboardHeader,
+  StatCard,
 } from "@/components/DashboardLayout";
 import { formatNaira } from "@/data/mockData";
+import {
+  Avatar,
+  BookingStatusBadge,
+  Button,
+  EmptyState,
+  ErrorState,
+  ResponsiveModal,
+  Skeleton,
+} from "@/components/ui";
 
 const API_URL =
   import.meta.env.VITE_API_URL ||
@@ -571,6 +582,14 @@ export function CustomerBookings() {
       },
     ];
 
+  const hasData =
+    filteredBookings.length > 0;
+
+  const showFullError =
+    Boolean(error) &&
+    !loading &&
+    !hasData;
+
   return (
     <DashboardLayout
       role="customer"
@@ -579,6 +598,20 @@ export function CustomerBookings() {
       <DashboardHeader
         title="My Bookings"
         subtitle="Track your services, payments and booking details."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            icon={RefreshCw}
+            loading={refreshing}
+            onClick={() =>
+              fetchBookings(true)
+            }
+            aria-label="Refresh bookings"
+          >
+            Refresh
+          </Button>
+        }
       />
 
       <div className="space-y-6">
@@ -586,148 +619,153 @@ export function CustomerBookings() {
             SUMMARY
         ================================================== */}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <SummaryCard
-            icon={<Receipt />}
-            label="Total"
-            value={counts.all}
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard
+            label="Total bookings"
+            value={String(counts.all)}
+            icon={Receipt}
+            color="brand"
           />
 
-          <SummaryCard
-            icon={<Clock3 />}
+          <StatCard
             label="Pending"
-            value={counts.pending}
+            value={String(counts.pending)}
+            icon={Clock3}
+            color="warning"
           />
 
-          <SummaryCard
-            icon={<CreditCard />}
+          <StatCard
             label="Paid"
-            value={counts.paid}
+            value={String(counts.paid)}
+            icon={CreditCard}
+            color="success"
           />
 
-          <SummaryCard
-            icon={<CheckCircle2 />}
+          <StatCard
             label="Completed"
-            value={counts.completed}
+            value={String(
+              counts.completed
+            )}
+            icon={CheckCircle2}
+            color="sky"
           />
         </div>
 
         {/* ==================================================
-            FILTER BAR
+            FILTER CHIPS
         ================================================== */}
 
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {tabs.map((tab) => {
-              const count =
-                counts[tab.id];
+        <div
+          role="group"
+          aria-label="Filter bookings"
+          className="no-scrollbar flex gap-2 overflow-x-auto pb-1"
+        >
+          {tabs.map((tab) => {
+            const count =
+              counts[tab.id];
 
-              const active =
-                filter === tab.id;
+            const active =
+              filter === tab.id;
 
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() =>
-                    setFilter(tab.id)
-                  }
-                  className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${active
-                      ? "bg-primary-600 text-white shadow-sm"
-                      : "bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setFilter(tab.id)
+                }
+                className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${active
+                  ? "bg-brand-600 text-white shadow-soft"
+                  : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:text-ink-50"
+                  }`}
+              >
+                {tab.label}
+
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${active
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-100 text-slate-500 dark:bg-ink-800 dark:text-ink-400"
                     }`}
                 >
-                  {tab.label}
-
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${active
-                        ? "bg-white/20 text-white"
-                        : "bg-white/70 text-ink-500 dark:bg-ink-700 dark:text-ink-300"
-                      }`}
-                  >
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              fetchBookings(true)
-            }
-            disabled={refreshing}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-600 transition hover:bg-ink-50 disabled:opacity-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:bg-ink-800"
-            title="Refresh bookings"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${refreshing
-                  ? "animate-spin"
-                  : ""
-                }`}
-            />
-          </button>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* ==================================================
-            ERROR
+            REFRESH ERROR (data already on screen)
         ================================================== */}
 
-        {error && (
-          <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/20 dark:text-red-300">
-            <AlertCircle className="h-5 w-5 shrink-0" />
+        {Boolean(error) &&
+          !loading &&
+          hasData && (
+            <div className="flex flex-col gap-3 rounded-2xl border border-danger-100 bg-danger-50/60 p-4 dark:border-danger-500/20 dark:bg-danger-500/5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-200" />
 
-            <div className="flex-1">
-              <p className="font-semibold">
-                Unable to load bookings
-              </p>
+                <div>
+                  <p className="text-sm font-semibold text-danger-700 dark:text-danger-200">
+                    Unable to refresh bookings
+                  </p>
 
-              <p className="mt-0.5 text-xs opacity-80">
-                {error}
-              </p>
+                  <p className="mt-0.5 text-xs text-danger-600 dark:text-danger-200/80">
+                    {error}
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                icon={RefreshCw}
+                onClick={() =>
+                  fetchBookings()
+                }
+                className="shrink-0"
+              >
+                Try again
+              </Button>
             </div>
-
-            <button
-              type="button"
-              onClick={() =>
-                fetchBookings()
-              }
-              className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
-            >
-              Retry
-            </button>
-          </div>
-        )}
+          )}
 
         {/* ==================================================
             LOADING
         ================================================== */}
 
         {loading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((item) => (
-              <BookingSkeleton
-                key={item}
-              />
-            ))}
-          </div>
+          <BookingSkeleton />
+        ) : showFullError ? (
+          /* ==================================================
+             ERROR
+          ================================================== */
+          <ErrorState
+            message={error}
+            onRetry={() =>
+              fetchBookings()
+            }
+          />
         ) : filteredBookings.length ===
           0 ? (
           /* ==================================================
              EMPTY STATE
           ================================================== */
-          <div className="rounded-3xl border border-dashed border-ink-200 bg-white px-6 py-20 text-center dark:border-ink-700 dark:bg-ink-900">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-ink-100 dark:bg-ink-800">
-              <Calendar className="h-7 w-7 text-ink-400" />
-            </div>
-
-            <h3 className="mt-5 text-lg font-bold text-ink-900 dark:text-ink-50">
-              No bookings found
-            </h3>
-
-            <p className="mx-auto mt-2 max-w-sm text-sm text-ink-500">
-              {filter === "all"
+          <EmptyState
+            icon={Calendar}
+            title={
+              filter === "all"
+                ? "No bookings yet"
+                : `No ${tabs
+                  .find(
+                    (tab) =>
+                      tab.id === filter
+                  )
+                  ?.label.toLowerCase()} bookings`
+            }
+            description={
+              filter === "all"
                 ? "Book a service to see your bookings and payment details here."
                 : filter ===
                   "payment_pending"
@@ -735,28 +773,237 @@ export function CustomerBookings() {
                   : `You don't have any ${filter.replace(
                     "_",
                     " "
-                  )} bookings.`}
-            </p>
-          </div>
+                  )} bookings.`
+            }
+            action={
+              filter === "all" ? (
+                <Link
+                  to="/customer/browse"
+                  className="btn-primary"
+                >
+                  <Search className="h-4 w-4" />
+                  Browse Services
+                </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    setFilter("all")
+                  }
+                >
+                  Show all bookings
+                </Button>
+              )
+            }
+          />
         ) : (
           /* ==================================================
-             BOOKINGS
+             BOOKINGS — desktop table + mobile cards
           ================================================== */
-          <div className="space-y-4">
-            {filteredBookings.map(
-              (booking) => (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  onView={() =>
-                    setSelectedBooking(
-                      booking
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className="space-y-4"
+          >
+            {/* Desktop table */}
+            <div className="hidden overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900 lg:block">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-200/70 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-ink-800 dark:bg-ink-800/60 dark:text-ink-400">
+                    <th
+                      scope="col"
+                      className="px-5 py-3.5"
+                    >
+                      Service
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-3.5"
+                    >
+                      Provider
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-3.5"
+                    >
+                      Date &amp; time
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-3.5"
+                    >
+                      Amount
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-3.5"
+                    >
+                      Status
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-3.5 text-right"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100 dark:divide-ink-800">
+                  {filteredBookings.map(
+                    (booking) => (
+                      <tr
+                        key={booking.id}
+                        className="transition-colors hover:bg-slate-50/70 dark:hover:bg-ink-800/40"
+                      >
+                        {/* SERVICE */}
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+                            {booking.serviceName}
+                          </p>
+
+                          {booking
+                            .serviceDetails
+                            ?.category && (
+                              <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-400">
+                                {
+                                  booking
+                                    .serviceDetails
+                                    .category
+                                }
+                              </p>
+                            )}
+                        </td>
+
+                        {/* PROVIDER */}
+                        <td className="px-5 py-4 align-top">
+                          <div className="flex items-center gap-2.5">
+                            <Avatar
+                              src={
+                                booking.providerAvatar
+                              }
+                              name={
+                                booking.providerName
+                              }
+                              size="sm"
+                            />
+
+                            <span className="text-sm text-slate-600 dark:text-ink-300">
+                              {booking.providerName}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* DATE & TIME */}
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-sm font-medium text-slate-700 dark:text-ink-200">
+                            {booking.date}
+                          </p>
+
+                          <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 dark:text-ink-400">
+                            <Clock3 className="h-3 w-3 shrink-0" />
+
+                            <span className="truncate">
+                              {booking.time}
+                              {booking.location
+                                ? ` · ${booking.location}`
+                                : ""}
+                            </span>
+                          </p>
+                        </td>
+
+                        {/* AMOUNT */}
+                        <td className="px-5 py-4 align-top">
+                          <p className="text-sm font-bold text-slate-900 dark:text-ink-50">
+                            {formatNaira(
+                              booking.price
+                            )}
+                          </p>
+
+                          <div className="mt-1">
+                            <PaymentBadge
+                              status={
+                                booking.paymentStatus
+                              }
+                            />
+                          </div>
+                        </td>
+
+                        {/* STATUS */}
+                        <td className="px-5 py-4 align-top">
+                          <BookingStatusBadge
+                            status={
+                              booking.bookingStatus
+                            }
+                          />
+                        </td>
+
+                        {/* ACTIONS */}
+                        <td className="px-5 py-4 align-top">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedBooking(
+                                  booking
+                                )
+                              }
+                              className="btn-outline btn-sm"
+                              aria-label={`View details for ${booking.serviceName}`}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              Details
+                            </button>
+
+                            {booking.paymentStatus ===
+                              "unpaid" ||
+                              booking.paymentStatus ===
+                              "pending" ? (
+                              <Link
+                                to={`/payment/${booking.id}`}
+                                className="btn-primary btn-sm"
+                              >
+                                <CreditCard className="h-3.5 w-3.5" />
+                                Pay now
+                              </Link>
+                            ) : null}
+
+                            {booking.bookingStatus ===
+                              "completed" ? (
+                              <Link
+                                to={`/review/${booking.id}`}
+                                className="btn-outline btn-sm"
+                              >
+                                Review
+                              </Link>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
                     )
-                  }
-                />
-              )
-            )}
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="space-y-4 lg:hidden">
+              {filteredBookings.map(
+                (booking) => (
+                  <BookingCard
+                    key={booking.id}
+                    booking={booking}
+                    onView={() =>
+                      setSelectedBooking(
+                        booking
+                      )
+                    }
+                  />
+                )
+              )}
+            </div>
+          </motion.div>
         )}
       </div>
 
@@ -777,7 +1024,7 @@ export function CustomerBookings() {
 }
 
 /* ======================================================
-   BOOKING CARD
+   BOOKING CARD (mobile / tablet)
 ====================================================== */
 
 function BookingCard({
@@ -788,141 +1035,139 @@ function BookingCard({
   onView: () => void;
 }) {
   const isPaid =
-    booking.paymentStatus ===
-    "paid";
+    booking.paymentStatus === "paid";
 
   const needsPayment =
     booking.paymentStatus ===
     "unpaid" ||
-    booking.paymentStatus ===
-    "pending";
+    booking.paymentStatus === "pending";
 
   const isCompleted =
-    booking.bookingStatus ===
-    "completed";
+    booking.bookingStatus === "completed";
 
   return (
-    <div className="group overflow-hidden rounded-3xl border border-ink-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-ink-700 dark:bg-ink-900">
+    <motion.article
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="card overflow-hidden transition-shadow hover:shadow-card-hover"
+    >
       <div className="p-4 sm:p-5">
-        <div className="flex flex-col gap-5 sm:flex-row">
-          {/* PROVIDER */}
-          <div className="flex min-w-0 flex-1 gap-4">
-            <img
-              src={
-                booking.providerAvatar ||
-                "/images/avatar-placeholder.png"
-              }
-              alt={
-                booking.providerName
-              }
-              className="h-14 w-14 shrink-0 rounded-2xl object-cover ring-1 ring-ink-200 dark:ring-ink-700"
-              onError={(e) => {
-                e.currentTarget.src =
-                  "/images/avatar-placeholder.png";
-              }}
-            />
+        <div className="flex items-start gap-3.5">
+          <Avatar
+            src={booking.providerAvatar}
+            name={booking.providerName}
+            size="lg"
+          />
 
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="truncate font-bold text-ink-900 dark:text-ink-50">
-                  {booking.serviceName}
-                </h3>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
+                {booking.serviceName}
+              </h3>
 
-                <PaymentBadge
-                  status={
-                    booking.paymentStatus
-                  }
-                />
-              </div>
+              <BookingStatusBadge
+                status={
+                  booking.bookingStatus
+                }
+              />
+            </div>
 
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-ink-500">
-                <UserRound className="h-3.5 w-3.5" />
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-ink-400">
+              <UserRound className="h-3.5 w-3.5 shrink-0" />
+              {booking.providerName}
+            </p>
 
-                {booking.providerName}
-              </p>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
+              <InfoPill
+                icon={<Calendar />}
+                text={booking.date}
+              />
 
-              <div className="mt-3 flex flex-wrap gap-2">
-                <InfoPill
-                  icon={<Calendar />}
-                  text={booking.date}
-                />
+              <InfoPill
+                icon={<Clock3 />}
+                text={booking.time}
+              />
 
-                <InfoPill
-                  icon={<Clock3 />}
-                  text={booking.time}
-                />
+              <InfoPill
+                icon={<MapPin />}
+                text={booking.location}
+              />
+            </div>
+          </div>
+        </div>
 
-                <InfoPill
-                  icon={<MapPin />}
-                  text={booking.location}
-                />
-              </div>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-slate-100 pt-4 dark:border-ink-800">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-ink-500">
+              Total
+            </p>
+
+            <p className="mt-0.5 text-lg font-bold text-slate-900 dark:text-ink-50">
+              {formatNaira(
+                booking.price
+              )}
+            </p>
+
+            <div className="mt-1.5">
+              <PaymentBadge
+                status={
+                  booking.paymentStatus
+                }
+              />
             </div>
           </div>
 
-          {/* PRICE / ACTION */}
-          <div className="flex items-center justify-between gap-4 border-t border-ink-100 pt-4 sm:min-w-[180px] sm:flex-col sm:items-end sm:justify-center sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0 dark:border-ink-800">
-            <div className="text-left sm:text-right">
-              <p className="text-[11px] font-medium uppercase tracking-wider text-ink-400">
-                Total
-              </p>
-
-              <p className="mt-0.5 text-xl font-black text-ink-900 dark:text-white">
-                {formatNaira(
-                  booking.price
-                )}
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              {needsPayment && (
-                <Link
-                  to={`/payment/${booking.id}`}
-                  className="rounded-xl bg-primary-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-primary-700"
-                >
-                  Pay Now
-                </Link>
-              )}
-
-              <button
-                type="button"
-                onClick={onView}
-                className="flex items-center gap-1.5 rounded-xl border border-ink-200 bg-white px-3.5 py-2 text-xs font-bold text-ink-700 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+          <div className="flex flex-wrap justify-end gap-2">
+            {needsPayment && (
+              <Link
+                to={`/payment/${booking.id}`}
+                className="btn-primary btn-sm"
               >
-                <Eye className="h-3.5 w-3.5" />
-                Details
-              </button>
+                <CreditCard className="h-3.5 w-3.5" />
+                Pay now
+              </Link>
+            )}
 
-              {isCompleted && (
-                <Link
-                  to={`/review/${booking.id}`}
-                  className="inline-flex items-center justify-center rounded-xl border border-ink-200 px-3.5 py-2 text-xs font-bold text-ink-700 transition hover:border-primary-300 hover:text-primary-600 dark:border-ink-700 dark:text-ink-200 dark:hover:border-primary-500 dark:hover:text-primary-400"
-                >
-                  Review
-                </Link>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={onView}
+              className="btn-outline btn-sm"
+              aria-label={`View details for ${booking.serviceName}`}
+            >
+              <Eye className="h-3.5 w-3.5" />
+              Details
+            </button>
+
+            {isCompleted && (
+              <Link
+                to={`/review/${booking.id}`}
+                className="btn-outline btn-sm"
+              >
+                Review
+              </Link>
+            )}
           </div>
         </div>
       </div>
 
       {/* PAYMENT CONFIRMATION */}
       {isPaid && (
-        <div className="flex flex-col gap-2 border-t border-emerald-100 bg-emerald-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-          <div className="flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-            <CheckCircle2 className="h-4 w-4" />
+        <div className="flex flex-col gap-1.5 border-t border-success-100 bg-success-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-success-600/30 dark:bg-success-600/10">
+          <div className="flex items-center gap-2 text-xs font-semibold text-success-700 dark:text-success-200">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
 
             Payment confirmed by Paystack
           </div>
 
           {booking.payment.reference && (
-            <span className="truncate font-mono text-[10px] text-emerald-600 dark:text-emerald-500">
+            <span className="truncate font-mono text-[10px] text-success-600 dark:text-success-200/80">
               {booking.payment.reference}
             </span>
           )}
         </div>
       )}
-    </div>
+    </motion.article>
   );
 }
 
@@ -938,46 +1183,46 @@ function BookingDetailsModal({
   onClose: () => void;
 }) {
   const isPaid =
+    booking.paymentStatus === "paid";
+
+  const needsPayment =
     booking.paymentStatus ===
-    "paid";
+    "unpaid" ||
+    booking.paymentStatus === "pending";
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-      onMouseDown={(e) => {
-        if (
-          e.target === e.currentTarget
-        ) {
-          onClose();
-        }
-      }}
-    >
-      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white shadow-2xl sm:max-w-2xl sm:rounded-3xl dark:bg-ink-900">
-        {/* HEADER */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-ink-100 bg-white/95 px-5 py-4 backdrop-blur sm:px-6 dark:border-ink-800 dark:bg-ink-900/95">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-primary-600">
-              Booking details
-            </p>
-
-            <h2 className="mt-1 text-lg font-black text-ink-900 dark:text-white">
-              {booking.serviceName}
-            </h2>
-          </div>
+    <ResponsiveModal
+      open
+      onClose={onClose}
+      title="Booking details"
+      footer={
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {needsPayment && (
+            <Link
+              to={`/payment/${booking.id}`}
+              onClick={onClose}
+              className="btn-primary w-full sm:w-auto"
+            >
+              <CreditCard className="h-4 w-4" />
+              Complete payment
+            </Link>
+          )}
 
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink-100 text-ink-500 transition hover:bg-ink-200 dark:bg-ink-800 dark:hover:bg-ink-700"
+            className="btn-outline w-full sm:w-auto"
           >
-            <X className="h-4 w-4" />
+            Close
           </button>
         </div>
-
-        <div className="space-y-5 p-5 sm:p-6">
-          {/* SERVICE */}
-          <section className="overflow-hidden rounded-2xl border border-ink-200 dark:border-ink-700">
-            {booking.serviceDetails.image && (
+      }
+    >
+      <div className="space-y-5">
+        {/* SERVICE */}
+        <section className="overflow-hidden rounded-2xl border border-slate-200/70 dark:border-ink-800">
+          {booking.serviceDetails
+            ?.image && (
               <img
                 src={
                   booking.serviceDetails
@@ -991,341 +1236,235 @@ function BookingDetailsModal({
               />
             )}
 
-            <div className="p-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-bold text-ink-900 dark:text-white">
-                  {booking.serviceDetails.title}
-                </h3>
-
+          <div className="p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-ink-50">
                 {booking.serviceDetails
-                  .category && (
-                    <span className="rounded-full bg-primary-50 px-2.5 py-1 text-[10px] font-bold text-primary-700 dark:bg-primary-950/30 dark:text-primary-400">
-                      {
-                        booking.serviceDetails
-                          .category
-                      }
-                    </span>
-                  )}
-              </div>
+                  ?.title ||
+                  booking.serviceName}
+              </h3>
 
               {booking.serviceDetails
-                .description && (
-                  <p className="mt-2 text-sm leading-6 text-ink-500">
-                    {
-                      booking.serviceDetails
-                        .description
-                    }
-                  </p>
+                ?.category && (
+                  <span className="badge bg-lavender text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                    {booking.serviceDetails.category}
+                  </span>
                 )}
             </div>
-          </section>
 
-          {/* PROVIDER */}
-          <section>
-            <SectionTitle
-              icon={<UserRound />}
-              title="Provider"
+            {booking.serviceDetails
+              ?.description && (
+                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-ink-400">
+                  {booking.serviceDetails.description}
+                </p>
+              )}
+          </div>
+        </section>
+
+        {/* PROVIDER */}
+        <section>
+          <SectionTitle
+            icon={<UserRound />}
+            title="Provider"
+          />
+
+          <div className="mt-3 flex items-center gap-3 rounded-2xl bg-slate-50 p-4 dark:bg-ink-800/60">
+            <Avatar
+              src={booking.providerAvatar}
+              name={booking.providerName}
+              size="md"
             />
 
-            <div className="mt-3 flex items-center gap-3 rounded-2xl bg-ink-50 p-4 dark:bg-ink-800/60">
-              <img
-                src={
-                  booking.providerAvatar ||
-                  "/images/avatar-placeholder.png"
-                }
-                alt=""
-                className="h-11 w-11 rounded-xl object-cover"
-              />
+            <div>
+              <p className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+                {booking.providerName}
+              </p>
 
-              <div>
-                <p className="font-bold text-ink-900 dark:text-white">
-                  {booking.providerName}
-                </p>
-
-                <p className="text-xs text-ink-500">
-                  Service Provider
-                </p>
-              </div>
+              <p className="text-xs text-slate-500 dark:text-ink-400">
+                Service provider
+              </p>
             </div>
-          </section>
+          </div>
+        </section>
 
-          {/* BOOKING INFORMATION */}
-          <section>
-            <SectionTitle
+        {/* BOOKING INFORMATION */}
+        <section>
+          <SectionTitle
+            icon={<Calendar />}
+            title="Booking information"
+          />
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <DetailItem
               icon={<Calendar />}
-              title="Booking information"
+              label="Date"
+              value={booking.date}
             />
 
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <DetailItem
-                icon={<Calendar />}
-                label="Date"
-                value={booking.date}
-              />
+            <DetailItem
+              icon={<Clock3 />}
+              label="Time"
+              value={booking.time}
+            />
 
-              <DetailItem
-                icon={<Clock3 />}
-                label="Time"
-                value={booking.time}
-              />
+            <DetailItem
+              icon={<MapPin />}
+              label="Location"
+              value={booking.location}
+            />
 
-              <DetailItem
-                icon={<MapPin />}
-                label="Location"
-                value={booking.location}
-              />
+            <div className="rounded-2xl bg-slate-50 p-3.5 dark:bg-ink-800/60">
+              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-ink-500">
+                <FileText className="h-3 w-3" />
 
-              <DetailItem
-                icon={<FileText />}
-                label="Booking status"
-                value={formatStatus(
-                  booking.bookingStatus
-                )}
-              />
-            </div>
-          </section>
-
-          {/* NOTES */}
-          {booking.notes && (
-            <section>
-              <SectionTitle
-                icon={<FileText />}
-                title="Your notes"
-              />
-
-              <div className="mt-3 rounded-2xl bg-ink-50 p-4 text-sm leading-6 text-ink-600 dark:bg-ink-800/60 dark:text-ink-300">
-                {booking.notes}
+                Booking status
               </div>
-            </section>
-          )}
 
-          {/* PAYMENT */}
+              <div className="mt-2">
+                <BookingStatusBadge
+                  status={
+                    booking.bookingStatus
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* NOTES */}
+        {booking.notes && (
           <section>
             <SectionTitle
-              icon={<CreditCard />}
-              title="Payment information"
+              icon={<FileText />}
+              title="Your notes"
             />
 
+            <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600 dark:bg-ink-800/60 dark:text-ink-300">
+              {booking.notes}
+            </div>
+          </section>
+        )}
+
+        {/* PAYMENT */}
+        <section>
+          <SectionTitle
+            icon={<CreditCard />}
+            title="Payment information"
+          />
+
+          <div
+            className={`mt-3 overflow-hidden rounded-2xl border ${isPaid
+              ? "border-success-100 dark:border-success-600/30"
+              : "border-slate-200 dark:border-ink-800"
+              }`}
+          >
             <div
-              className={`mt-3 overflow-hidden rounded-2xl border ${isPaid
-                  ? "border-emerald-200 dark:border-emerald-900/50"
-                  : "border-ink-200 dark:border-ink-700"
+              className={`flex items-center justify-between px-4 py-4 ${isPaid
+                ? "bg-success-50 dark:bg-success-600/10"
+                : "bg-slate-50 dark:bg-ink-800/50"
                 }`}
             >
-              <div
-                className={`flex items-center justify-between px-4 py-4 ${isPaid
-                    ? "bg-emerald-50 dark:bg-emerald-950/20"
-                    : "bg-ink-50 dark:bg-ink-800/50"
-                  }`}
-              >
-                <div className="flex items-center gap-2">
-                  {isPaid ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                  ) : (
-                    <Clock3 className="h-5 w-5 text-amber-500" />
-                  )}
-
-                  <span className="text-sm font-bold text-ink-900 dark:text-white">
-                    {isPaid
-                      ? "Payment successful"
-                      : formatStatus(
-                        booking.paymentStatus
-                      )}
-                  </span>
-                </div>
-
-                {isPaid && (
-                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
+              <div className="flex items-center gap-2">
+                {isPaid ? (
+                  <CheckCircle2 className="h-5 w-5 text-success-600 dark:text-success-200" />
+                ) : (
+                  <Clock3 className="h-5 w-5 text-warning-500" />
                 )}
+
+                <span className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+                  {isPaid
+                    ? "Payment successful"
+                    : formatStatus(
+                      booking.paymentStatus
+                    )}
+                </span>
               </div>
 
-              <div className="divide-y divide-ink-100 dark:divide-ink-800">
-                <PaymentRow
-                  label="Amount paid"
-                  value={formatNaira(
-                    booking.payment
-                      .amount !== null &&
-                      booking.payment
-                        .amount !==
-                      undefined
-                      ? booking.payment
-                        .amount
-                      : booking.price
-                  )}
-                  strong
-                />
-
-                {booking.payment
-                  .reference && (
-                    <PaymentRow
-                      label="Payment reference"
-                      value={
-                        booking.payment
-                          .reference
-                      }
-                      mono
-                    />
-                  )}
-
-                {booking.payment
-                  .transactionId && (
-                    <PaymentRow
-                      label="Transaction ID"
-                      value={
-                        booking.payment
-                          .transactionId
-                      }
-                      mono
-                    />
-                  )}
-
-                {booking.payment
-                  .channel && (
-                    <PaymentRow
-                      label="Payment channel"
-                      value={formatStatus(
-                        booking.payment
-                          .channel
-                      )}
-                    />
-                  )}
-
-                {booking.payment
-                  .paidAt && (
-                    <PaymentRow
-                      label="Paid on"
-                      value={formatDateTime(
-                        booking.payment
-                          .paidAt
-                      )}
-                    />
-                  )}
-
-                <PaymentRow
-                  label="Servicely fee"
-                  value={formatNaira(
-                    booking.platformFee
-                  )}
-                />
-
-                <PaymentRow
-                  label="Provider amount"
-                  value={formatNaira(
-                    booking.providerAmount
-                  )}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* FOOTER ACTIONS */}
-          <div className="flex flex-col gap-2 sm:flex-row">
-            {!isPaid &&
-              (booking.paymentStatus ===
-                "unpaid" ||
-                booking.paymentStatus ===
-                "pending") && (
-                <Link
-                  to={`/payment/${booking.id}`}
-                  onClick={onClose}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-primary-700"
-                >
-                  <CreditCard className="h-4 w-4" />
-                  Complete Payment
-                </Link>
+              {isPaid && (
+                <ShieldCheck className="h-5 w-5 text-success-600 dark:text-success-200" />
               )}
+            </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-ink-200 px-5 py-3 text-sm font-bold text-ink-700 dark:border-ink-700 dark:text-ink-200"
-            >
-              Close
-            </button>
+            <div className="divide-y divide-slate-100 dark:divide-ink-800">
+              <PaymentRow
+                label="Amount paid"
+                value={formatNaira(
+                  booking.payment
+                    .amount !== null &&
+                    booking.payment
+                      .amount !==
+                    undefined
+                    ? booking.payment
+                      .amount
+                    : booking.price
+                )}
+                strong
+              />
+
+              {booking.payment
+                .reference && (
+                  <PaymentRow
+                    label="Payment reference"
+                    value={
+                      booking.payment
+                        .reference
+                    }
+                    mono
+                  />
+                )}
+
+              {booking.payment
+                .transactionId && (
+                  <PaymentRow
+                    label="Transaction ID"
+                    value={
+                      booking.payment
+                        .transactionId
+                    }
+                    mono
+                  />
+                )}
+
+              {booking.payment
+                .channel && (
+                  <PaymentRow
+                    label="Payment channel"
+                    value={formatStatus(
+                      booking.payment
+                        .channel
+                    )}
+                  />
+                )}
+
+              {booking.payment
+                .paidAt && (
+                  <PaymentRow
+                    label="Paid on"
+                    value={formatDateTime(
+                      booking.payment
+                        .paidAt
+                    )}
+                  />
+                )}
+
+              <PaymentRow
+                label="Servicely fee"
+                value={formatNaira(
+                  booking.platformFee
+                )}
+              />
+
+              <PaymentRow
+                label="Provider amount"
+                value={formatNaira(
+                  booking.providerAmount
+                )}
+              />
+            </div>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
-  );
-}
-
-/* ======================================================
-   SUMMARY CARD
-====================================================== */
-
-function SummaryCard({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-2xl border border-ink-200 bg-white p-4 dark:border-ink-700 dark:bg-ink-900">
-      <div className="flex items-center justify-between">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-950/30 dark:text-primary-400">
-          <span className="[&>svg]:h-4 [&>svg]:w-4">
-            {icon}
-          </span>
-        </div>
-
-        <span className="text-xl font-black text-ink-900 dark:text-white">
-          {value}
-        </span>
-      </div>
-
-      <p className="mt-3 text-xs font-medium text-ink-500">
-        {label}
-      </p>
-    </div>
-  );
-}
-
-/* ======================================================
-   PAYMENT BADGE
-====================================================== */
-
-function PaymentBadge({
-  status,
-}: {
-  status: string;
-}) {
-  if (status === "paid") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
-        <CheckCircle2 className="h-3 w-3" />
-        Paid
-      </span>
-    );
-  }
-
-  if (
-    status === "pending" ||
-    status === "unpaid"
-  ) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
-        <Clock3 className="h-3 w-3" />
-        Payment Pending
-      </span>
-    );
-  }
-
-  if (status === "failed") {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-bold text-red-700 dark:bg-red-950/30 dark:text-red-400">
-        <XCircle className="h-3 w-3" />
-        Failed
-      </span>
-    );
-  }
-
-  return (
-    <span className="rounded-full bg-ink-100 px-2.5 py-1 text-[10px] font-bold text-ink-600 dark:bg-ink-800 dark:text-ink-300">
-      {formatStatus(status)}
-    </span>
+    </ResponsiveModal>
   );
 }
 
@@ -1340,8 +1479,10 @@ function InfoPill({
   icon: React.ReactNode;
   text: string;
 }) {
+  if (!text) return null;
+
   return (
-    <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-ink-50 px-2.5 py-1.5 text-[11px] font-medium text-ink-500 dark:bg-ink-800 dark:text-ink-400">
+    <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-medium text-slate-600 dark:bg-ink-800 dark:text-ink-300">
       <span className="[&>svg]:h-3 [&>svg]:w-3">
         {icon}
       </span>
@@ -1365,8 +1506,8 @@ function SectionTitle({
   title: string;
 }) {
   return (
-    <div className="flex items-center gap-2 text-sm font-bold text-ink-900 dark:text-white">
-      <span className="text-primary-600 [&>svg]:h-4 [&>svg]:w-4">
+    <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-ink-50">
+      <span className="text-brand-600 [&>svg]:h-4 [&>svg]:w-4 dark:text-brand-400">
         {icon}
       </span>
 
@@ -1389,8 +1530,8 @@ function DetailItem({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl bg-ink-50 p-3.5 dark:bg-ink-800/60">
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-ink-400">
+    <div className="rounded-2xl bg-slate-50 p-3.5 dark:bg-ink-800/60">
+      <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-ink-500">
         <span className="[&>svg]:h-3 [&>svg]:w-3">
           {icon}
         </span>
@@ -1398,7 +1539,7 @@ function DetailItem({
         {label}
       </div>
 
-      <p className="mt-1.5 text-sm font-semibold text-ink-800 dark:text-ink-200">
+      <p className="mt-1.5 text-sm font-semibold text-slate-700 dark:text-ink-200">
         {value || "—"}
       </p>
     </div>
@@ -1422,15 +1563,15 @@ function PaymentRow({
 }) {
   return (
     <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-xs text-ink-500">
+      <span className="text-xs text-slate-500 dark:text-ink-400">
         {label}
       </span>
 
       <span
         className={`break-all text-right text-xs ${mono ? "font-mono" : ""
           } ${strong
-            ? "font-black text-ink-900 dark:text-white"
-            : "font-semibold text-ink-700 dark:text-ink-300"
+            ? "font-bold text-slate-900 dark:text-ink-50"
+            : "font-semibold text-slate-700 dark:text-ink-300"
           }`}
       >
         {value}
@@ -1440,23 +1581,87 @@ function PaymentRow({
 }
 
 /* ======================================================
+   PAYMENT BADGE
+====================================================== */
+
+function PaymentBadge({
+  status,
+}: {
+  status: string;
+}) {
+  if (status === "paid") {
+    return (
+      <span className="badge bg-success-50 text-success-700 dark:bg-success-600/15 dark:text-success-200">
+        <CheckCircle2 className="h-3 w-3" />
+        Paid
+      </span>
+    );
+  }
+
+  if (
+    status === "pending" ||
+    status === "unpaid"
+  ) {
+    return (
+      <span className="badge bg-warning-50 text-warning-700 dark:bg-warning-600/15 dark:text-warning-200">
+        <Clock3 className="h-3 w-3" />
+        Payment pending
+      </span>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <span className="badge bg-danger-50 text-danger-700 dark:bg-danger-500/15 dark:text-danger-200">
+        <XCircle className="h-3 w-3" />
+        Failed
+      </span>
+    );
+  }
+
+  return (
+    <span className="badge bg-slate-100 text-slate-600 dark:bg-ink-800 dark:text-ink-300">
+      {formatStatus(status)}
+    </span>
+  );
+}
+
+/* ======================================================
    SKELETON
 ====================================================== */
 
 function BookingSkeleton() {
   return (
-    <div className="animate-pulse rounded-3xl border border-ink-200 bg-white p-5 dark:border-ink-700 dark:bg-ink-900">
-      <div className="flex gap-4">
-        <div className="h-14 w-14 rounded-2xl bg-ink-200 dark:bg-ink-700" />
+    <div
+      className="space-y-4"
+      aria-hidden="true"
+    >
+      {[0, 1, 2].map((item) => (
+        <div
+          key={item}
+          className="card animate-pulse p-5"
+        >
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-12 w-12 rounded-full" />
 
-        <div className="flex-1 space-y-3">
-          <div className="h-4 w-48 rounded bg-ink-200 dark:bg-ink-700" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-1/3 rounded-lg" />
 
-          <div className="h-3 w-32 rounded bg-ink-200 dark:bg-ink-700" />
+              <Skeleton className="h-3 w-1/4 rounded-lg" />
+            </div>
 
-          <div className="h-8 w-full max-w-md rounded bg-ink-100 dark:bg-ink-800" />
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <Skeleton className="h-7 w-24 rounded-lg" />
+
+            <Skeleton className="h-7 w-24 rounded-lg" />
+
+            <Skeleton className="h-7 w-24 rounded-lg" />
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }

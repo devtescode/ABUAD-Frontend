@@ -1,139 +1,657 @@
-import { motion } from 'framer-motion';
-import { PublicNavbar, Footer, ProviderCard } from '@/components/shared';
-import { providers } from '@/data/mockData';
-import { Search, Users, Calendar, Star, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import {
+  ArrowRight,
+  BadgeCheck,
+  CalendarCheck,
+  CheckCircle2,
+  Compass,
+  Heart,
+  Lock,
+  Search,
+  SearchX,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Store,
+  Users,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  MarketplaceProviderCard,
+  SearchBar,
+  SectionHeading,
+  SkeletonCard,
+  providerId,
+  type ProviderLike,
+  type ServiceLike,
+} from '@/components/ui';
+import { Footer, PublicNavbar } from '@/components/shared';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+/* =========================================================
+   SHARED HELPERS
+========================================================= */
+
+/**
+ * Fetches the public approved-services catalogue (no auth) and
+ * derives a de-duplicated list of real providers from it.
+ */
+async function fetchApprovedServices(): Promise<ServiceLike[]> {
+  const response = await fetch(`${API_URL}/provider/approved-services`);
+
+  let data: unknown = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    const message = (data as { message?: string } | null)?.message;
+    throw new Error(message || 'Failed to load providers.');
+  }
+
+  const list = (data as { services?: unknown } | null)?.services;
+  if (!Array.isArray(list)) {
+    throw new Error('Received an unexpected response from the server.');
+  }
+
+  return list as ServiceLike[];
+}
+
+interface DerivedProvider extends ProviderLike {
+  categories: string[];
+  portfolio: Array<{ image?: string; title?: string }>;
+  startingPrice?: number;
+}
+
+/** Groups real approved services into unique providers. */
+function deriveProviders(services: ServiceLike[]): DerivedProvider[] {
+  const map = new Map<string, DerivedProvider>();
+
+  for (const service of services) {
+    const provider = service.provider;
+    if (!provider) continue;
+
+    const id = providerId(provider);
+    if (!id) continue;
+
+    let entry = map.get(id);
+    if (!entry) {
+      entry = { ...provider, categories: [], portfolio: [] };
+      map.set(id, entry);
+    }
+
+    const category =
+      typeof service.category === 'string' ? service.category.trim() : '';
+    if (category && !entry.categories.includes(category)) {
+      entry.categories.push(category);
+    }
+
+    if (typeof service.image === 'string' && service.image) {
+      entry.portfolio.push({ image: service.image, title: service.title });
+    }
+
+    const price =
+      typeof service.price === 'number' && service.price > 0
+        ? service.price
+        : undefined;
+    if (
+      price !== undefined &&
+      (entry.startingPrice === undefined || price < entry.startingPrice)
+    ) {
+      entry.startingPrice = price;
+    }
+  }
+
+  return Array.from(map.values());
+}
+
+function PageHero({
+  badge,
+  badgeIcon: BadgeIcon,
+  title,
+  subtitle,
+}: {
+  badge: string;
+  badgeIcon: LucideIcon;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <section className="border-b border-slate-200/70 bg-gradient-to-b from-lavender via-lavender/40 to-transparent dark:border-ink-800 dark:from-brand-950/50 dark:via-brand-950/10">
+      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14 lg:py-16">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45 }}
+          className="mx-auto max-w-3xl text-center"
+        >
+          <Badge tone="brand" icon={BadgeIcon}>
+            {badge}
+          </Badge>
+          <h1 className="mt-3 text-balance text-3xl font-bold tracking-tight text-slate-900 dark:text-ink-50 sm:text-4xl lg:text-5xl">
+            {title}
+          </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-slate-500 dark:text-ink-400 sm:text-lg">
+            {subtitle}
+          </p>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function CtaBand({
+  title,
+  subtitle,
+  primaryLabel,
+  primaryTo,
+  secondaryLabel,
+  secondaryTo,
+}: {
+  title: string;
+  subtitle: string;
+  primaryLabel: string;
+  primaryTo: string;
+  secondaryLabel: string;
+  secondaryTo: string;
+}) {
+  return (
+    <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: '-60px' }}
+        transition={{ duration: 0.45 }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 via-brand-600 to-brand-800 px-6 py-14 text-center shadow-soft sm:px-12"
+      >
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-white/10 blur-3xl"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-brand-400/20 blur-3xl"
+        />
+        <div className="relative">
+          <h2 className="text-balance text-2xl font-bold text-white sm:text-4xl">
+            {title}
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-brand-100">{subtitle}</p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              to={primaryTo}
+              className="btn btn-lg bg-white text-brand-700 shadow-card-hover hover:bg-lavender"
+            >
+              {primaryLabel} <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              to={secondaryTo}
+              className="btn btn-lg border border-white/30 bg-white/10 text-white hover:bg-white/20"
+            >
+              {secondaryLabel}
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+    </section>
+  );
+}
+
+/* =========================================================
+   PROVIDERS DIRECTORY (/providers)
+========================================================= */
 
 export function ProvidersPage() {
-  const verified = providers.filter((p) => p.verified);
+  const [providers, setProviders] = useState<DerivedProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const loadProviders = async () => {
+    setLoading(true);
+    setFailed(false);
+    try {
+      const services = await fetchApprovedServices();
+      setProviders(deriveProviders(services));
+    } catch {
+      setProviders([]);
+      setFailed(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProviders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return providers;
+    return providers.filter((p) => {
+      const name = String(p.fullName || p.name || '').toLowerCase();
+      const cats = p.categories.map((c) => c.toLowerCase());
+      return name.includes(query) || cats.some((c) => c.includes(query));
+    });
+  }, [providers, search]);
+
   return (
-    <div className="min-h-screen bg-ink-50">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
       <PublicNavbar />
-      <div className="border-b border-ink-100 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-ink-50">All Providers</h1>
-          <p className="mt-1 text-ink-500">Browse all verified service providers on the platform</p>
-        </div>
-      </div>
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {verified.map((provider, i) => (
-            <motion.div
-              key={provider.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.05 }}
-            >
-              <ProviderCard provider={provider} />
-            </motion.div>
-          ))}
-        </div>
-      </div>
+
+      <PageHero
+        badge="Provider directory"
+        badgeIcon={Users}
+        title="Meet our providers"
+        subtitle="Browse professionals who list their services on Servicely — compare categories, portfolios and starting prices before you book."
+      />
+
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        {loading ? (
+          <div>
+            <p className="sr-only" role="status">
+              Loading providers…
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </div>
+        ) : failed ? (
+          <EmptyState
+            icon={Lock}
+            title="We couldn't load providers right now"
+            description="Sign in or browse the public service catalogue while we reconnect you."
+            action={
+              <div className="flex flex-col items-center gap-2 sm:flex-row">
+                <Link to="/login" className="btn-primary">
+                  Login
+                </Link>
+                <Link to="/services" className="btn-outline">
+                  Browse services
+                </Link>
+              </div>
+            }
+          />
+        ) : providers.length === 0 ? (
+          <EmptyState
+            icon={Store}
+            title="No providers yet"
+            description="Providers appear here once their services are approved. Be the first to offer a service on Servicely."
+            action={
+              <Link to="/signup" className="btn-primary">
+                Become a provider
+              </Link>
+            }
+          />
+        ) : (
+          <>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p
+                aria-live="polite"
+                className="text-sm text-slate-500 dark:text-ink-400"
+              >
+                {filtered.length}{' '}
+                {filtered.length === 1 ? 'provider' : 'providers'} found
+              </p>
+              <SearchBar
+                className="sm:w-72"
+                value={search}
+                onChange={setSearch}
+                placeholder="Search providers..."
+              />
+            </div>
+
+            {filtered.length === 0 ? (
+              <EmptyState
+                icon={SearchX}
+                title="No providers match your search"
+                description="Try a different name or category."
+                action={
+                  <Button variant="outline" onClick={() => setSearch('')}>
+                    Clear search
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {filtered.map((provider, i) => (
+                  <motion.div
+                    key={providerId(provider)}
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      delay: Math.min(i, 11) * 0.04,
+                      duration: 0.35,
+                    }}
+                  >
+                    <MarketplaceProviderCard provider={provider} />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
       <Footer />
     </div>
   );
 }
+
+/* =========================================================
+   HOW IT WORKS (/how-it-works)
+========================================================= */
+
+const howItWorksSteps = [
+  {
+    icon: Compass,
+    title: 'Discover providers',
+    description:
+      'Browse the service catalogue by category — photography, videography, graphic design and makeup. Open a provider profile to see real work samples, ratings and starting prices.',
+    points: [
+      'Filter by category or search by name',
+      'Compare portfolios, reviews and pricing',
+    ],
+  },
+  {
+    icon: CalendarCheck,
+    title: 'Book a service',
+    description:
+      'Found the right professional? Pick your preferred date, time and location, share the details of your event, and send your booking request directly to the provider.',
+    points: [
+      'Choose a date that works for you',
+      'Add notes so the provider can prepare',
+    ],
+  },
+  {
+    icon: Wallet,
+    title: 'Pay securely with Paystack',
+    description:
+      'Once your booking is confirmed, complete your payment through Paystack’s secure checkout. Every transaction is encrypted, and you receive a confirmation as soon as it goes through.',
+    points: [
+      'Trusted Paystack payment processing',
+      'Clear pricing — no surprises',
+    ],
+  },
+  {
+    icon: Star,
+    title: 'Rate & review',
+    description:
+      'After the service is delivered, rate your provider and leave an honest review. Your feedback keeps the marketplace trustworthy for the whole ABUAD community.',
+    points: [
+      'Reviews come from completed bookings',
+      'Help other students choose with confidence',
+    ],
+  },
+];
 
 export function HowItWorksPage() {
-  const steps = [
-    { icon: Search, title: 'Find a Service', desc: 'Search for the service you need from our categories — photography, videography, design, and makeup.' },
-    { icon: Users, title: 'Choose a Provider', desc: 'Compare profiles, portfolios, ratings and prices to find the perfect match for your needs.' },
-    { icon: Calendar, title: 'Book Your Service', desc: 'Select your preferred date, time and location. Add any special requests and submit your booking.' },
-    { icon: Star, title: 'Get the Service & Review', desc: 'After the service is completed, leave a rating and review to help other students choose.' },
-  ];
-
   return (
-    <div className="min-h-screen bg-ink-50">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
       <PublicNavbar />
-      <section className="relative overflow-hidden border-b border-ink-100 bg-white">
-        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-primary-100/50 blur-3xl" />
-        <div className="relative mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:py-24">
-          <span className="badge bg-primary-100 text-primary-700 mb-4">Simple Process</span>
-          <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-ink-50 sm:text-5xl">How Servicely Works</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-ink-600">
-            From discovery to delivery, we make booking professional services effortless for ABUAD students.
-          </p>
-        </div>
-      </section>
 
-      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="space-y-8">
-          {steps.map((step, i) => (
-            <motion.div
+      <PageHero
+        badge="Simple process"
+        badgeIcon={Sparkles}
+        title="How Servicely works"
+        subtitle="From discovery to delivery, booking a professional service on campus takes just four steps."
+      />
+
+      <section className="mx-auto max-w-5xl px-4 py-14 sm:px-6 sm:py-16">
+        <ol className="space-y-12 sm:space-y-16">
+          {howItWorksSteps.map((step, i) => (
+            <motion.li
               key={step.title}
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-              className="flex items-start gap-6"
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-80px' }}
+              transition={{ duration: 0.45, delay: 0.05 }}
+              className="flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:gap-10"
             >
-              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-primary-600 text-white shadow-md">
-                <step.icon className="h-7 w-7" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-primary-600">Step {i + 1}</span>
+              <div
+                className={`relative shrink-0 ${i % 2 === 1 ? 'sm:order-last' : ''}`}
+              >
+                <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-lavender text-brand-600 shadow-soft dark:bg-brand-950 dark:text-brand-300 sm:h-28 sm:w-28">
+                  <step.icon className="h-10 w-10 sm:h-12 sm:w-12" />
                 </div>
-                <h3 className="mt-1 text-xl font-bold text-ink-900 dark:text-ink-50">{step.title}</h3>
-                <p className="mt-2 text-ink-600">{step.desc}</p>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute -right-3 -top-4 select-none text-5xl font-black text-brand-200 dark:text-brand-800/70"
+                >
+                  {i + 1}
+                </span>
               </div>
-            </motion.div>
+
+              <div className="min-w-0 flex-1">
+                <Badge tone="brand">Step {i + 1}</Badge>
+                <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-ink-50 sm:text-2xl">
+                  {step.title}
+                </h2>
+                <p className="mt-2 leading-relaxed text-slate-500 dark:text-ink-400">
+                  {step.description}
+                </p>
+                <ul className="mt-4 space-y-2">
+                  {step.points.map((point) => (
+                    <li
+                      key={point}
+                      className="flex items-start gap-2 text-sm font-medium text-slate-700 dark:text-ink-300"
+                    >
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-600 dark:text-brand-400" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.li>
           ))}
-        </div>
+        </ol>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-        <div className="rounded-3xl bg-gradient-to-br from-primary-600 to-primary-800 p-8 text-center sm:p-12">
-          <h2 className="font-display text-2xl font-bold text-white sm:text-3xl">Ready to get started?</h2>
-          <p className="mx-auto mt-2 max-w-xl text-primary-100">Browse our verified providers and book your next service today.</p>
-          <Link to="/services" className="btn-accent btn-lg mt-6">
-            Browse Services <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </section>
+      <CtaBand
+        title="Ready to get started?"
+        subtitle="Browse verified providers, book your next service and pay securely — all in one place."
+        primaryLabel="Browse Services"
+        primaryTo="/services"
+        secondaryLabel="Become a Provider"
+        secondaryTo="/signup"
+      />
+
       <Footer />
     </div>
   );
 }
+
+/* =========================================================
+   ABOUT (/about)
+========================================================= */
+
+const trustPoints = [
+  {
+    icon: BadgeCheck,
+    title: 'Verified providers',
+    description:
+      'Every provider is reviewed and approved before they can list services, so students book from real, accountable professionals.',
+  },
+  {
+    icon: Wallet,
+    title: 'Secure payments',
+    description:
+      'Payments run through Paystack’s secure checkout with bank-grade encryption — no cash hand-offs, no guesswork.',
+  },
+  {
+    icon: Star,
+    title: 'Honest reviews',
+    description:
+      'Ratings and reviews come from students who actually completed bookings, so you can trust the feedback you read.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Transparent pricing',
+    description:
+      'See starting prices upfront on every listing. What you see before you book is what you pay for — no hidden fees.',
+  },
+];
 
 export function AboutPage() {
   return (
-    <div className="min-h-screen bg-ink-50">
+    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
       <PublicNavbar />
-      <section className="relative overflow-hidden border-b border-ink-100 bg-white">
-        <div className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-accent-100/50 blur-3xl" />
-        <div className="relative mx-auto max-w-4xl px-4 py-16 text-center sm:px-6 lg:py-24">
-          <span className="badge bg-accent-100 text-accent-700 mb-4">Our Story</span>
-          <h1 className="font-display text-3xl font-bold text-ink-900 dark:text-ink-50 sm:text-5xl">About Servicely</h1>
-          <p className="mx-auto mt-4 max-w-2xl text-lg text-ink-600">
-            We are building Nigeria's most trusted student service marketplace — starting at ABUAD and expanding nationwide.
-          </p>
+
+      <PageHero
+        badge="Our mission"
+        badgeIcon={Heart}
+        title="Built for the ABUAD community"
+        subtitle="Servicely connects students who need professional services with verified providers who deliver them — transparently, securely and right here on campus."
+      />
+
+      {/* Mission */}
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-16">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-ink-50 sm:text-3xl">
+              Why Servicely exists
+            </h2>
+          </div>
+          <div className="space-y-5 text-base leading-relaxed text-slate-600 dark:text-ink-300 sm:text-lg">
+            <p>
+              Finding a photographer for your birthday, a designer for your
+              project or a makeup artist for an event shouldn't mean scrolling
+              through group chats and hoping for the best. Most students either
+              don't know who is trustworthy, or can't tell what a service
+              should really cost.
+            </p>
+            <p>
+              Servicely fixes that. We bring verified service providers and
+              students onto one marketplace where portfolios, reviews and
+              prices are visible upfront — so every booking starts with trust
+              and ends with a secure, confirmed payment.
+            </p>
+            <p>
+              We're starting with the ABUAD community, with the goal of
+              becoming the standard way students across Nigeria discover and
+              book professional services.
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="prose prose-lg max-w-none">
-          <h2 className="font-display text-2xl font-bold text-ink-900 dark:text-ink-50">Our Mission</h2>
-          <p className="mt-3 text-ink-600">
-            Servicely connects students who need professional services with verified service providers who offer them. We believe finding a photographer, videographer, designer, or makeup artist should be as simple as ordering food online — transparent, secure, and reliable.
-          </p>
-          <h2 className="mt-8 font-display text-2xl font-bold text-ink-900">Why Servicely?</h2>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {[
-              { icon: CheckCircle2, title: 'Verified Providers', desc: 'Every provider is reviewed and approved before joining.' },
-              { icon: Star, title: 'Real Reviews', desc: 'Genuine feedback from students who completed bookings.' },
-              { icon: Users, title: 'Student-First', desc: 'Built for the ABUAD community with student needs in mind.' },
-              { icon: ArrowRight, title: 'Scaling Nationwide', desc: 'Designed to expand to other universities and cities.' },
-            ].map((item) => (
-              <div key={item.title} className="card p-5">
-                <item.icon className="h-6 w-6 text-primary-600" />
-                <h3 className="mt-2 font-semibold text-ink-900">{item.title}</h3>
-                <p className="mt-1 text-sm text-ink-500">{item.desc}</p>
-              </div>
+      {/* Trust */}
+      <section className="border-y border-slate-200/70 bg-white py-14 dark:border-ink-800 dark:bg-ink-900/50 sm:py-16">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <SectionHeading
+            title="Why students trust Servicely"
+            subtitle="Trust isn't a feature bolted on at the end — it's built into every step of the marketplace."
+            align="center"
+          />
+          <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {trustPoints.map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{ duration: 0.4, delay: i * 0.06 }}
+                className="card p-6"
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-4 font-semibold text-slate-900 dark:text-ink-50">
+                  {item.title}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-slate-500 dark:text-ink-400">
+                  {item.description}
+                </p>
+              </motion.div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* Who it's for */}
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
+        <SectionHeading
+          title="A marketplace for both sides of campus"
+          subtitle="Whether you need a service or you offer one, Servicely is built around you."
+          align="center"
+        />
+        <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.4 }}
+            className="card p-6 sm:p-8"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+              <Search className="h-5 w-5" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-ink-50">
+              For students
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-ink-400">
+              Discover verified providers, compare work and prices, book a
+              service in minutes and pay securely with Paystack — then share
+              your experience with honest reviews.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link to="/services" className="btn-primary btn-sm">
+                Browse services
+              </Link>
+              <Link to="/how-it-works" className="btn-outline btn-sm">
+                See how it works
+              </Link>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ duration: 0.4, delay: 0.08 }}
+            className="card p-6 sm:p-8"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+              <Users className="h-5 w-5" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-ink-50">
+              For providers
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500 dark:text-ink-400">
+              Showcase your portfolio, set your own prices, receive booking
+              requests from serious students and get paid through a secure,
+              trackable flow — no chasing people for payment.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link to="/signup" className="btn-primary btn-sm">
+                Become a provider
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      <CtaBand
+        title="Join Servicely today"
+        subtitle="Create a free account to book services or start offering yours to the ABUAD community."
+        primaryLabel="Get Started"
+        primaryTo="/signup"
+        secondaryLabel="Browse Services"
+        secondaryTo="/services"
+      />
+
       <Footer />
     </div>
   );

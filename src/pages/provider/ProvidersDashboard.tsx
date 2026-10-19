@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
   ArrowUpRight,
+  BadgeCheck,
   Calendar,
+  Camera,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -12,24 +20,27 @@ import {
   Image as ImageIcon,
   Inbox,
   MapPin,
-  Package,
   Plus,
   RefreshCw,
   Sparkles,
   Star,
+  Store,
   TrendingUp,
   User,
+  Wallet,
+  type LucideIcon,
 } from "lucide-react";
 
-import {
-  DashboardLayout,
-  StatCard,
-} from "@/components/DashboardLayout";
+import { DashboardLayout, StatCard } from "@/components/DashboardLayout";
 
 import {
-  StatusBadge,
-  VerifiedBadge,
-} from "@/components/shared";
+  Avatar,
+  BookingStatusBadge,
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  cn,
+} from "@/components/ui";
 
 import { useAuth } from "@/context/AppContext";
 import { formatNaira } from "@/data/mockData";
@@ -45,9 +56,9 @@ const API_URL =
 /*
  * Backend endpoints used by this dashboard:
  *
- *   GET /provider/eachprofile/:userId    → provider profile
- *   GET /provider/services               → provider's services
- *   GET /bookings/provider-bookings      → provider's bookings
+ *   GET /provider/eachprofiledetails/:userId  → provider profile
+ *   GET /provider/services                    → provider's services
+ *   GET /bookings/provider-bookings           → provider's bookings
  */
 const PROFILE_ENDPOINT = "/provider/eachprofiledetails";
 const SERVICES_ENDPOINT = "/provider/services";
@@ -56,7 +67,11 @@ const REFRESH_INTERVAL = 30_000;
 
 /* How many items each section shows before "+X more" */
 const SERVICES_PREVIEW_LIMIT = 3;
-const BOOKINGS_PREVIEW_LIMIT = 3;
+const BOOKINGS_PREVIEW_LIMIT = 5;
+
+/* Max number of individual month bars in the earnings chart
+   (older months are aggregated into a single "Earlier" bar). */
+const CHART_MAX_BARS = 7;
 
 type AnyObject = Record<string, any>;
 
@@ -96,6 +111,8 @@ interface Booking {
   price?: number | string;
   amount?: number | string;
   providerAmount?: number | string;
+  paidAt?: string;
+  paymentDate?: string;
   createdAt?: string;
 }
 
@@ -191,6 +208,33 @@ const getBookingSortTime = (booking: Booking) => {
   return Number.isNaN(time) ? 0 : time;
 };
 
+/*
+ * When the money for a booking was received — prefers explicit
+ * payment timestamps, falls back to the booking creation date.
+ * Returns 0 when nothing parseable exists (entry is then skipped).
+ */
+const getEarningsTime = (booking: Booking) => {
+  const raw =
+    booking.paidAt ||
+    booking.paymentDate ||
+    booking.createdAt ||
+    booking.date ||
+    booking.bookingDate ||
+    0;
+
+  const time = new Date(raw).getTime();
+
+  return Number.isNaN(time) || time <= 0 ? 0 : time;
+};
+
+const getBookingAmount = (booking: Booking) =>
+  Number(
+    booking.providerAmount ??
+    booking.amount ??
+    booking.price ??
+    0
+  );
+
 const isPending = (status?: string) =>
   ["pending", "requested"].includes(
     String(status || "").toLowerCase()
@@ -201,29 +245,8 @@ const isCancelled = (status?: string) =>
     String(status || "").toLowerCase()
   );
 
-const isCompleted = (status?: string) =>
-  ["completed", "reviewed", "done"].includes(
-    String(status || "").toLowerCase()
-  );
-
 const isPaid = (booking: Booking) =>
   String(booking.paymentStatus || "").toLowerCase() === "paid";
-
-/*
- * Recent booking requests are:
- *   - paid
- *   - not completed / not reviewed
- *   - not cancelled
- */
-const isRecentPaidRequest = (booking: Booking) => {
-  const status = String(booking.status || "").toLowerCase();
-
-  return (
-    isPaid(booking) &&
-    !isCompleted(status) &&
-    !isCancelled(status)
-  );
-};
 
 const isActiveService = (service: Service) => {
   const status = String(service.status || "").toLowerCase();
@@ -240,6 +263,30 @@ const isActiveService = (service: Service) => {
       !status
     )
   );
+};
+
+/* Backend statuses → BookingStatusBadge keys */
+const normalizeBookingStatus = (booking: Booking) =>
+  String(
+    booking.status || booking.bookingStatus || "pending"
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+
+/* ₦1.2m / ₦250k / ₦900 — for tight chart labels only */
+const compactNaira = (value: number) => {
+  if (value >= 1_000_000) {
+    return `₦${(value / 1_000_000).toFixed(
+      value >= 10_000_000 ? 0 : 1
+    )}m`;
+  }
+
+  if (value >= 1_000) {
+    return `₦${Math.round(value / 1_000)}k`;
+  }
+
+  return `₦${value}`;
 };
 
 
@@ -349,23 +396,6 @@ export function ProvidersDashboard() {
           );
         }
 
-        /* =====================================================
-           DEBUG LOGS — rating diagnostic
-           
-           These will show you exactly what the API returned.
-           Remove once the rating is displaying correctly.
-        ===================================================== */
-        console.log("🔍 Profile from API:", profile);
-        console.log("🔍 provider.rating:", profile?.rating);
-        console.log(
-          "🔍 provider.averageRating:",
-          profile?.averageRating
-        );
-        console.log(
-          "🔍 provider.reviewCount:",
-          profile?.reviewCount
-        );
-
         /* SERVICES */
         if (!servicesResponse.ok) {
           throw new Error(
@@ -470,25 +500,18 @@ export function ProvidersDashboard() {
   }, [loadDashboard]);
 
   /* =========================================================
-     DERIVED DATA
+     DERIVED DATA — everything below is computed from the
+     real profile / services / bookings returned by the API.
   ========================================================= */
 
-  /*
-   * All active services (any order). Used for header counts.
-   * Declared here so it's available in the JSX below.
-   */
   const activeServices = useMemo(
     () => services.filter(isActiveService),
     [services]
   );
 
-  /*
-   * Active services sorted by most recent upload first
-   * (createdAt, falling back to updatedAt).
-   */
   const sortedActiveServices = useMemo(
     () =>
-      services
+      [...services]
         .filter(isActiveService)
         .sort(
           (a, b) =>
@@ -510,68 +533,83 @@ export function ProvidersDashboard() {
   const extraServicesCount =
     sortedActiveServices.length - previewServices.length;
 
-  /*
-   * Recent booking requests — paid but not completed.
-   * Sorted by newest first.
-   */
-  const recentPaidRequests = useMemo(
+  /* Most recent bookings of any status, newest first */
+  const recentBookings = useMemo(
     () =>
-      bookings
-        .filter(isRecentPaidRequest)
-        .sort(
-          (a, b) =>
-            getBookingSortTime(b) -
-            getBookingSortTime(a)
-        ),
+      [...bookings].sort(
+        (a, b) =>
+          getBookingSortTime(b) -
+          getBookingSortTime(a)
+      ),
     [bookings]
   );
 
   const previewBookings = useMemo(
     () =>
-      recentPaidRequests.slice(
+      recentBookings.slice(
         0,
         BOOKINGS_PREVIEW_LIMIT
       ),
-    [recentPaidRequests]
+    [recentBookings]
   );
 
   const extraBookingsCount =
-    recentPaidRequests.length - previewBookings.length;
+    bookings.length - previewBookings.length;
 
   const pendingBookings = useMemo(
-    () => bookings.filter((booking) => isPending(booking.status)),
+    () =>
+      bookings.filter((booking) =>
+        isPending(
+          booking.status || booking.bookingStatus
+        )
+      ),
+    [bookings]
+  );
+
+  /* Real money received: paid, non-cancelled bookings only */
+  const paidBookings = useMemo(
+    () =>
+      bookings.filter(
+        (booking) =>
+          isPaid(booking) &&
+          !isCancelled(booking.status)
+      ),
     [bookings]
   );
 
   const totalEarnings = useMemo(
     () =>
-      bookings.reduce((total, booking) => {
-        if (!isPaid(booking) || isCancelled(booking.status)) {
-          return total;
-        }
-
-        return (
-          total +
-          Number(
-            booking.providerAmount ??
-            booking.amount ??
-            booking.price ??
-            0
-          )
-        );
-      }, 0),
-    [bookings]
+      paidBookings.reduce(
+        (total, booking) =>
+          total + getBookingAmount(booking),
+        0
+      ),
+    [paidBookings]
   );
 
   /*
-   * ⭐ RATING
-   *
-   * The backend now returns `rating` (computed live from
-   * reviews) AND `averageRating` (same value) AND
-   * `reviewCount`.
-   *
-   * We read `rating` first, then fall back to
-   * `averageRating`, then 0.
+   * Chart input: paid bookings that carry both a real amount
+   * and a parseable date. Nothing is invented — months without
+   * payments simply render a zero bar.
+   */
+  const earningsEntries = useMemo<EarningsEntry[]>(
+    () =>
+      paidBookings
+        .map((booking) => ({
+          time: getEarningsTime(booking),
+          amount: getBookingAmount(booking),
+        }))
+        .filter(
+          (entry) =>
+            entry.time > 0 && entry.amount > 0
+        ),
+    [paidBookings]
+  );
+
+  /*
+   * ⭐ RATING — read from the live profile the backend
+   * returns (`rating`, falling back to `averageRating`).
+   * When the profile provides none, we show "—".
    */
   const averageRating = Number(
     provider?.rating ??
@@ -582,6 +620,8 @@ export function ProvidersDashboard() {
   const reviewCount = Number(
     provider?.reviewCount ?? 0
   );
+
+  const hasRating = averageRating > 0;
 
   const providerName =
     provider?.name ||
@@ -595,39 +635,46 @@ export function ProvidersDashboard() {
     provider?.avatar ||
     provider?.profileImage ||
     authUser?.avatar ||
-    authUser?.profileImage ||
     "";
 
   const verified =
     provider?.verified === true ||
     provider?.status === "verified";
 
+  const hour = new Date().getHours();
+  const greeting =
+    hour < 12
+      ? "Good morning"
+      : hour < 17
+        ? "Good afternoon"
+        : "Good evening";
+
   /* Loading screen */
   if (loading) {
     return (
       <DashboardLayout role="provider" navItems={providerNavItems}>
-        <div className="space-y-6">
-          <div className="animate-pulse rounded-3xl border border-ink-200 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
-            <div className="flex items-center gap-4">
-              <div className="h-16 w-16 rounded-full bg-ink-200 dark:bg-ink-700" />
-              <div className="flex-1 space-y-3">
-                <div className="h-4 w-32 rounded bg-ink-200 dark:bg-ink-700" />
-                <div className="h-7 w-48 max-w-full rounded bg-ink-200 dark:bg-ink-700" />
-                <div className="h-3 w-56 max-w-full rounded bg-ink-200 dark:bg-ink-700" />
-              </div>
-            </div>
-          </div>
+        <div
+          className="space-y-6"
+          aria-busy="true"
+          aria-label="Loading your dashboard"
+        >
+          <Skeleton className="h-48 w-full rounded-3xl sm:h-52" />
 
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[1, 2, 3, 4].map((item) => (
-              <div
+              <Skeleton
                 key={item}
-                className="h-28 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800"
+                className="h-32 rounded-2xl"
               />
             ))}
           </div>
 
-          <div className="h-64 animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800" />
+          <Skeleton className="h-72 rounded-2xl" />
+
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+            <Skeleton className="h-80 rounded-2xl xl:col-span-2" />
+            <Skeleton className="h-80 rounded-2xl" />
+          </div>
         </div>
       </DashboardLayout>
     );
@@ -635,190 +682,329 @@ export function ProvidersDashboard() {
 
   return (
     <DashboardLayout role="provider" navItems={providerNavItems}>
-      {/* WELCOME */}
+      {/* ============================ WELCOME BANNER ============================ */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="relative mb-8 overflow-hidden rounded-3xl border border-ink-200/70 bg-white shadow-sm dark:border-ink-800 dark:bg-ink-900"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-800 text-white shadow-soft dark:from-brand-800 dark:via-brand-900 dark:to-brand-950"
       >
-        <div className="pointer-events-none absolute -right-20 -top-20 h-60 w-60 rounded-full bg-primary-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-28 left-1/3 h-56 w-56 rounded-full bg-accent-500/10 blur-3xl" />
+        {/* Decorative service-themed accents */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+        >
+          <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-white/10" />
+          <div className="absolute -bottom-28 -left-16 h-64 w-64 rounded-full bg-white/5" />
+          <div className="absolute right-[20%] top-5 flex h-14 w-14 items-center justify-center rounded-full bg-white/10">
+            <Camera className="h-6 w-6 text-white/70" />
+          </div>
+          <div className="absolute bottom-8 right-[7%] hidden h-20 w-20 items-center justify-center rounded-full bg-white/10 sm:flex">
+            <Sparkles className="h-8 w-8 text-white/60" />
+          </div>
+          <div className="absolute bottom-3 right-[34%] hidden h-11 w-11 items-center justify-center rounded-full bg-white/10 md:flex">
+            <Store className="h-5 w-5 text-white/70" />
+          </div>
+          <div className="absolute -left-8 top-10 hidden h-28 w-28 rounded-full border border-white/10 md:block" />
+        </div>
 
         <div className="relative flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
+          <div className="flex min-w-0 items-start gap-4">
             <Link
               to="/provider/profile"
-              className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink-100 ring-4 ring-primary-500/15 dark:bg-ink-800"
+              aria-label="Open your provider profile"
+              className="relative shrink-0"
             >
-              {profileImage ? (
-                <img
-                  src={profileImage}
-                  alt={`${firstName}'s profile`}
-                  className="h-full w-full object-cover"
-                  onError={(event) => {
-                    event.currentTarget.style.display = "none";
-                  }}
-                />
-              ) : (
-                <User className="h-8 w-8 text-primary-600 dark:text-primary-400" />
+              <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/15 ring-2 ring-white/30 sm:h-16 sm:w-16">
+                {profileImage ? (
+                  <img
+                    src={profileImage}
+                    alt={`${firstName}'s profile`}
+                    className="h-full w-full object-cover"
+                    onError={(event) => {
+                      event.currentTarget.style.display = "none";
+                    }}
+                  />
+                ) : (
+                  <User className="h-7 w-7 text-white" />
+                )}
+              </span>
+
+              {verified && (
+                <span className="absolute -bottom-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm">
+                  <BadgeCheck className="h-4 w-4 text-brand-600" />
+                </span>
               )}
             </Link>
 
             <div className="min-w-0">
-              <div className="mb-1 flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-primary-600 dark:text-primary-400">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-white/90 backdrop-blur">
                   Provider Dashboard
                 </span>
-                {verified && <VerifiedBadge />}
+
+                {verified && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-semibold text-white/90 backdrop-blur">
+                    <BadgeCheck className="h-3.5 w-3.5" />
+                    Verified
+                  </span>
+                )}
               </div>
 
-              <h1 className="text-2xl font-bold tracking-tight text-ink-900 dark:text-white sm:text-3xl">
-                Hello,{" "}
-                <span className="bg-gradient-to-r from-primary-600 to-accent-500 bg-clip-text text-transparent">
+              <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                {greeting},{" "}
+                <span className="text-brand-100">
                   {firstName}
                 </span>{" "}
                 👋
               </h1>
 
-              <p className="mt-1 text-sm leading-6 text-ink-500 dark:text-ink-400">
-                Manage your bookings, services, and performance in one place.
+              <p className="mt-1.5 max-w-xl text-sm leading-6 text-white/80 sm:text-base">
+                Every booking grows your campus business —
+                keep your services sharp and your calendar
+                open, and watch the work come to you.
               </p>
 
-              <p className="mt-2 flex items-center gap-2 text-xs text-ink-500 dark:text-ink-400">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Dashboard connected
+              <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                  </span>
+                  Live
+                </span>
+
                 {lastUpdated && (
                   <span>
-                    · Updated{" "}
+                    Updated{" "}
                     {lastUpdated.toLocaleTimeString("en-NG", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
                   </span>
                 )}
+
+                <span className="hidden sm:inline">
+                  · {activeServices.length} service
+                  {activeServices.length === 1 ? "" : "s"}{" "}
+                  published · {bookings.length} booking
+                  {bookings.length === 1 ? "" : "s"}
+                </span>
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex shrink-0 flex-wrap gap-2.5">
+            <Link
+              to="/provider/profile"
+              className="btn bg-white px-4 py-2.5 text-sm text-brand-700 shadow-sm hover:bg-brand-50"
+            >
+              View Public Profile
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+
+            <Link
+              to="/provider/add-service"
+              className="btn border border-white/30 bg-white/10 px-4 py-2.5 text-sm text-white backdrop-blur hover:bg-white/20"
+            >
+              <Plus className="h-4 w-4" />
+              Add Service
+            </Link>
+
             <button
               type="button"
               onClick={() => void loadDashboard(true)}
               disabled={refreshing}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:border-primary-300 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:text-ink-200"
+              aria-label="Refresh dashboard data"
+              className="btn border border-white/20 px-3.5 py-2.5 text-sm text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw
-                className={`h-4 w-4 ${refreshing ? "animate-spin" : ""
-                  }`}
+                className={cn(
+                  "h-4 w-4",
+                  refreshing && "animate-spin"
+                )}
               />
               Refresh
             </button>
-
-            <Link
-              to="/provider/add-service"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-700"
-            >
-              <Plus className="h-4 w-4" />
-              Add Service
-              <ArrowRight className="h-4 w-4" />
-            </Link>
           </div>
         </div>
       </motion.section>
 
-      {/* ERROR */}
+      {/* ============================ ERROR BANNER ============================ */}
       {error && (
         <div
           role="alert"
-          className="mb-6 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+          className="mt-6 flex flex-col gap-3 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700 sm:flex-row sm:items-center sm:justify-between dark:border-danger-500/25 dark:bg-danger-500/10 dark:text-danger-200"
         >
           <p>{error}</p>
           <button
             type="button"
             onClick={() => void loadDashboard(true)}
-            className="inline-flex shrink-0 items-center gap-2 font-semibold"
+            disabled={refreshing}
+            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-danger-200 bg-white px-3 py-1.5 text-xs font-semibold text-danger-700 transition hover:bg-danger-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-danger-500/30 dark:bg-transparent dark:text-danger-200 dark:hover:bg-danger-500/15"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw
+              className={cn(
+                "h-3.5 w-3.5",
+                refreshing && "animate-spin"
+              )}
+            />
             Try again
           </button>
         </div>
       )}
 
-      {/* STAT CARDS */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35 }}
-        className="grid grid-cols-2 gap-4 lg:grid-cols-4"
-      >
+      {/* ============================ STATS ============================ */}
+      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
           label="Total Bookings"
-          value={String(bookings.length)}
+          value={bookings.length.toLocaleString("en-NG")}
           icon={ClipboardList}
-          color="primary"
+          color="brand"
+        />
+
+        <StatCard
+          label="Total Earnings"
+          value={formatNaira(totalEarnings)}
+          icon={DollarSign}
+          color="success"
+          trend={
+            paidBookings.length > 0
+              ? `${paidBookings.length} paid`
+              : undefined
+          }
         />
 
         <StatCard
           label="Pending Requests"
           value={String(pendingBookings.length)}
           icon={Inbox}
-          color="accent"
+          color="warning"
         />
 
         <StatCard
-          label="Paid Earnings"
-          value={formatNaira(totalEarnings)}
-          icon={DollarSign}
-          color="sky"
+          label="Average Rating"
+          value={hasRating ? averageRating.toFixed(1) : "—"}
+          icon={Star}
+          color="rose"
+          trend={
+            reviewCount > 0
+              ? `${reviewCount} review${reviewCount === 1 ? "" : "s"}`
+              : undefined
+          }
         />
+      </div>
 
-        <RatingCard
-          rating={averageRating}
-          reviewCount={reviewCount}
-        />
-      </motion.div>
+      {/* ============================ EARNINGS OVERVIEW ============================ */}
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.05 }}
+        aria-labelledby="earnings-heading"
+        className="card mt-6 overflow-hidden"
+      >
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6 dark:border-ink-800">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+              <TrendingUp className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h2
+                id="earnings-heading"
+                className="text-base font-bold tracking-tight text-slate-900 sm:text-lg dark:text-ink-50"
+              >
+                Earnings Overview
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-400">
+                Paid bookings grouped by month
+              </p>
+            </div>
+          </div>
 
-      {/* RECENT BOOKING REQUESTS + ACTIVE SERVICES */}
-      <div className="mt-8 grid grid-cols-1 gap-6 xl:grid-cols-3">
-        {/* RECENT BOOKING REQUESTS */}
+          <div className="sm:text-right">
+            <p className="text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-ink-50">
+              {formatNaira(totalEarnings)}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-ink-400">
+              Total received · {paidBookings.length} paid booking
+              {paidBookings.length === 1 ? "" : "s"}
+            </p>
+          </div>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          {error ? (
+            <ErrorState
+              message={error}
+              onRetry={() => void loadDashboard(true)}
+            />
+          ) : earningsEntries.length === 0 ? (
+            <EmptyState
+              icon={Wallet}
+              title="Earnings will appear here once bookings are paid"
+              description="As soon as customers pay for your services, your monthly earnings chart will start to build itself."
+              action={
+                <Link to="/provider/add-service" className="btn-primary btn-sm">
+                  Add a service
+                </Link>
+              }
+            />
+          ) : (
+            <EarningsChart entries={earningsEntries} />
+          )}
+        </div>
+      </motion.section>
+
+      {/* ==================== RECENT BOOKINGS + SERVICES ==================== */}
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-3">
+        {/* ---------- RECENT BOOKING REQUESTS ---------- */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+          aria-labelledby="recent-bookings-heading"
           className="min-w-0 xl:col-span-2"
         >
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                </span>
-                <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-                  Recent Booking Requests
-                </h2>
-              </div>
+          <PanelHeading
+            icon={CheckCircle2}
+            tone="success"
+            title="Recent Booking Requests"
+            subtitle="Your latest customer bookings, newest first"
+            action={
+              <Link
+                to="/provider/bookings"
+                className="group inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-700 dark:border-ink-700 dark:bg-transparent dark:text-ink-300 dark:hover:border-brand-700 dark:hover:text-brand-300"
+              >
+                View all
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            }
+          />
 
-              <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-                Paid bookings waiting to be completed.
-              </p>
-            </div>
-
-            <Link
-              to="/provider/bookings"
-              className="group inline-flex shrink-0 items-center gap-1 rounded-xl border border-ink-200 bg-white px-3 py-1.5 text-xs font-semibold text-ink-700 transition hover:border-primary-300 hover:text-primary-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:border-primary-700 dark:hover:text-primary-300"
-            >
-              View all
-              <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-            </Link>
+          <div id="recent-bookings-heading" className="sr-only">
+            Recent booking requests
           </div>
 
-          {previewBookings.length === 0 ? (
-            <EmptyBookingsCard />
+          {error && bookings.length === 0 ? (
+            <ErrorState
+              message={error}
+              onRetry={() => void loadDashboard(true)}
+            />
+          ) : previewBookings.length === 0 ? (
+            <EmptyState
+              icon={Calendar}
+              title="No booking requests yet"
+              description="When customers book one of your services, their request will appear here so you can follow it from start to finish."
+              action={
+                <Link to="/provider/services" className="btn-outline btn-sm">
+                  Manage your services
+                </Link>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {previewBookings.map((booking, index) => (
-                <BookingRequestRow
+                <BookingRow
                   key={
                     getId(booking) ||
                     `${index}-${getServiceName(booking)}`
@@ -831,10 +1017,10 @@ export function ProvidersDashboard() {
               {extraBookingsCount > 0 && (
                 <Link
                   to="/provider/bookings"
-                  className="group flex items-center justify-between rounded-2xl border border-dashed border-ink-300 bg-white px-4 py-3 text-sm font-semibold text-ink-600 transition hover:border-primary-400 hover:bg-primary-50/40 hover:text-primary-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:border-primary-700 dark:hover:bg-primary-950/20 dark:hover:text-primary-300"
+                  className="group flex items-center justify-between rounded-2xl border border-dashed border-brand-300 bg-lavender/60 px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-lavender dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300 dark:hover:bg-brand-950/50"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-100 text-xs font-bold text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
                       +{extraBookingsCount}
                     </span>
                     More booking
@@ -847,49 +1033,59 @@ export function ProvidersDashboard() {
           )}
         </motion.section>
 
-        {/* ACTIVE SERVICES */}
+        {/* ---------- ACTIVE SERVICES ---------- */}
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
+          transition={{ duration: 0.4, delay: 0.15 }}
+          aria-labelledby="services-heading"
           className="min-w-0"
         >
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
-                  <Sparkles className="h-3.5 w-3.5" />
-                </span>
-                <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-                  Active Services
-                </h2>
-              </div>
+          <PanelHeading
+            icon={Sparkles}
+            title="Your Services"
+            subtitle={
+              activeServices.length === 0
+                ? "Nothing published yet"
+                : `${activeServices.length} published · latest first`
+            }
+            action={
+              <Link
+                to="/provider/services"
+                aria-label="View all services"
+                className="group inline-flex shrink-0 items-center gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-brand-300 hover:text-brand-700 dark:border-ink-700 dark:bg-transparent dark:text-ink-300 dark:hover:border-brand-700 dark:hover:text-brand-300"
+              >
+                View all
+                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            }
+          />
 
-              <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-                {activeServices.length === 0
-                  ? "No services published"
-                  : `Latest ${Math.min(
-                    previewServices.length,
-                    activeServices.length
-                  )} of ${activeServices.length} published`}
-              </p>
-            </div>
-
-            <Link
-              to="/provider/services"
-              aria-label="View all services"
-              className="rounded-lg p-2 text-ink-500 transition hover:bg-ink-100 dark:hover:bg-ink-800"
-            >
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+          <div id="services-heading" className="sr-only">
+            Your services
           </div>
 
-          {previewServices.length === 0 ? (
-            <EmptyServicesCard />
+          {error && services.length === 0 ? (
+            <ErrorState
+              message={error}
+              onRetry={() => void loadDashboard(true)}
+            />
+          ) : previewServices.length === 0 ? (
+            <EmptyState
+              icon={ImageIcon}
+              title="No active services"
+              description="Add a service so customers can discover what you offer."
+              action={
+                <Link to="/provider/add-service" className="btn-primary btn-sm">
+                  <Plus className="h-4 w-4" />
+                  Add a service
+                </Link>
+              }
+            />
           ) : (
             <div className="space-y-3">
               {previewServices.map((service, index) => (
-                <ServiceCard
+                <ServiceRow
                   key={
                     getId(service) ||
                     `${service.title}-${index}`
@@ -902,10 +1098,10 @@ export function ProvidersDashboard() {
               {extraServicesCount > 0 && (
                 <Link
                   to="/provider/services"
-                  className="group flex items-center justify-between rounded-2xl border border-dashed border-primary-300 bg-primary-50/50 px-4 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 dark:border-primary-800 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-950/40"
+                  className="group flex items-center justify-between rounded-2xl border border-dashed border-brand-300 bg-lavender/60 px-4 py-3 text-sm font-semibold text-brand-700 transition hover:bg-lavender dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300 dark:hover:bg-brand-950/50"
                 >
                   <span className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-100 text-xs font-bold text-primary-700 dark:bg-primary-500/20 dark:text-primary-300">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-100 text-xs font-bold text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
                       +{extraServicesCount}
                     </span>
                     More service
@@ -919,62 +1115,369 @@ export function ProvidersDashboard() {
 
           <Link
             to="/provider/add-service"
-            className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-primary-300 bg-primary-50/50 py-3.5 text-sm font-semibold text-primary-600 transition hover:bg-primary-50 dark:border-primary-800 dark:bg-primary-950/20 dark:text-primary-400"
+            className="mt-4 flex items-center justify-center gap-2 rounded-2xl border border-dashed border-brand-300 bg-lavender/60 py-3.5 text-sm font-semibold text-brand-600 transition hover:bg-lavender dark:border-brand-800 dark:bg-brand-950/30 dark:text-brand-300 dark:hover:bg-brand-950/50"
           >
             <Plus className="h-4 w-4" />
             Add another service
           </Link>
         </motion.section>
       </div>
-
-      {/* KEEP PROFILE FRESH */}
-      <motion.section
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.15 }}
-        className="mt-6 rounded-3xl border border-ink-200/70 bg-white p-5 shadow-sm sm:p-6 dark:border-ink-800 dark:bg-ink-900"
-      >
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-400">
-              <TrendingUp className="h-5 w-5" />
-            </div>
-
-            <div>
-              <h2 className="font-bold text-ink-900 dark:text-white">
-                Keep your profile up to date
-              </h2>
-              <p className="mt-1 max-w-xl text-sm leading-6 text-ink-500 dark:text-ink-400">
-                Maintain your portfolio, availability, and services
-                to help customers decide to book you.
-              </p>
-              <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">
-                {reviewCount > 0
-                  ? `${reviewCount} review${reviewCount === 1 ? "" : "s"
-                  } received`
-                  : "Customer reviews will appear as they become available."}
-              </p>
-            </div>
-          </div>
-
-          <Link
-            to="/provider/profile"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-ink-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 dark:bg-white dark:text-ink-900"
-          >
-            Manage Profile
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </motion.section>
     </DashboardLayout>
   );
 }
 
+
 /* =========================================================
-   BOOKING REQUEST ROW
+   PANEL HEADING (section header used by the lower grid)
 ========================================================= */
 
-function BookingRequestRow({
+function PanelHeading({
+  icon: Icon,
+  title,
+  subtitle,
+  action,
+  tone = "brand",
+}: {
+  icon: LucideIcon;
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+  tone?: "brand" | "success";
+}) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-2.5">
+        <span
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+            tone === "success"
+              ? "bg-success-50 text-success-600 dark:bg-success-600/15 dark:text-success-200"
+              : "bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300"
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+
+        <div className="min-w-0">
+          <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-ink-50">
+            {title}
+          </h2>
+          {subtitle && (
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-400">
+              {subtitle}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {action}
+    </div>
+  );
+}
+
+
+/* =========================================================
+   EARNINGS CHART — pure CSS bars, no charting library.
+   Every value comes from real paid bookings.
+========================================================= */
+
+interface EarningsEntry {
+  time: number;
+  amount: number;
+}
+
+interface EarningsBucket {
+  key: string;
+  label: string;
+  fullLabel: string;
+  amount: number;
+}
+
+function buildEarningsBuckets(
+  entries: EarningsEntry[]
+): EarningsBucket[] {
+  if (entries.length === 0) return [];
+
+  const times = entries.map((entry) => entry.time);
+  const first = new Date(Math.min(...times));
+  const last = new Date(Math.max(...times));
+
+  /* Every calendar month between the first and last payment */
+  const months: Array<{ y: number; m: number }> = [];
+  const cursor = new Date(first.getFullYear(), first.getMonth(), 1);
+  const end = new Date(last.getFullYear(), last.getMonth(), 1);
+
+  while (
+    cursor.getTime() <= end.getTime() &&
+    months.length < 60
+  ) {
+    months.push({
+      y: cursor.getFullYear(),
+      m: cursor.getMonth(),
+    });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  const totals = new Map<string, number>();
+
+  for (const entry of entries) {
+    const date = new Date(entry.time);
+    const key = `${date.getFullYear()}-${date.getMonth()}`;
+    totals.set(key, (totals.get(key) || 0) + entry.amount);
+  }
+
+  /* Keep the chart readable: newest months individually,
+     everything older collapses into one "Earlier" bar. */
+  const startIdx = Math.max(
+    0,
+    months.length - CHART_MAX_BARS
+  );
+
+  const buckets: EarningsBucket[] = [];
+
+  if (startIdx > 0) {
+    let earlierAmount = 0;
+
+    for (const month of months.slice(0, startIdx)) {
+      earlierAmount +=
+        totals.get(`${month.y}-${month.m}`) || 0;
+    }
+
+    buckets.push({
+      key: "earlier",
+      label: "Earlier",
+      fullLabel: "Earlier months",
+      amount: earlierAmount,
+    });
+  }
+
+  const crossesYear =
+    months.length > 1 &&
+    months[0].y !== months[months.length - 1].y;
+
+  for (const month of months.slice(startIdx)) {
+    const date = new Date(month.y, month.m, 1);
+    const key = `${month.y}-${month.m}`;
+
+    buckets.push({
+      key,
+      label: crossesYear
+        ? `${date.toLocaleDateString("en-NG", {
+            month: "short",
+          })} ${String(month.y).slice(2)}`
+        : date.toLocaleDateString("en-NG", {
+            month: "short",
+          }),
+      fullLabel: date.toLocaleDateString("en-NG", {
+        month: "long",
+        year: "numeric",
+      }),
+      amount: totals.get(key) || 0,
+    });
+  }
+
+  return buckets;
+}
+
+function EarningsChart({
+  entries,
+}: {
+  entries: EarningsEntry[];
+}) {
+  const buckets = useMemo(
+    () => buildEarningsBuckets(entries),
+    [entries]
+  );
+
+  const maxAmount = buckets.reduce(
+    (max, bucket) => Math.max(max, bucket.amount),
+    0
+  );
+
+  const chartTotal = buckets.reduce(
+    (total, bucket) => total + bucket.amount,
+    0
+  );
+
+  const peak = buckets.reduce<EarningsBucket | null>(
+    (best, bucket) =>
+      !best || bucket.amount > best.amount
+        ? bucket
+        : best,
+    null
+  );
+
+  const latestTime = entries.reduce(
+    (latest, entry) => Math.max(latest, entry.time),
+    0
+  );
+
+  const latestPaymentLabel = latestTime
+    ? new Date(latestTime).toLocaleDateString("en-NG", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "—";
+
+  const ariaLabel =
+    "Monthly earnings from paid bookings. " +
+    buckets
+      .map(
+        (bucket) =>
+          `${bucket.fullLabel}: ${
+            bucket.amount > 0
+              ? formatNaira(bucket.amount)
+              : "no earnings"
+          }`
+      )
+      .join("; ");
+
+  return (
+    <div>
+      {/* legend + best month */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-ink-400">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-sm bg-brand-500 dark:bg-brand-400" />
+          Paid earnings per month
+        </span>
+
+        {peak && peak.amount > 0 && (
+          <span>
+            Best month:{" "}
+            <span className="font-semibold text-slate-700 dark:text-ink-200">
+              {peak.fullLabel}
+            </span>{" "}
+            ·{" "}
+            <span className="font-semibold tabular-nums text-brand-600 dark:text-brand-300">
+              {formatNaira(peak.amount)}
+            </span>
+          </span>
+        )}
+      </div>
+
+      {/* bars */}
+      <div role="img" aria-label={ariaLabel}>
+        <div className="flex h-44 items-end gap-1.5 sm:gap-3">
+          {buckets.map((bucket, index) => {
+            const height =
+              bucket.amount > 0
+                ? Math.max(
+                    6,
+                    (bucket.amount / maxAmount) * 80
+                  )
+                : 4;
+
+            return (
+              <div
+                key={bucket.key}
+                title={`${bucket.fullLabel}: ${
+                  bucket.amount > 0
+                    ? formatNaira(bucket.amount)
+                    : "No earnings"
+                }`}
+                className="flex h-full min-w-0 flex-1 flex-col items-center justify-end"
+              >
+                <span
+                  className={cn(
+                    "mb-1.5 truncate text-[9px] font-bold tabular-nums sm:text-[10px]",
+                    bucket.amount > 0
+                      ? "text-slate-600 dark:text-ink-300"
+                      : "text-slate-400 dark:text-ink-500"
+                  )}
+                >
+                  {bucket.amount > 0
+                    ? compactNaira(bucket.amount)
+                    : "—"}
+                </span>
+
+                <motion.div
+                  initial={{ height: 0 }}
+                  animate={{ height: `${height}%` }}
+                  transition={{
+                    duration: 0.5,
+                    delay: 0.1 + index * 0.05,
+                    ease: "easeOut",
+                  }}
+                  className={cn(
+                    "mx-auto w-full max-w-16 rounded-t-md",
+                    bucket.amount > 0
+                      ? "bg-gradient-to-t from-brand-600 to-brand-400 dark:from-brand-500 dark:to-brand-400"
+                      : "bg-slate-200 dark:bg-ink-700"
+                  )}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-2 flex gap-1.5 border-t border-slate-100 pt-2 sm:gap-3 dark:border-ink-800">
+          {buckets.map((bucket) => (
+            <span
+              key={bucket.key}
+              title={bucket.fullLabel}
+              className="min-w-0 flex-1 truncate text-center text-[9px] font-medium text-slate-400 sm:text-[10px] dark:text-ink-500"
+            >
+              {bucket.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* summary chips */}
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <MiniStat
+          icon={DollarSign}
+          label="Chart total"
+          value={formatNaira(chartTotal)}
+        />
+        <MiniStat
+          icon={CheckCircle2}
+          label="Paid bookings"
+          value={entries.length.toLocaleString("en-NG")}
+        />
+        <div className="col-span-2 sm:col-span-1">
+          <MiniStat
+            icon={Calendar}
+            label="Latest payment"
+            value={latestPaymentLabel}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="h-full rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-ink-800 dark:bg-ink-800/50">
+      <div className="flex items-center gap-1.5 text-slate-500 dark:text-ink-400">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate text-[11px] font-medium">
+          {label}
+        </span>
+      </div>
+      <p className="mt-1 truncate text-sm font-bold tabular-nums text-slate-900 dark:text-ink-50">
+        {value}
+      </p>
+    </div>
+  );
+}
+
+
+/* =========================================================
+   BOOKING ROW
+========================================================= */
+
+function BookingRow({
   booking,
   index,
 }: {
@@ -985,85 +1488,64 @@ function BookingRequestRow({
   const customerAvatar = getCustomerAvatar(booking);
   const serviceName = getServiceName(booking);
 
-  const price = Number(
-    booking.providerAmount ??
-    booking.amount ??
-    booking.price ??
-    0
-  );
+  const price = getBookingAmount(booking);
+  const paid = isPaid(booking);
 
   return (
     <motion.article
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: index * 0.05 }}
-      className="group relative overflow-hidden rounded-2xl border border-ink-200/70 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-lg dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900"
+      transition={{
+        duration: 0.25,
+        delay: index * 0.05,
+      }}
+      className="group rounded-2xl border border-slate-200/70 bg-white p-4 shadow-card transition hover:border-brand-200/70 hover:shadow-card-hover dark:border-ink-800 dark:bg-ink-900 dark:hover:border-brand-900"
     >
-      <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-emerald-400 to-emerald-600" />
-
-      <div className="flex items-start gap-3 pl-2">
-        <div className="relative shrink-0">
-          {customerAvatar ? (
-            <img
-              src={customerAvatar}
-              alt={customerName}
-              className="h-11 w-11 rounded-full object-cover ring-2 ring-emerald-100 dark:ring-emerald-500/20"
-              onError={(e) => {
-                e.currentTarget.src =
-                  "/images/default-avatar.png";
-              }}
-            />
-          ) : (
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-primary-500 to-primary-700 text-sm font-bold text-white ring-2 ring-primary-100 dark:ring-primary-500/20">
-              {customerName.charAt(0).toUpperCase()}
-            </div>
-          )}
-
-          <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full border-2 border-white bg-emerald-500 dark:border-ink-900">
-            <CheckCircle2 className="h-2.5 w-2.5 text-white" />
-          </span>
-        </div>
+      <div className="flex items-start gap-3">
+        <Avatar
+          src={customerAvatar || undefined}
+          name={customerName}
+          size="md"
+        />
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="truncate text-sm font-bold text-ink-900 dark:text-white">
+              <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
                 {serviceName}
               </h3>
-
-              <p className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
-                <User className="h-3 w-3 shrink-0" />
-                <span className="truncate">
-                  {customerName}
-                </span>
+              <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-ink-400">
+                {customerName}
               </p>
             </div>
 
             <div className="shrink-0 text-right">
-              <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">
-                {formatNaira(price)}
+              <p className="text-sm font-bold tabular-nums text-slate-900 dark:text-ink-50">
+                {price > 0 ? formatNaira(price) : "—"}
               </p>
-              <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-500/80">
-                Paid
-              </p>
+              {paid && (
+                <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-600 dark:text-success-500">
+                  Paid
+                </p>
+              )}
             </div>
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-ink-500 dark:text-ink-400">
+          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-ink-400">
             <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
+              <Calendar className="h-3.5 w-3.5 shrink-0" />
               {getBookingDate(booking)}
             </span>
 
             {booking.time && (
               <span className="inline-flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
+                <Clock className="h-3.5 w-3.5 shrink-0" />
                 {booking.time}
               </span>
             )}
 
             {booking.location && (
-              <span className="inline-flex items-center gap-1 max-w-full">
+              <span className="inline-flex min-w-0 items-center gap-1">
                 <MapPin className="h-3.5 w-3.5 shrink-0" />
                 <span className="truncate">
                   {booking.location}
@@ -1072,17 +1554,18 @@ function BookingRequestRow({
             )}
           </div>
 
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <StatusBadge
-              status={booking.status || "confirmed"}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+            <BookingStatusBadge
+              status={normalizeBookingStatus(booking)}
             />
 
             <Link
               to={`/provider/bookings?booking=${getId(booking)}`}
-              className="inline-flex items-center gap-1 rounded-lg border border-ink-200 px-2.5 py-1 text-[11px] font-bold text-ink-600 opacity-0 transition group-hover:opacity-100 hover:border-primary-300 hover:text-primary-700 dark:border-ink-700 dark:text-ink-300 dark:hover:border-primary-700 dark:hover:text-primary-300"
+              aria-label={`View details for ${serviceName} booked by ${customerName}`}
+              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-brand-600 transition hover:bg-lavender dark:text-brand-300 dark:hover:bg-brand-950"
             >
-              Details
-              <ArrowUpRight className="h-3 w-3" />
+              View details
+              <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </Link>
           </div>
         </div>
@@ -1091,11 +1574,12 @@ function BookingRequestRow({
   );
 }
 
+
 /* =========================================================
-   SERVICE CARD
+   SERVICE ROW
 ========================================================= */
 
-function ServiceCard({
+function ServiceRow({
   service,
   index,
 }: {
@@ -1103,210 +1587,70 @@ function ServiceCard({
   index: number;
 }) {
   const image = getServiceImage(service);
+  const title = service.title || "Untitled service";
 
   return (
-    <motion.article
+    <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.25, delay: index * 0.05 }}
-      className="group relative overflow-hidden rounded-2xl border border-ink-200/70 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-primary-200 hover:shadow-lg dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900"
+      transition={{
+        duration: 0.25,
+        delay: index * 0.05,
+      }}
     >
-      <div className="flex items-stretch">
-        {/* ---------- COMPACT IMAGE ---------- */}
-        <div className="relative w-24 shrink-0 overflow-hidden bg-ink-100 sm:w-28 dark:bg-ink-800">
+      <Link
+        to="/provider/services"
+        aria-label={`View ${title} in your services`}
+        className="group flex items-center gap-3 rounded-2xl border border-slate-200/70 bg-white p-3 shadow-card transition hover:border-brand-200/70 hover:shadow-card-hover dark:border-ink-800 dark:bg-ink-900 dark:hover:border-brand-900"
+      >
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-lavender dark:bg-brand-950">
           {image ? (
             <img
               src={image}
-              alt={service.title || "Service"}
-              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
               onError={(event) => {
-                event.currentTarget.src =
-                  "/images/service-placeholder.png";
+                event.currentTarget.style.display = "none";
               }}
             />
           ) : (
-            <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-ink-100 via-white to-primary-50 text-ink-400 dark:from-ink-900 dark:via-ink-800 dark:to-ink-900">
+            <span className="flex h-full w-full items-center justify-center text-brand-400 dark:text-brand-600">
               <ImageIcon className="h-5 w-5" />
-            </div>
-          )}
-
-          <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white backdrop-blur">
-            <Package className="h-2.5 w-2.5" />
-            New
-          </span>
-        </div>
-
-        {/* ---------- CONTENT ---------- */}
-        <div className="flex min-w-0 flex-1 flex-col justify-between p-3.5">
-          <div>
-            <div className="flex items-start justify-between gap-2">
-              <h3 className="line-clamp-2 pr-1 text-sm font-bold leading-snug text-ink-900 dark:text-white">
-                {service.title || "Untitled service"}
-              </h3>
-
-              <span className="shrink-0 rounded-lg bg-primary-50 px-2 py-1 text-xs font-black text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">
-                {formatNaira(Number(service.price || 0))}
-              </span>
-            </div>
-
-            {service.category && (
-              <p className="mt-1 line-clamp-1 text-[11px] font-medium uppercase tracking-wider text-ink-400 dark:text-ink-500">
-                {service.category}
-              </p>
-            )}
-
-            {service.description && (
-              <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-ink-500 dark:text-ink-400">
-                {service.description}
-              </p>
-            )}
-          </div>
-
-          <div className="mt-2.5 flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2 text-[11px] text-ink-500 dark:text-ink-400">
-              {service.duration && (
-                <span className="inline-flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {service.duration}
-                </span>
-              )}
-            </div>
-
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-              <CheckCircle2 className="h-3 w-3" />
-              Available
             </span>
-          </div>
+          )}
         </div>
-      </div>
-    </motion.article>
-  );
-}
 
-/* =========================================================
-   EMPTY STATES
-========================================================= */
-
-function EmptyBookingsCard() {
-  return (
-    <div className="rounded-2xl border border-dashed border-ink-300 bg-white px-5 py-10 text-center dark:border-ink-700 dark:bg-ink-900">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-400">
-        <Inbox className="h-6 w-6" />
-      </div>
-
-      <h3 className="mt-3 font-semibold text-ink-900 dark:text-white">
-        No paid booking requests
-      </h3>
-
-      <p className="mx-auto mt-1 max-w-sm text-sm text-ink-500 dark:text-ink-400">
-        Once a customer pays for a service, their booking
-        will appear here waiting for completion.
-      </p>
-    </div>
-  );
-}
-
-function RatingCard({
-  rating,
-  reviewCount,
-}: {
-  rating: number;
-  reviewCount: number;
-}) {
-  const hasRatings = rating > 0 && reviewCount > 0;
-
-  return (
-    <div className="card group relative overflow-hidden p-5">
-      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-rose-400/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:bg-rose-400/10" />
-
-      <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500">
-            Average Rating
+          <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
+            {title}
+          </h3>
+
+          <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-ink-400">
+            {service.category || "Service"}
           </p>
 
-          {hasRatings ? (
-            <>
-              <div className="mt-3 flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => {
-                  const isFull = star <= Math.round(rating);
-                  const isHalf =
-                    !isFull &&
-                    star - 0.5 <= rating &&
-                    rating < star;
-
-                  return (
-                    <span
-                      key={star}
-                      className="relative inline-block h-5 w-5"
-                    >
-                      <Star className="absolute inset-0 h-5 w-5 text-ink-200 dark:text-ink-700" />
-
-                      {(isFull || isHalf) && (
-                        <span
-                          className="absolute inset-0 overflow-hidden"
-                          style={{
-                            width: isFull ? "100%" : "50%",
-                          }}
-                        >
-                          <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
-                        </span>
-                      )}
-                    </span>
-                  );
-                })}
-
-                <span className="ml-1 text-lg font-black tracking-tight text-ink-900 dark:text-white">
-                  {rating.toFixed(1)}
-                </span>
-              </div>
-
-              <p className="mt-2 text-xs text-ink-500 dark:text-ink-400">
-                Based on{" "}
-                <span className="font-semibold text-ink-700 dark:text-ink-200">
-                  {reviewCount}
-                </span>{" "}
-                {reviewCount === 1 ? "review" : "reviews"}
-              </p>
-            </>
-          ) : (
-            <>
-              <div className="mt-3 flex items-center gap-1">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className="h-5 w-5 text-ink-200 dark:text-ink-700"
-                  />
-                ))}
-              </div>
-
-              <p className="mt-2 text-xs italic text-ink-400 dark:text-ink-500">
-                No ratings yet
-              </p>
-            </>
+          {service.duration && (
+            <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-slate-400 dark:text-ink-500">
+              <Clock className="h-3 w-3 shrink-0" />
+              {service.duration}
+            </p>
           )}
         </div>
 
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 transition-transform duration-300 group-hover:scale-110 dark:bg-rose-500/10 dark:text-rose-400">
-          <Star className="h-5 w-5 fill-current" />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="text-sm font-bold tabular-nums text-slate-900 dark:text-ink-50">
+            {Number(service.price || 0) > 0
+              ? formatNaira(Number(service.price || 0))
+              : "—"}
+          </span>
+
+          <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-slate-400 transition group-hover:text-brand-600 dark:text-ink-500 dark:group-hover:text-brand-300">
+            View
+            <ArrowUpRight className="h-3 w-3" />
+          </span>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function EmptyServicesCard() {
-  return (
-    <div className="rounded-2xl border border-dashed border-ink-300 bg-white p-6 text-center dark:border-ink-700 dark:bg-ink-900">
-      <ImageIcon className="mx-auto h-8 w-8 text-ink-400" />
-
-      <h3 className="mt-3 text-sm font-semibold text-ink-900 dark:text-white">
-        No active services
-      </h3>
-
-      <p className="mt-1 text-xs leading-5 text-ink-500 dark:text-ink-400">
-        Add a service so customers can discover what you offer.
-      </p>
-    </div>
+      </Link>
+    </motion.div>
   );
 }

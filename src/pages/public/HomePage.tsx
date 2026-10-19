@@ -1,362 +1,802 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { Search, ArrowRight, ShieldCheck, Star, Camera, Sparkles, Heart, Users, Calendar, CheckCircle2, Quote, Zap } from 'lucide-react';
-import { PublicNavbar, Footer, ProviderCard, StarRating } from '@/components/shared';
-import { categories, providers } from '@/data/mockData';
+import { motion, type Variants } from 'framer-motion';
+import {
+  ArrowRight,
+  BadgeCheck,
+  CalendarCheck,
+  CalendarDays,
+  CreditCard,
+  Lock,
+  MessageSquareText,
+  PartyPopper,
+  PenLine,
+  Search,
+  Sparkles,
+  Star,
+  type LucideIcon,
+} from 'lucide-react';
+import { PublicNavbar, Footer } from '@/components/shared';
+import {
+  Badge,
+  MarketplaceProviderCard,
+  ReviewCard,
+  SectionHeading,
+  SkeletonCard,
+  providerId,
+  type ProviderLike,
+} from '@/components/ui';
+import { categories } from '@/data/mockData';
 
-const container = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-};
-const item = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4 } },
+/* =========================================================
+   CONFIG
+========================================================= */
+
+const API_URL =
+  import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+const HERO_IMAGE =
+  'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?fm=jpg&q=75&w=1400&auto=format&fit=crop';
+
+/* =========================================================
+   STATIC PRESENTATION DATA (taxonomy only — no fake listings)
+========================================================= */
+
+interface ExtraCategory {
+  id: string;
+  name: string;
+  slug: string;
+  icon: LucideIcon;
+  description: string;
+}
+
+const extraCategories: ExtraCategory[] = [
+  {
+    id: 'event-planning',
+    name: 'Event Planning',
+    slug: 'event-planning',
+    icon: PartyPopper,
+    description: 'Plan and coordinate campus events from idea to finish.',
+  },
+  {
+    id: 'writing',
+    name: 'Writing',
+    slug: 'writing',
+    icon: PenLine,
+    description: 'Essays, reports, and content crafted with care.',
+  },
+];
+
+const trustIndicators = [
+  {
+    icon: BadgeCheck,
+    title: 'Verified Providers',
+    description: 'Profiles reviewed and approved before going live.',
+  },
+  {
+    icon: Lock,
+    title: 'Secure Payments',
+    description: 'Protected checkout for every booking you make.',
+  },
+  {
+    icon: CalendarCheck,
+    title: 'Easy Booking',
+    description: 'Request a date, time, and location in minutes.',
+  },
+  {
+    icon: MessageSquareText,
+    title: 'Rate & Review',
+    description: 'Genuine feedback from students like you.',
+  },
+];
+
+const steps = [
+  {
+    icon: Search,
+    title: 'Discover',
+    description:
+      'Browse categories and compare verified student providers.',
+  },
+  {
+    icon: CalendarDays,
+    title: 'Book',
+    description: 'Pick a date, time, and location that works for you.',
+  },
+  {
+    icon: CreditCard,
+    title: 'Pay Securely',
+    description: 'Complete payment safely through protected checkout.',
+  },
+  {
+    icon: Star,
+    title: 'Rate',
+    description:
+      'Once it is done, leave a review to help others choose.',
+  },
+];
+
+/* =========================================================
+   MOTION PRESETS (subtle)
+========================================================= */
+
+const fadeUp: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: 'easeOut' },
+  },
 };
 
-function SectionHeader({ title, subtitle, align = 'left' }: { title: string; subtitle?: string; align?: 'left' | 'center' }) {
+const stagger: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07 } },
+};
+
+/* =========================================================
+   API NORMALIZATION HELPERS
+========================================================= */
+
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
+ * Derives a unique provider list from the
+ * `/provider/approved-services` response (`result.services`).
+ */
+function deriveProviders(services: unknown): ProviderLike[] {
+  const seen = new Set<string>();
+  const list: ProviderLike[] = [];
+
+  for (const entry of toArray(services)) {
+    if (!entry || typeof entry !== 'object') continue;
+
+    const provider = (entry as { provider?: unknown }).provider;
+    if (!provider || typeof provider !== 'object') continue;
+
+    const p = provider as ProviderLike;
+    const id =
+      providerId(p) || String(p.fullName || p.name || '').trim();
+
+    if (!id || seen.has(id)) continue;
+
+    seen.add(id);
+    list.push(p);
+  }
+
+  return list;
+}
+
+interface NormalizedReview {
+  rating: number;
+  comment?: string;
+  reviewerName?: string;
+  date?: string;
+  avatar?: string;
+}
+
+/**
+ * Normalizes the `/reviews/recommended` payload into review shapes.
+ * The endpoint may return review objects directly, or provider
+ * objects with an embedded review — both are handled.
+ */
+function normalizeReviews(payload: unknown): NormalizedReview[] {
+  const data = payload as Record<string, unknown> | null;
+
+  const rawList = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.reviews)
+      ? data.reviews
+      : Array.isArray(data?.providers)
+        ? data.providers
+        : [];
+
+  const out: NormalizedReview[] = [];
+
+  for (const entry of rawList) {
+    if (!entry || typeof entry !== 'object') continue;
+
+    const item = entry as Record<string, unknown>;
+
+    const embeddedRaw =
+      item.latestReview ??
+      item.review ??
+      (Array.isArray(item.reviews) ? item.reviews[0] : undefined);
+
+    const source =
+      embeddedRaw && typeof embeddedRaw === 'object'
+        ? (embeddedRaw as Record<string, unknown>)
+        : item;
+
+    const rating = Number(source.rating ?? 0);
+    if (!Number.isFinite(rating) || rating <= 0) continue;
+
+    const customerRaw =
+      source.customer ?? source.reviewer ?? item.customer;
+
+    const customer =
+      customerRaw && typeof customerRaw === 'object'
+        ? (customerRaw as Record<string, unknown>)
+        : undefined;
+
+    const reviewerName =
+      String(
+        source.reviewerName ??
+          customer?.fullName ??
+          customer?.name ??
+          item.fullName ??
+          item.name ??
+          ''
+      ).trim() || 'ABUAD Student';
+
+    const avatar =
+      typeof source.avatar === 'string'
+        ? source.avatar
+        : typeof customer?.avatar === 'string'
+          ? customer.avatar
+          : typeof customer?.profileImage === 'string'
+            ? customer.profileImage
+            : undefined;
+
+    const comment =
+      typeof source.comment === 'string' && source.comment.trim()
+        ? source.comment.trim()
+        : undefined;
+
+    const dateRaw = source.createdAt ?? source.date ?? item.createdAt;
+    const date = typeof dateRaw === 'string' ? dateRaw : undefined;
+
+    out.push({ rating, comment, reviewerName, avatar, date });
+  }
+
+  return out;
+}
+
+/* =========================================================
+   SMALL LOCAL PIECES
+========================================================= */
+
+function CategoryTile({
+  to,
+  name,
+  description,
+  children,
+}: {
+  to: string;
+  name: string;
+  description: string;
+  children: ReactNode;
+}) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.4 }}
-      className={align === 'center' ? 'text-center' : ''}
+    <Link
+      to={to}
+      className="card-hover group flex h-full flex-col overflow-hidden"
     >
-      <h2 className="text-2xl font-bold tracking-tight text-ink-900 dark:text-ink-50 sm:text-3xl">{title}</h2>
-      {subtitle && <p className="mt-1.5 text-ink-500 dark:text-ink-400">{subtitle}</p>}
-    </motion.div>
+      {children}
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-base font-semibold text-slate-900 dark:text-ink-50">
+            {name}
+          </h3>
+          <ArrowRight
+            className="h-4 w-4 shrink-0 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-brand-500 dark:text-ink-600 dark:group-hover:text-brand-400"
+            aria-hidden="true"
+          />
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-slate-500 dark:text-ink-400">
+          {description}
+        </p>
+      </div>
+    </Link>
   );
 }
 
+/* =========================================================
+   HOME PAGE
+========================================================= */
+
 export function HomePage() {
-  const [search, setSearch] = useState('');
-  const featured = providers.filter((p) => p.featured && p.verified);
-  const heroRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] });
-  const heroY = useTransform(scrollYProgress, [0, 1], [0, 60]);
+  const [featuredProviders, setFeaturedProviders] = useState<
+    ProviderLike[]
+  >([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+
+  const [reviews, setReviews] = useState<NormalizedReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+
+  /* -------------------------------------------------------
+     FEATURED PROVIDERS — public, no auth header
+  ------------------------------------------------------- */
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const load = async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/provider/approved-services`,
+          {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        );
+
+        const result: unknown = await response
+          .json()
+          .catch(() => null);
+
+        if (!response.ok) {
+          throw new Error('Failed to load featured providers');
+        }
+
+        const services = (result as { services?: unknown } | null)
+          ?.services;
+
+        setFeaturedProviders(
+          deriveProviders(services).slice(0, 8)
+        );
+      } catch {
+        if (!controller.signal.aborted) {
+          setFeaturedProviders([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setFeaturedLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => controller.abort();
+  }, []);
+
+  /* -------------------------------------------------------
+     TESTIMONIALS — public, no auth header
+  ------------------------------------------------------- */
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const load = async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/reviews/recommended?limit=6`,
+          {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+            signal: controller.signal,
+          }
+        );
+
+        const result: unknown = await response
+          .json()
+          .catch(() => null);
+
+        if (!response.ok) {
+          throw new Error('Failed to load reviews');
+        }
+
+        setReviews(normalizeReviews(result).slice(0, 6));
+      } catch {
+        if (!controller.signal.aborted) {
+          setReviews([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setReviewsLoading(false);
+        }
+      }
+    };
+
+    load();
+
+    return () => controller.abort();
+  }, []);
+
+  const showFeatured = !featuredLoading && featuredProviders.length > 0;
+  const showReviews = !reviewsLoading && reviews.length > 0;
 
   return (
-    <div className="min-h-screen bg-ink-50 dark:bg-ink-950">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-ink-950">
       <PublicNavbar />
 
-      {/* Hero */}
-      <section
-        ref={heroRef}
-        className="relative isolate min-h-[720px] overflow-hidden border-b border-ink-800"
-      >
-        {/* Background photograph */}
-        <div
-          className="absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage:
-              "url('https://images.unsplash.com/photo-1605076896228-086cda8868c9?fm=jpg&q=60&w=3000&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8cGVyc29uJTIwbG9va2luZyUyMGF0JTIwY2FtZXJhfGVufDB8fDB8fHww')",
-          }}
-        />
-
-        {/* Dark overlay for readability */}
-        <div className="absolute inset-0 -z-10 bg-black/60" />
-
-        {/* Subtle primary-color gradient */}
-        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-primary-950/80 via-black/40 to-black/70" />
-
-        {/* Decorative glow */}
-        <div className="absolute left-1/2 top-0 -z-10 h-[500px] w-[700px] -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl" />
-
-        <motion.div
-          style={{ y: heroY }}
-          className="relative mx-auto flex min-h-[720px] max-w-7xl items-center px-4 py-20 sm:px-6 lg:px-8"
+      <main>
+        {/* ===================================================
+           HERO
+        =================================================== */}
+        <section
+          aria-labelledby="hero-heading"
+          className="relative overflow-hidden"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="mx-auto w-full max-w-4xl text-center"
-          >
-            {/* Trust badge */}
+          {/* Decorative glows */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-32 -top-40 h-96 w-96 rounded-full bg-brand-200/40 blur-3xl dark:bg-brand-900/25"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-32 top-16 h-96 w-96 rounded-full bg-lavender blur-3xl dark:bg-ink-800/50"
+          />
+
+          <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:pb-24 lg:pt-20">
+            {/* Copy */}
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="mb-7 flex justify-center"
+              transition={{ duration: 0.5 }}
             >
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white shadow-lg backdrop-blur-md">
-                <ShieldCheck className="h-4 w-4 text-primary-300" />
-                Trusted by ABUAD students
-              </span>
-            </motion.div>
+              <Badge
+                tone="brand"
+                icon={Sparkles}
+                className="bg-lavender px-3 py-1 dark:bg-brand-950/60"
+              >
+                ABUAD Student Service Marketplace
+              </Badge>
 
-            {/* Heading */}
-            <h1 className="text-balance text-4xl font-bold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-7xl">
-              Find trusted service providers for your{' '}
-              <span className="text-primary-300">next project</span>
-            </h1>
+              <h1
+                id="hero-heading"
+                className="mt-5 text-4xl font-bold leading-[1.1] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl dark:text-ink-50"
+              >
+                Get Your Campus Services{' '}
+                <span className="text-brand-600 dark:text-brand-400">
+                  Done Easily
+                </span>
+              </h1>
 
-            {/* Description */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="mx-auto mt-6 max-w-2xl text-base leading-7 text-white/75 sm:text-lg"
-            >
-              Book verified photographers, videographers, designers, and makeup
-              artists. Compare portfolios, read reviews, and pay securely all in
-              one place.
-            </motion.p>
+              <p className="mt-5 max-w-xl text-base leading-7 text-slate-500 sm:text-lg dark:text-ink-400">
+                Discover and book trusted student service providers for
+                photography, design, makeup, events, and more. Compare
+                portfolios, read genuine reviews, and pay securely —
+                all in one place.
+              </p>
 
-            {/* Search */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="mx-auto mt-9 max-w-2xl"
-            >
-              <div className="flex items-center gap-2 rounded-2xl border border-white/20 bg-white/95 p-2 shadow-2xl backdrop-blur-xl dark:bg-ink-900/95">
-                <Search className="ml-3 h-5 w-5 shrink-0 text-ink-400" />
-
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search photography, makeup, design..."
-                  className="min-w-0 flex-1 bg-transparent px-1 py-3 text-base text-ink-900 outline-none placeholder:text-ink-400 sm:text-sm dark:text-white"
-                />
-
-                <Link
-                  to={`/services?q=${encodeURIComponent(search)}`}
-                  className="shrink-0 rounded-xl bg-primary-600 px-5 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-primary-700 hover:shadow-primary-600/30"
-                >
-                  Search
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link to="/services" className="btn-primary btn-lg">
+                  Explore Services
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link to="/how-it-works" className="btn-outline btn-lg">
+                  How It Works
                 </Link>
               </div>
             </motion.div>
 
-            {/* Benefits */}
+            {/* Image */}
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="mt-7 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-sm text-white/75"
-            >
-              <span className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-500/20">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-primary-300" />
-                </span>
-                Verified providers
-              </span>
-
-              <span className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-500/20">
-                  <Star className="h-3.5 w-3.5 text-accent-300" />
-                </span>
-                Real reviews
-              </span>
-
-              <span className="flex items-center gap-2">
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-500/20">
-                  <ShieldCheck className="h-3.5 w-3.5 text-primary-300" />
-                </span>
-                Secure payments
-              </span>
-            </motion.div>
-
-            {/* Stats */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
+              initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="mx-auto mt-14 grid max-w-2xl grid-cols-3 divide-x divide-white/15 border-t border-white/15 pt-8"
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="relative"
             >
-              {[
-                { value: '72+', label: 'Verified Providers' },
-                { value: '1,200+', label: 'Happy Students' },
-                { value: '4.9★', label: 'Average Rating' },
-              ].map((stat) => (
-                <div key={stat.label} className="px-3 text-center">
-                  <p className="text-2xl font-bold text-white sm:text-3xl">
-                    {stat.value}
+              <div
+                aria-hidden="true"
+                className="absolute -right-2 -top-4 h-full w-full rounded-3xl bg-lavender lg:-right-4 dark:bg-brand-950/50"
+              />
+              <div className="relative overflow-hidden rounded-3xl shadow-card ring-1 ring-slate-900/5 dark:ring-ink-700/60">
+                <img
+                  src={HERO_IMAGE}
+                  alt="Students collaborating together on campus"
+                  className="h-72 w-full object-cover sm:h-96 lg:h-[460px]"
+                />
+              </div>
+
+              {/* Floating trust card */}
+              <div className="absolute bottom-4 left-4 right-4 flex max-w-[19rem] items-start gap-3 rounded-2xl border border-slate-200/70 bg-white/95 p-4 shadow-card backdrop-blur sm:bottom-6 sm:left-6 sm:right-auto dark:border-ink-800 dark:bg-ink-900/95">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+                  <BadgeCheck className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+                    Verified student providers
                   </p>
-                  <p className="mt-1 text-[11px] text-white/55 sm:text-xs">
-                    {stat.label}
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-ink-400">
+                    Every provider is reviewed by our team before they
+                    can take bookings.
                   </p>
                 </div>
-              ))}
+              </div>
             </motion.div>
-          </motion.div>
-        </motion.div>
-
-        {/* Bottom fade into the next section */}
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white/10 to-transparent dark:from-ink-900/30" />
-      </section>
-
-      {/* Categories */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <div className="mb-8 flex items-end justify-between">
-          <SectionHeader title="Browse by category" subtitle="Find the right professional for any occasion" />
-          <Link to="/services" className="hidden text-sm font-semibold text-primary-600 hover:text-primary-700 sm:block">
-            View all →
-          </Link>
-        </div>
-        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {categories.map((cat) => (
-            <motion.div key={cat.id} variants={item} whileHover={{ y: -4, transition: { duration: 0.2 } }}>
-              <Link to={`/services?category=${cat.slug}`} className="group relative block overflow-hidden rounded-xl border border-ink-100">
-                <div className="relative h-44 overflow-hidden">
-                  <img src={cat.image} alt={cat.name} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${cat.color} opacity-70 mix-blend-multiply`} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-ink-900/60 to-transparent" />
-                </div>
-                <div className="absolute inset-0 flex flex-col justify-end p-4">
-                  <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-lg bg-white/20 backdrop-blur-sm">
-                    <cat.icon className="h-4 w-4 text-white" />
-                  </div>
-                  <h3 className="text-base font-bold text-white">{cat.name}</h3>
-                  <p className="mt-0.5 text-xs text-white/70 line-clamp-2">{cat.description}</p>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
-
-      {/* Featured Providers */}
-      <section className="border-y border-ink-100 bg-white py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="mb-8 flex items-end justify-between">
-            <SectionHeader title="Featured providers" subtitle="Top-rated professionals, ready to book" />
-            <Link to="/providers" className="hidden text-sm font-semibold text-primary-600 hover:text-primary-700 sm:block">
-              View all →
-            </Link>
           </div>
-          <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {featured.map((provider) => (
-              <motion.div key={provider.id} variants={item}>
-                <ProviderCard provider={provider} />
+        </section>
+
+        {/* ===================================================
+           TRUST INDICATORS
+        =================================================== */}
+        <section
+          aria-label="Why students trust Servicely"
+          className="border-y border-slate-200/70 bg-white dark:border-ink-800 dark:bg-ink-900/40"
+        >
+          <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+            {trustIndicators.map((indicator, i) => (
+              <motion.div
+                key={indicator.title}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-40px' }}
+                transition={{ duration: 0.4, delay: i * 0.06 }}
+                className="flex items-start gap-3"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+                  <indicator.icon
+                    className="h-5 w-5"
+                    aria-hidden="true"
+                  />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+                    {indicator.title}
+                  </p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-ink-400">
+                    {indicator.description}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
+        {/* ===================================================
+           POPULAR SERVICES
+        =================================================== */}
+        <section
+          aria-label="Popular services"
+          className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20"
+        >
+          <SectionHeading
+            title="Popular Services"
+            subtitle="Find the right student professional for any occasion"
+            action={
+              <Link
+                to="/services"
+                className="text-sm font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+              >
+                View all services →
+              </Link>
+            }
+          />
+
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: '-40px' }}
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {categories.map((cat) => (
+              <motion.div key={cat.id} variants={fadeUp}>
+                <CategoryTile
+                  to={`/services?category=${cat.slug}`}
+                  name={cat.name}
+                  description={cat.description}
+                >
+                  <div className="relative h-40 overflow-hidden bg-lavender">
+                    <img
+                      src={cat.image}
+                      alt={cat.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent"
+                    />
+                    <span className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-white/90 text-brand-700 backdrop-blur dark:bg-ink-900/90 dark:text-brand-300">
+                      <cat.icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  </div>
+                </CategoryTile>
+              </motion.div>
+            ))}
+
+            {extraCategories.map((cat) => (
+              <motion.div key={cat.id} variants={fadeUp}>
+                <CategoryTile
+                  to={`/services?category=${cat.slug}`}
+                  name={cat.name}
+                  description={cat.description}
+                >
+                  <div className="flex h-40 items-center justify-center bg-gradient-to-br from-lavender to-brand-100 dark:from-brand-950 dark:to-ink-800">
+                    <cat.icon
+                      className="h-10 w-10 text-brand-600 dark:text-brand-300"
+                      aria-hidden="true"
+                    />
+                  </div>
+                </CategoryTile>
               </motion.div>
             ))}
           </motion.div>
-        </div>
-      </section>
+        </section>
 
-      {/* How It Works */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <SectionHeader title="How it works" subtitle="Book a service in four simple steps" align="center" />
-        <div className="mt-12 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { icon: Search, title: 'Find a Service', desc: 'Search for the service you need from our categories.' },
-            { icon: Users, title: 'Choose a Provider', desc: 'Compare profiles, portfolios, ratings and prices.' },
-            { icon: Calendar, title: 'Book', desc: 'Select your preferred date, time and location.' },
-            { icon: Star, title: 'Get the Service', desc: 'Complete the service and leave a review.' },
-          ].map((step, i) => (
-            <motion.div
-              key={step.title}
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-40px' }}
-              transition={{ delay: i * 0.08, duration: 0.4 }}
-              className="relative text-center"
-            >
-              <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-ink-100 text-ink-700">
-                <step.icon className="h-6 w-6" />
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-ink-900 text-[10px] font-bold text-white">
-                  {i + 1}
-                </span>
-              </div>
-              <h3 className="mt-4 text-base font-semibold text-ink-900 dark:text-ink-50">{step.title}</h3>
-              <p className="mt-1 text-sm text-ink-500">{step.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+        {/* ===================================================
+           FEATURED PROVIDERS (hidden when no real data)
+        =================================================== */}
+        {(featuredLoading || showFeatured) && (
+          <section
+            aria-label="Featured providers"
+            className="border-y border-slate-200/70 bg-white py-16 dark:border-ink-800 dark:bg-ink-900/40 lg:py-20"
+          >
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
+              <SectionHeading
+                title="Featured Providers"
+                subtitle="Top-rated professionals ready to book"
+                action={
+                  <Link
+                    to="/providers"
+                    className="text-sm font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                  >
+                    Browse all providers →
+                  </Link>
+                }
+              />
 
-      {/* Testimonials */}
-      <section className="border-y border-ink-100 bg-white py-16">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <SectionHeader title="What students say" subtitle="Real experiences from the ABUAD community" align="center" />
-          <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
-            {[
-              { name: 'Chioma O.', text: 'Found an amazing photographer for my birthday in minutes. The whole process was so smooth!', rating: 5, role: 'Student' },
-              { name: 'Tunde A.', text: 'Servicely made it easy to compare providers and pick the best one. Highly recommend.', rating: 5, role: 'Student' },
-              { name: 'Fatima I.', text: 'The makeup artist I booked was professional and talented. Will definitely use again.', rating: 5, role: 'Student' },
-            ].map((t, i) => (
-              <motion.div
-                key={i}
+              {featuredLoading ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))}
+                </div>
+              ) : (
+                <motion.div
+                  variants={stagger}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, margin: '-40px' }}
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                >
+                  {featuredProviders.map((provider) => (
+                    <motion.div
+                      key={providerId(provider)}
+                      variants={fadeUp}
+                    >
+                      <MarketplaceProviderCard provider={provider} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ===================================================
+           HOW IT WORKS
+        =================================================== */}
+        <section
+          aria-label="How it works"
+          className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20"
+        >
+          <SectionHeading
+            title="How It Works"
+            subtitle="Book a campus service in four simple steps"
+            align="center"
+          />
+
+          <ol className="mt-12 grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-8">
+            {steps.map((step, i) => (
+              <motion.li
+                key={step.title}
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-40px' }}
-                transition={{ delay: i * 0.08, duration: 0.4 }}
-                className="card p-6"
+                transition={{ duration: 0.4, delay: i * 0.08 }}
+                className="relative text-center sm:text-left"
               >
-                <div className="flex items-center justify-between">
-                  <Quote className="h-7 w-7 text-ink-200" />
-                  <StarRating rating={t.rating} />
+                <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300 sm:mx-0">
+                  <step.icon className="h-6 w-6" aria-hidden="true" />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-[11px] font-bold text-white shadow-sm"
+                  >
+                    {i + 1}
+                  </span>
                 </div>
-                <p className="mt-3 text-sm leading-relaxed text-ink-600">{t.text}</p>
-                <div className="mt-5 flex items-center gap-3 border-t border-ink-100 pt-4">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink-100 text-sm font-semibold text-ink-700">
-                    {t.name[0]}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-ink-900">{t.name}</p>
-                    <p className="text-xs text-ink-400">{t.role}</p>
-                  </div>
-                </div>
-              </motion.div>
+                <h3 className="mt-4 text-base font-semibold text-slate-900 dark:text-ink-50">
+                  {step.title}
+                </h3>
+                <p className="mx-auto mt-1.5 max-w-[16rem] text-sm leading-relaxed text-slate-500 dark:text-ink-400 sm:mx-0">
+                  {step.description}
+                </p>
+              </motion.li>
             ))}
-          </div>
-        </div>
-      </section>
+          </ol>
+        </section>
 
-      {/* Trust & Safety */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <SectionHeader title="Book with confidence" subtitle="Every provider on Servicely goes through a verification process. We prioritize your safety at every step." align="center" />
-        <motion.div variants={container} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-40px' }} className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[
-            { icon: ShieldCheck, title: 'Verified Providers', desc: 'Every provider is reviewed and approved by our team before they can receive bookings.' },
-            { icon: Star, title: 'Ratings & Reviews', desc: 'Read genuine reviews from students who have booked and completed services.' },
-            { icon: Camera, title: 'Portfolio Verification', desc: 'Browse real work samples to ensure quality before you book.' },
-            { icon: CheckCircle2, title: 'Completed Booking Count', desc: 'See how many successful bookings each provider has completed.' },
-            { icon: Heart, title: 'Transparent Pricing', desc: 'Know the price upfront. No hidden fees, no surprises.' },
-            { icon: Users, title: 'Admin Oversight', desc: 'Our team monitors the platform to resolve disputes and maintain quality.' },
-          ].map((it) => (
-            <motion.div key={it.title} variants={item} className="card p-6">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ink-100 text-ink-700">
-                <it.icon className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 font-semibold text-ink-900">{it.title}</h3>
-              <p className="mt-1 text-sm text-ink-500">{it.desc}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      </section>
+        {/* ===================================================
+           TESTIMONIALS (hidden when no real data)
+        =================================================== */}
+        {(reviewsLoading || showReviews) && (
+          <section
+            aria-label="Testimonials"
+            className="border-y border-slate-200/70 bg-white py-16 dark:border-ink-800 dark:bg-ink-900/40 lg:py-20"
+          >
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
+              <SectionHeading
+                align="center"
+                title="Loved by the ABUAD Community"
+                subtitle="Real feedback from students who booked through Servicely"
+              />
 
-      {/* CTA */}
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-40px' }}
-          transition={{ duration: 0.4 }}
-          className="relative overflow-hidden rounded-2xl border border-ink-100 bg-ink-900 px-6 py-12 text-center sm:px-12 sm:py-16"
-        >
-          <div className="relative">
-            <span className="badge bg-white/10 text-white mb-4">
-              <Zap className="h-3.5 w-3.5" /> Get started today
-            </span>
-            <h2 className="text-2xl font-bold text-white text-balance sm:text-4xl">Ready to book your next service?</h2>
-            <p className="mx-auto mt-3 max-w-xl text-ink-400">
-              Join hundreds of ABUAD students who trust Servicely for their professional service needs.
-            </p>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link to="/services" className="btn-accent btn-lg">
-                Book a Service <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/signup" className="btn-lg btn border border-ink-700 bg-ink-800 text-white hover:bg-ink-700">
-                Become a Provider
-              </Link>
+              {reviewsLoading ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))}
+                </div>
+              ) : (
+                <motion.div
+                  variants={stagger}
+                  initial="hidden"
+                  whileInView="show"
+                  viewport={{ once: true, margin: '-40px' }}
+                  className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3"
+                >
+                  {reviews.map((review, i) => (
+                    <motion.div
+                      key={`${review.reviewerName ?? 'review'}-${i}`}
+                      variants={fadeUp}
+                    >
+                      <ReviewCard {...review} />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
             </div>
-          </div>
-        </motion.div>
-      </section>
+          </section>
+        )}
+
+        {/* ===================================================
+           FINAL CTA
+        =================================================== */}
+        <section
+          aria-label="Get started with Servicely"
+          className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20"
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-40px' }}
+            transition={{ duration: 0.45 }}
+            className="relative overflow-hidden rounded-3xl bg-brand-600 px-6 py-14 text-center shadow-soft sm:px-12 lg:py-16"
+          >
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -left-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-2xl"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -bottom-24 -right-16 h-72 w-72 rounded-full bg-brand-400/40 blur-2xl"
+            />
+
+            <div className="relative">
+              <h2 className="mx-auto max-w-2xl text-balance text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Ready to Get Your Campus Services Done?
+              </h2>
+              <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">
+                Create a free account, discover trusted student
+                providers, and book your next service with confidence.
+              </p>
+
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link
+                  to="/signup"
+                  className="btn bg-white px-7 py-3.5 text-base text-brand-700 shadow-sm hover:bg-lavender"
+                >
+                  Get Started
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <Link
+                  to="/services"
+                  className="btn border border-white/30 bg-transparent px-7 py-3.5 text-base text-white hover:bg-white/10"
+                >
+                  Browse Services
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+      </main>
 
       <Footer />
     </div>

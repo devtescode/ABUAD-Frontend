@@ -1,35 +1,41 @@
-
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import {
   DashboardLayout,
   DashboardHeader,
 } from "@/components/DashboardLayout";
 import { customerNavItems } from "@/data/customerNavItems";
-import { CustomerServiceCard } from "@/components/CustomerServiceCard";
+import { categories as staticCategories } from "@/data/mockData";
 import {
-  Search,
-  SlidersHorizontal,
-  X,
-  ChevronDown,
-  Sparkles,
-} from "lucide-react";
+  Button,
+  EmptyState,
+  ErrorState,
+  SearchBar,
+  ServiceCard,
+  Skeleton,
+  cn,
+} from "@/components/ui";
+import { RefreshCw, Search, Sparkles, X } from "lucide-react";
 
 const API_URL =
   import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 /* =========================================================
    TYPES
+   (type aliases so they stay assignable to the
+    backend-aware ServiceLike / ProviderLike shapes)
 ========================================================= */
 
-interface Provider {
+type Provider = {
   _id?: string;
   fullName?: string;
   name?: string;
   avatar?: string;
   profileImage?: string;
-}
+};
 
-interface Service {
+type Service = {
   _id: string;
   title: string;
   category: string;
@@ -41,28 +47,27 @@ interface Service {
   createdAt?: string;
 
   provider?: Provider;
-}
+};
 
-interface DisplayService extends Service {
+type DisplayService = Service & {
   providerServiceCount: number;
   additionalServicesCount: number;
-}
+};
 
-interface LoggedInUser {
+type LoggedInUser = {
   _id?: string;
   id?: string;
   fullName?: string;
   name?: string;
   email?: string;
   role?: string;
-}
+};
 
-const categories = [
-  "All",
-  "Photography",
-  "Videography",
-  "Graphic Design",
-  "Makeup",
+const sortOptions = [
+  { value: "newest", label: "Newest" },
+  { value: "price-low", label: "Price: Low to High" },
+  { value: "price-high", label: "Price: High to Low" },
+  { value: "name", label: "Name" },
 ];
 
 /* =========================================================
@@ -71,57 +76,71 @@ const categories = [
 
 const getStoredUserId = (): string | null => {
   try {
-    const storedUser =
-      sessionStorage.getItem(
-        "servicely_user"
-      );
+    const storedUser = sessionStorage.getItem("servicely_user");
 
     if (!storedUser) {
       return null;
     }
 
-    const user: LoggedInUser =
-      JSON.parse(storedUser);
+    const user: LoggedInUser = JSON.parse(storedUser);
 
     return user._id || user.id || null;
   } catch (error) {
-    console.error(
-      "Failed to read logged-in user:",
-      error
-    );
+    console.error("Failed to read logged-in user:", error);
 
     return null;
   }
 };
+
+/*
+ * Search matches title, description, category and provider name —
+ * same client-side filtering behaviour as before the redesign.
+ */
+function matchesSearch(service: Service, rawQuery: string): boolean {
+  const query = rawQuery.trim().toLowerCase();
+
+  if (!query) {
+    return true;
+  }
+
+  const title = (service.title || "").toLowerCase();
+  const description = (service.description || "").toLowerCase();
+  const category = (service.category || "").toLowerCase();
+  const providerName = (
+    service.provider?.fullName ||
+    service.provider?.name ||
+    ""
+  ).toLowerCase();
+
+  return (
+    title.includes(query) ||
+    description.includes(query) ||
+    category.includes(query) ||
+    providerName.includes(query)
+  );
+}
 
 /* =========================================================
    COMPONENT
 ========================================================= */
 
 export function CustomerBrowse() {
-  const [services, setServices] =
-    useState<Service[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [search, setSearch] =
-    useState("");
+  const [search, setSearch] = useState("");
 
-  const [selectedCategory, setSelectedCategory] =
-    useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
-  const [sortBy, setSortBy] =
-    useState("newest");
+  const [sortBy, setSortBy] = useState("newest");
 
-  const [showFilters, setShowFilters] =
-    useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  const [currentUserId, setCurrentUserId] =
-    useState<string | null>(null);
+  /* Increment to re-run the fetch (used by the retry buttons). */
+  const [reloadKey, setReloadKey] = useState(0);
 
   /* =========================================================
      GET CURRENT USER
@@ -135,6 +154,7 @@ export function CustomerBrowse() {
 
   /* =========================================================
      FETCH SERVICES
+     GET /provider/approved-services (Bearer token)
   ========================================================= */
 
   useEffect(() => {
@@ -143,15 +163,10 @@ export function CustomerBrowse() {
         setLoading(true);
         setError("");
 
-        const token =
-          sessionStorage.getItem(
-            "servicely_token"
-          );
+        const token = sessionStorage.getItem("servicely_token");
 
         if (!token) {
-          setError(
-            "Please log in to browse services."
-          );
+          setError("Please log in to browse services.");
 
           return;
         }
@@ -167,24 +182,17 @@ export function CustomerBrowse() {
           }
         );
 
-        const result =
-          await response.json();
+        const result = await response.json();
 
         if (!response.ok) {
           throw new Error(
-            result.message ||
-              "Failed to fetch services."
+            result.message || "Failed to fetch services."
           );
         }
 
-        setServices(
-          result.services || []
-        );
+        setServices(result.services || []);
       } catch (error) {
-        console.error(
-          "Fetch customer services error:",
-          error
-        );
+        console.error("Fetch customer services error:", error);
 
         setError(
           error instanceof Error
@@ -197,7 +205,9 @@ export function CustomerBrowse() {
     };
 
     fetchServices();
-  }, []);
+  }, [reloadKey]);
+
+  const retry = () => setReloadKey((key) => key + 1);
 
   /* =========================================================
      REMOVE CURRENT USER'S OWN SERVICES
@@ -209,8 +219,7 @@ export function CustomerBrowse() {
     }
 
     return services.filter((service) => {
-      const providerId =
-        service.provider?._id;
+      const providerId = service.provider?._id;
 
       if (!providerId) {
         return true;
@@ -221,175 +230,134 @@ export function CustomerBrowse() {
   }, [services, currentUserId]);
 
   /* =========================================================
-     FILTER + SEARCH + GROUP BY PROVIDER
+     CATEGORY CHIPS
+     Static categories from mockData + whatever the
+     backend returned on the approved-services feed.
   ========================================================= */
 
-  const filteredServices =
-    useMemo(() => {
-      let result = [
-        ...servicesFromOtherUsers,
-      ];
+  const categoryOptions = useMemo(() => {
+    const names = new Set<string>();
 
-      /* -----------------------------------------------------
-         SEARCH
-      ----------------------------------------------------- */
-
-      const searchValue =
-        search.trim().toLowerCase();
-
-      if (searchValue) {
-        result = result.filter(
-          (service) => {
-            const title =
-              service.title?.toLowerCase() ||
-              "";
-
-            const description =
-              service.description?.toLowerCase() ||
-              "";
-
-            const category =
-              service.category?.toLowerCase() ||
-              "";
-
-            const providerName =
-              service.provider?.fullName?.toLowerCase() ||
-              service.provider?.name?.toLowerCase() ||
-              "";
-
-            return (
-              title.includes(
-                searchValue
-              ) ||
-              description.includes(
-                searchValue
-              ) ||
-              category.includes(
-                searchValue
-              ) ||
-              providerName.includes(
-                searchValue
-              )
-            );
-          }
-        );
+    staticCategories.forEach((category) => {
+      if (category.name) {
+        names.add(category.name);
       }
+    });
 
-      /* -----------------------------------------------------
-         CATEGORY
-      ----------------------------------------------------- */
-
-      if (
-        selectedCategory !== "All"
-      ) {
-        result = result.filter(
-          (service) =>
-            service.category ===
-            selectedCategory
-        );
+    servicesFromOtherUsers.forEach((service) => {
+      if (service.category) {
+        names.add(service.category);
       }
+    });
 
-      /* -----------------------------------------------------
-         SORT SERVICES BEFORE GROUPING
-      ----------------------------------------------------- */
+    return ["All", ...Array.from(names)];
+  }, [servicesFromOtherUsers]);
 
-      if (sortBy === "price-low") {
-        result.sort(
-          (a, b) =>
-            a.price - b.price
-        );
-      }
+  /* =========================================================
+     FILTER + SEARCH + SORT + GROUP BY PROVIDER
+  ========================================================= */
 
-      if (sortBy === "price-high") {
-        result.sort(
-          (a, b) =>
-            b.price - a.price
-        );
-      }
+  const filteredServices = useMemo(() => {
+    let result = [...servicesFromOtherUsers];
 
-      if (sortBy === "name") {
-        result.sort((a, b) =>
-          a.title.localeCompare(
-            b.title
-          )
-        );
-      }
-
-      if (sortBy === "newest") {
-        result.sort((a, b) => {
-          const dateA = a.createdAt
-            ? new Date(
-                a.createdAt
-              ).getTime()
-            : 0;
-
-          const dateB = b.createdAt
-            ? new Date(
-                b.createdAt
-              ).getTime()
-            : 0;
-
-          return dateB - dateA;
-        });
-      }
-
-      /* -----------------------------------------------------
-         GROUP SERVICES BY PROVIDER
-      ----------------------------------------------------- */
-
-      const providerMap =
-        new Map<
-          string,
-          DisplayService
-        >();
-
-      result.forEach((service) => {
-        /*
-         * If provider ID exists, use it.
-         *
-         * If for some reason the backend doesn't
-         * populate provider, fall back to service ID
-         * so the service is still displayed.
-         */
-        const providerId =
-          service.provider?._id ||
-          `service-${service._id}`;
-
-        const existing =
-          providerMap.get(
-            providerId
-          );
-
-        if (!existing) {
-          providerMap.set(
-            providerId,
-            {
-              ...service,
-              providerServiceCount: 1,
-              additionalServicesCount: 0,
-            }
-          );
-        } else {
-          /*
-           * Same provider has another service.
-           */
-          existing.providerServiceCount += 1;
-
-          existing.additionalServicesCount =
-            existing.providerServiceCount -
-            1;
-        }
-      });
-
-      return Array.from(
-        providerMap.values()
+    /* SEARCH */
+    if (search.trim()) {
+      result = result.filter((service) =>
+        matchesSearch(service, search)
       );
-    }, [
-      servicesFromOtherUsers,
-      search,
-      selectedCategory,
-      sortBy,
-    ]);
+    }
+
+    /* CATEGORY */
+    if (selectedCategory !== "All") {
+      result = result.filter(
+        (service) => service.category === selectedCategory
+      );
+    }
+
+    /* SORT SERVICES BEFORE GROUPING */
+    if (sortBy === "price-low") {
+      result.sort((a, b) => a.price - b.price);
+    }
+
+    if (sortBy === "price-high") {
+      result.sort((a, b) => b.price - a.price);
+    }
+
+    if (sortBy === "name") {
+      result.sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    if (sortBy === "newest") {
+      result.sort((a, b) => {
+        const dateA = a.createdAt
+          ? new Date(a.createdAt).getTime()
+          : 0;
+
+        const dateB = b.createdAt
+          ? new Date(b.createdAt).getTime()
+          : 0;
+
+        return dateB - dateA;
+      });
+    }
+
+    /* GROUP SERVICES BY PROVIDER */
+    const providerMap = new Map<string, DisplayService>();
+
+    result.forEach((service) => {
+      /*
+       * If provider ID exists, use it.
+       *
+       * If for some reason the backend doesn't
+       * populate provider, fall back to service ID
+       * so the service is still displayed.
+       */
+      const providerKey =
+        service.provider?._id || `service-${service._id}`;
+
+      const existing = providerMap.get(providerKey);
+
+      if (!existing) {
+        providerMap.set(providerKey, {
+          ...service,
+          providerServiceCount: 1,
+          additionalServicesCount: 0,
+        });
+      } else {
+        /*
+         * Same provider has another service.
+         */
+        existing.providerServiceCount += 1;
+
+        existing.additionalServicesCount =
+          existing.providerServiceCount - 1;
+      }
+    });
+
+    return Array.from(providerMap.values());
+  }, [servicesFromOtherUsers, search, selectedCategory, sortBy]);
+
+  /* =========================================================
+     RESULT COUNT (services matching search + category)
+  ========================================================= */
+
+  const totalMatchingServices = useMemo(() => {
+    let result = [...servicesFromOtherUsers];
+
+    if (search.trim()) {
+      result = result.filter((service) =>
+        matchesSearch(service, search)
+      );
+    }
+
+    if (selectedCategory !== "All") {
+      result = result.filter(
+        (service) => service.category === selectedCategory
+      );
+    }
+
+    return result.length;
+  }, [servicesFromOtherUsers, search, selectedCategory]);
 
   /* =========================================================
      CLEAR FILTERS
@@ -406,73 +374,13 @@ export function CustomerBrowse() {
     selectedCategory !== "All" ||
     sortBy !== "newest";
 
-  /* =========================================================
-     TOTAL SERVICE COUNT
-  ========================================================= */
-
-  const totalMatchingServices =
-    useMemo(() => {
-      let result = [
-        ...servicesFromOtherUsers,
-      ];
-
-      const searchValue =
-        search.trim().toLowerCase();
-
-      if (searchValue) {
-        result = result.filter(
-          (service) => {
-            const title =
-              service.title?.toLowerCase() ||
-              "";
-
-            const description =
-              service.description?.toLowerCase() ||
-              "";
-
-            const category =
-              service.category?.toLowerCase() ||
-              "";
-
-            const providerName =
-              service.provider?.fullName?.toLowerCase() ||
-              service.provider?.name?.toLowerCase() ||
-              "";
-
-            return (
-              title.includes(
-                searchValue
-              ) ||
-              description.includes(
-                searchValue
-              ) ||
-              category.includes(
-                searchValue
-              ) ||
-              providerName.includes(
-                searchValue
-              )
-            );
-          }
-        );
-      }
-
-      if (
-        selectedCategory !== "All"
-      ) {
-        result = result.filter(
-          (service) =>
-            service.category ===
-            selectedCategory
-        );
-      }
-
-      return result.length;
-    }, [
-      servicesFromOtherUsers,
-      search,
-      selectedCategory,
-    ]);
+  const countLabel = hasActiveFilters
+    ? totalMatchingServices === 1
+      ? "service matches your search"
+      : "services match your search"
+    : totalMatchingServices === 1
+      ? "service available"
+      : "services available";
 
   /* =========================================================
      RENDER
@@ -489,213 +397,173 @@ export function CustomerBrowse() {
       />
 
       {/* =====================================================
-          HERO SEARCH AREA
+          PROMINENT SEARCH + CATEGORY CHIPS
       ===================================================== */}
 
-      <div className="mb-2 overflow-hidden rounded-2xl border border-ink-100 bg-gradient-to-br from-ink-50 via-white to-ink-50 p-5 dark:border-ink-800 dark:from-ink-900 dark:via-ink-900 dark:to-ink-800 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <section
+        aria-label="Search and filter services"
+        className="mb-5 overflow-hidden rounded-2xl border border-slate-200/70 shadow-card dark:border-ink-800"
+      >
+        {/* Brand banner */}
+        <div className="flex flex-col gap-4 bg-gradient-to-br from-brand-600 via-brand-500 to-brand-700 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:from-brand-700 dark:via-brand-600 dark:to-brand-800">
           <div>
-            <div className="mb-2 flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink-900 text-white dark:bg-white dark:text-ink-900">
-                <Sparkles className="h-4 w-4" />
-              </div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20">
+                <Sparkles className="h-4 w-4 text-white dark:text-white" />
+              </span>
 
-              <span className="text-xs font-semibold uppercase tracking-wider text-ink-400">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80 dark:text-white/80">
                 Servicely Marketplace
               </span>
             </div>
 
-            <h2 className="text-xl font-bold text-ink-900 dark:text-white sm:text-2xl">
-              Find the right service for
-              you
+            <h2 className="mt-2 text-lg font-bold text-white sm:text-xl">
+              Find the right service for you
             </h2>
 
-            <p className="mt-0 text-sm text-ink-500 dark:text-ink-400">
-              Browse services offered by
-              ABUAD providers.
+            <p className="mt-1 text-sm text-white/80 dark:text-white/70">
+              Browse trusted services offered by ABUAD providers.
             </p>
           </div>
 
-          <div className="text-left lg:text-right">
-            <p className="text-2xl font-bold text-ink-900 dark:text-white">
-              {totalMatchingServices}
+          <div className="flex items-baseline gap-2 rounded-2xl bg-white/15 px-4 py-3 sm:flex-col sm:items-end sm:gap-0">
+            <p className="text-2xl font-bold leading-none text-white">
+              {loading ? "—" : totalMatchingServices}
             </p>
 
-            <p className="text-xs text-ink-400">
-              {totalMatchingServices ===
-              1
-                ? "service available"
-                : "services available"}
+            <p className="text-xs font-medium text-white/80 sm:mt-1">
+              {loading ? "loading services" : countLabel}
             </p>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+        {/* Search + chips panel */}
+        <div className="space-y-4 bg-white p-4 sm:p-5 dark:bg-ink-900">
+          <SearchBar
+            value={search}
+            onChange={setSearch}
+            placeholder="Search services, categories or providers..."
+            className="w-full sm:flex-1"
+          />
 
-            <input
-              type="text"
-              value={search}
-              onChange={(e) =>
-                setSearch(
-                  e.target.value
-                )
-              }
-              placeholder="Search services, categories or providers..."
-              className="search-input"
-            />
-
-            {search && (
-              <button
-                type="button"
-                onClick={() =>
-                  setSearch("")
-                }
-                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ink-400 hover:bg-ink-100 hover:text-ink-900 dark:hover:bg-ink-700 dark:hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Mobile filter */}
-          <button
-            type="button"
-            onClick={() =>
-              setShowFilters(
-                !showFilters
-              )
-            }
-            className="flex items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm font-semibold text-ink-700 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200 dark:hover:bg-ink-700 sm:hidden"
+          <div
+            role="group"
+            aria-label="Filter by category"
+            className="flex flex-wrap gap-2"
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            {categoryOptions.map((category) => {
+              const active = selectedCategory === category;
 
-            Filters
-          </button>
+              return (
+                <button
+                  key={category}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setSelectedCategory(category)}
+                  className={cn(
+                    "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
+                    active
+                      ? "bg-brand-600 text-white shadow-soft dark:bg-brand-500 dark:text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-lavender hover:text-brand-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+                  )}
+                >
+                  {category}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* =====================================================
-          FILTER BAR
+          RESULTS TOOLBAR
       ===================================================== */}
 
-      <div
-        className={`mb-4 ${
-          showFilters
-            ? "block"
-            : "hidden"
-        } sm:block`}
-      >
-        <div className="flex flex-col gap-4 rounded-2xl border border-ink-100 bg-white p-4 dark:border-ink-800 dark:bg-ink-900 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p
+          aria-live="polite"
+          className="text-sm text-slate-500 dark:text-ink-400"
+        >
+          <span className="font-semibold text-slate-900 dark:text-ink-50">
+            {totalMatchingServices}
+          </span>{" "}
+          {totalMatchingServices === 1 ? "service" : "services"} from{" "}
+          <span className="font-semibold text-slate-900 dark:text-ink-50">
+            {filteredServices.length}
+          </span>{" "}
+          {filteredServices.length === 1 ? "provider" : "providers"}
+        </p>
 
-          {/* Categories */}
-          <div className="flex flex-wrap gap-2">
-            {categories.map(
-              (category) => {
-                const active =
-                  selectedCategory ===
-                  category;
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <label
+            htmlFor="browse-sort"
+            className="text-xs text-slate-500 dark:text-ink-400"
+          >
+            Sort by
+          </label>
 
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() =>
-                      setSelectedCategory(
-                        category
-                      )
-                    }
-                    className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                      active
-                        ? "bg-ink-900 text-white shadow-sm dark:bg-white dark:text-ink-900"
-                        : "bg-ink-50 text-ink-600 hover:bg-ink-100 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                );
-              }
-            )}
-          </div>
+          <select
+            id="browse-sort"
+            value={sortBy}
+            aria-label="Sort services"
+            onChange={(event) => setSortBy(event.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-brand-500 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200"
+          >
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
 
-          {/* Sort */}
-          <div className="flex items-center gap-2">
-            <span className="whitespace-nowrap text-xs text-ink-400">
-              Sort by
-            </span>
-
-            <div className="relative">
-              <select
-                value={sortBy}
-                onChange={(e) =>
-                  setSortBy(
-                    e.target.value
-                  )
-                }
-                className="appearance-none rounded-xl border border-ink-200 bg-white py-2 pl-3 pr-9 text-xs font-semibold text-ink-700 outline-none transition focus:border-ink-900 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200"
-              >
-                <option value="newest">
-                  Newest
-                </option>
-
-                <option value="price-low">
-                  Price: Low to High
-                </option>
-
-                <option value="price-high">
-                  Price: High to Low
-                </option>
-
-                <option value="name">
-                  Name
-                </option>
-              </select>
-
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-400" />
-            </div>
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={
-                  clearFilters
-                }
-                className="flex items-center gap-1 text-xs font-medium text-red-500 hover:text-red-600"
-              >
-                <X className="h-3.5 w-3.5" />
-
-                Clear
-              </button>
-            )}
-          </div>
+          {hasActiveFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={X}
+              aria-label="Clear all filters"
+              onClick={clearFilters}
+            >
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
       {/* =====================================================
-          LOADING
+          LOADING SKELETONS
       ===================================================== */}
 
       {loading && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {[
-            1, 2, 3, 4, 5, 6, 7, 8,
-          ].map((item) => (
+        <div
+          aria-busy="true"
+          className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
+          <span className="sr-only">Loading services…</span>
+
+          {Array.from({ length: 8 }).map((_, index) => (
             <div
-              key={item}
-              className="overflow-hidden rounded-2xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900"
+              key={index}
+              className="card overflow-hidden"
+              aria-hidden="true"
             >
-              <div className="h-52 animate-pulse bg-ink-100 dark:bg-ink-800" />
+              <div className="aspect-[16/10] animate-pulse bg-slate-100 dark:bg-ink-800" />
 
-              <div className="space-y-3 p-5">
-                <div className="h-4 w-3/4 animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+              <div className="space-y-3 p-4">
+                <Skeleton className="h-4 w-3/4" />
 
-                <div className="h-3 w-full animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-6 w-6 rounded-full" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
 
-                <div className="h-3 w-2/3 animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
 
-                <div className="h-10 animate-pulse rounded-xl bg-ink-100 dark:bg-ink-800" />
+                <div className="flex items-center justify-between pt-1">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-7 w-24 rounded-lg" />
+                </div>
               </div>
             </div>
           ))}
@@ -707,99 +575,119 @@ export function CustomerBrowse() {
       ===================================================== */}
 
       {!loading && error && (
-        <div className="flex min-h-[350px] items-center justify-center">
-          <div className="max-w-sm text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500 dark:bg-red-500/10">
-              <X className="h-5 w-5" />
-            </div>
-
-            <h3 className="mt-4 text-base font-semibold text-ink-900 dark:text-white">
-              Unable to load services
-            </h3>
-
-            <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-              {error}
-            </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                window.location.reload()
-              }
-              className="btn-primary btn-sm mt-4"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
+        <ErrorState message={error} onRetry={retry} />
       )}
 
       {/* =====================================================
           EMPTY
       ===================================================== */}
 
-      {!loading &&
-        !error &&
-        filteredServices.length ===
-          0 && (
-          <div className="flex min-h-[350px] items-center justify-center rounded-2xl border border-dashed border-ink-200 dark:border-ink-800">
-            <div className="max-w-sm px-6 text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-100 text-ink-500 dark:bg-ink-800 dark:text-ink-300">
-                <Search className="h-6 w-6" />
-              </div>
-
-              <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-white">
-                No services found
-              </h3>
-
-              <p className="mt-1 text-sm leading-6 text-ink-500 dark:text-ink-400">
-                We couldn't find any
-                services matching your
-                search or filters.
-              </p>
-
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={
-                    clearFilters
-                  }
-                  className="mt-4 text-sm font-semibold text-ink-900 underline underline-offset-4 dark:text-white"
-                >
-                  Clear filters
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+      {!loading && !error && filteredServices.length === 0 && (
+        <EmptyState
+          icon={Search}
+          title="No services found"
+          description={
+            hasActiveFilters
+              ? "We couldn't find any services matching your search or filters."
+              : "There are no services available right now. Please check back soon."
+          }
+          action={
+            hasActiveFilters ? (
+              <Button variant="outline" icon={X} onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : (
+              <Button variant="outline" icon={RefreshCw} onClick={retry}>
+                Refresh
+              </Button>
+            )
+          }
+        />
+      )}
 
       {/* =====================================================
-          SERVICES
+          SERVICES (grouped by provider)
       ===================================================== */}
 
-      {!loading &&
-        !error &&
-        filteredServices.length >
-          0 && (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredServices.map(
-              (service) => (
-                <CustomerServiceCard
-                  key={service._id}
-                  service={service}
-                  additionalServicesCount={
-                    service.additionalServicesCount
+      {!loading && !error && filteredServices.length > 0 && (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {filteredServices.map((group, index) => {
+            const providerId = group.provider?._id;
+
+            const providerLabel =
+              group.provider?.fullName ||
+              group.provider?.name ||
+              "provider";
+
+            const providerServices = servicesFromOtherUsers.filter(
+              (candidate) =>
+                candidate.provider?._id === group.provider?._id
+            );
+
+            return (
+              <motion.div
+                key={
+                  providerId
+                    ? `provider-${providerId}`
+                    : `service-${group._id}`
+                }
+                initial={{ opacity: 0, y: 18 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.4,
+                  delay: Math.min(index * 0.05, 0.4),
+                  ease: "easeOut",
+                }}
+                className="relative"
+              >
+                <ServiceCard
+                  service={group}
+                  action={
+                    providerId ? (
+                      <div className="flex flex-col items-end gap-1">
+                        <Link
+                          to={`/book/${providerId}?service=${group._id}`}
+                          aria-label={`Book Now: ${group.title} with ${providerLabel}`}
+                          className="btn-primary btn-sm whitespace-nowrap"
+                        >
+                          Book Now
+                        </Link>
+
+                        <Link
+                          to={`/providers/${providerId}`}
+                          state={{ providerServices }}
+                          className="text-[11px] font-semibold text-brand-600 transition hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                        >
+                          View provider
+                        </Link>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled
+                        aria-label="Provider unavailable"
+                        className="btn-outline btn-sm whitespace-nowrap"
+                      >
+                        Unavailable
+                      </button>
+                    )
                   }
-                  providerServices={servicesFromOtherUsers.filter(
-                    (candidate) =>
-                      candidate.provider?._id ===
-                      service.provider?._id
-                  )}
                 />
-              )
-            )}
-          </div>
-        )}
+
+                {group.additionalServicesCount > 0 && (
+                  <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-brand-700 shadow-sm backdrop-blur dark:bg-ink-900/90 dark:text-brand-300">
+                    +{group.additionalServicesCount} more
+                    <span className="sr-only">
+                      {" "}
+                      services from this provider
+                    </span>
+                  </span>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </DashboardLayout>
   );
 }

@@ -8,26 +8,28 @@ import {
   Mail,
   Lock,
   UserCircle,
-  ShieldCheck,
-  ArrowLeft,
   CheckCircle2,
   Eye,
   EyeOff,
   Sparkles,
   ShoppingBag,
-  LayoutDashboard,
-  Shield,
   TrendingUp,
   Wallet,
   Star,
   Calendar,
-  Phone,
   GraduationCap,
   Users,
+  Camera,
+  AlertCircle,
+  Phone,
+  ChevronDown,
+  ArrowLeft,
+  type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/context/AppContext';
 import type { UserRole } from '@/data/mockData';
 import { Logo } from '@/components/shared';
+import { Button, cn } from '@/components/ui';
 
 type AccountRole = 'customer' | 'provider';
 
@@ -36,7 +38,6 @@ type RoleConfig = {
   title: string;
   subtitle: string;
   icon: typeof User;
-  accent: string;
   benefits: { icon: typeof Star; text: string }[];
   cta: string;
   redirect: string;
@@ -51,7 +52,6 @@ const roleConfigs: Record<
     title: 'Customer Login',
     subtitle: 'Book trusted service providers in minutes',
     icon: User,
-    accent: 'primary',
     benefits: [
       {
         icon: ShoppingBag,
@@ -75,7 +75,6 @@ const roleConfigs: Record<
     title: 'Provider Login',
     subtitle: 'Manage your services and grow your business',
     icon: Briefcase,
-    accent: 'sky',
     benefits: [
       {
         icon: Calendar,
@@ -93,33 +92,12 @@ const roleConfigs: Record<
     cta: 'Sign in to your studio',
     redirect: '/provider',
   },
-
-  // admin: {
-  //   id: 'admin',
-  //   title: 'Admin Portal',
-  //   subtitle: 'Manage and monitor the marketplace',
-  //   icon: Shield,
-  //   accent: 'ink',
-  //   benefits: [
-  //     {
-  //       icon: ShieldCheck,
-  //       text: 'Verify and approve providers',
-  //     },
-  //     {
-  //       icon: LayoutDashboard,
-  //       text: 'Monitor platform analytics',
-  //     },
-  //     {
-  //       icon: CheckCircle2,
-  //       text: 'Resolve disputes and manage reviews',
-  //     },
-  //   ],
-  //   cta: 'Access admin dashboard',
-  //   redirect: '/admin',
-  // },
 };
 
 // ─── Auth Shell ──────────────────────────────────────────────────────────────
+// Premium split-screen layout:
+//  • Desktop: brand-indigo marketing panel (left) + centered form card (right)
+//  • Mobile: compact brand header + full-width form card
 
 function AuthShell({
   title,
@@ -135,44 +113,52 @@ function AuthShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen flex-col bg-ink-50 dark:bg-ink-950 lg:flex-row">
-      {/* Left brand panel */}
-      <div className="relative hidden flex-1 overflow-hidden bg-ink-900 dark:bg-ink-900 lg:flex lg:flex-col lg:justify-between lg:p-12">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary-600/10 blur-3xl" />
-          <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-sky-500/10 blur-3xl" />
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-ink-950 lg:grid lg:grid-cols-2">
+      {/* ── Left brand panel ── */}
+      <aside className="relative hidden overflow-hidden bg-brand-600 lg:flex lg:flex-col lg:justify-between lg:p-12">
+        {/* Decorative shapes */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          aria-hidden="true"
+        >
+          <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-brand-700/70 blur-3xl" />
+          <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-brand-800/50 blur-3xl" />
+          <div className="absolute right-10 top-1/3 h-56 w-56 rounded-full bg-brand-400/25 blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.10)_1px,transparent_1px)] [background-size:28px_28px]" />
         </div>
 
-        {/* Logo */}
-        <div className="relative z-10">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-              <ShieldCheck className="h-4 w-4 text-white" />
-            </div>
+        {/* White logo */}
+        <Link
+          to="/"
+          className="relative z-10 flex items-center gap-3"
+          aria-label="Servicely home"
+        >
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-soft">
+            <Camera className="h-5 w-5 text-brand-600" />
+          </span>
 
-            <span className="text-lg font-bold text-white">
-              Servicely
-            </span>
-          </Link>
-        </div>
+          <span className="text-xl font-bold tracking-tight text-white">
+            Servicely
+          </span>
+        </Link>
 
-        {/* Main content */}
+        {/* Marketing copy */}
         <div className="relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4 }}
-            className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-ink-300"
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90 backdrop-blur"
           >
-            {/* <Sparkles className="h-3.5 w-3.5 text-primary-400" /> */}
+            <Sparkles className="h-3.5 w-3.5" />
             Built for ABUAD students
           </motion.div>
 
           <motion.h2
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.4 }}
-            className="max-w-lg text-3xl font-bold leading-tight text-white"
+            transition={{ delay: 0.08, duration: 0.4 }}
+            className="max-w-lg text-3xl font-bold leading-tight text-white xl:text-4xl"
           >
             Trusted services.
             <br />
@@ -182,127 +168,295 @@ function AuthShell({
           <motion.p
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.4 }}
-            className="mt-4 max-w-md text-sm leading-6 text-ink-400"
+            transition={{ delay: 0.14, duration: 0.4 }}
+            className="mt-4 max-w-md text-sm leading-6 text-brand-100"
           >
             Join the marketplace where ABUAD students find,
             book, and pay for professional services with confidence.
           </motion.p>
 
-          <div className="mt-8 space-y-3">
+          <ul className="mt-8 space-y-3.5">
             {benefits.map((benefit, i) => (
-              <motion.div
+              <motion.li
                 key={i}
-                initial={{ opacity: 0, x: -12 }}
+                initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{
-                  delay: 0.2 + i * 0.08,
+                  delay: 0.22 + i * 0.08,
                   duration: 0.4,
                 }}
-                className="flex items-center gap-3 text-ink-300"
+                className="flex items-center gap-3"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5">
-                  <benefit.icon className="h-4 w-4" />
-                </div>
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/15">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-white" />
+                </span>
 
-                <span className="text-sm">
+                <span className="text-sm font-medium text-white/90">
                   {benefit.text}
                 </span>
-              </motion.div>
+              </motion.li>
             ))}
-          </div>
+          </ul>
         </div>
 
-        <p className="relative z-10 text-xs text-ink-600">
-           Servicely
+        <p className="relative z-10 text-xs text-brand-200">
+          Servicely — the ABUAD campus marketplace
         </p>
-      </div>
+      </aside>
 
-      {/* Right form panel */}
-      <div className="flex flex-1 items-center justify-center p-5 sm:p-8 lg:p-12">
-        <div className="w-full max-w-lg">
-          {/* Mobile logo */}
-          <div className="lg:hidden">
+      {/* ── Right form panel ── */}
+      <main className="flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-8 lg:min-h-0 lg:py-12">
+        <div className="w-full max-w-md">
+          {/* Compact mobile brand header */}
+          <div className="mb-6 flex items-center justify-between lg:hidden">
             <Logo />
+
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 shadow-sm">
+              <Camera className="h-4 w-4 text-white" />
+            </span>
           </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
+          <motion.section
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mt-8 lg:mt-0"
+            transition={{ duration: 0.35 }}
+            className="card p-6 sm:p-8"
           >
-            <h1 className="text-2xl font-bold tracking-tight text-ink-900 dark:text-ink-50 sm:text-3xl">
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-ink-50">
               {title}
             </h1>
 
-            <p className="mt-2 text-sm text-ink-500 dark:text-ink-400 sm:text-base">
+            <p className="mt-1.5 text-sm text-slate-500 dark:text-ink-400">
               {subtitle}
             </p>
 
-            <div className="mt-7">
-              {children}
-            </div>
+            <div className="mt-7">{children}</div>
 
-            {footer && (
-              <div className="mt-6">
-                {footer}
-              </div>
-            )}
-          </motion.div>
+            {footer && <div className="mt-7">{footer}</div>}
+          </motion.section>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
 
-// ─── Password Input ──────────────────────────────────────────────────────────
+// ─── Field Primitives ────────────────────────────────────────────────────────
 
-function PasswordInput({
-  value,
-  onChange,
-  placeholder,
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+
+  return (
+    <p
+      role="alert"
+      className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-danger-600 dark:text-danger-400"
+    >
+      <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+      <span>{message}</span>
+    </p>
+  );
+}
+
+function TextField({
+  id,
+  label,
+  icon: Icon,
+  error,
+  hint,
+  rightAdornment,
+  className,
+  ...props
 }: {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  error?: string;
+  hint?: React.ReactNode;
+  rightAdornment?: React.ReactNode;
+  className?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div>
+      <label htmlFor={id} className="label">
+        {label}
+      </label>
+
+      <div className="relative">
+        <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-ink-500" />
+
+        <input
+          id={id}
+          aria-invalid={error ? true : undefined}
+          className={cn(
+            'input h-11 text-base sm:text-sm',
+            rightAdornment ? 'pl-11 pr-12' : 'pl-11 pr-4',
+            error &&
+              'border-danger-300 focus:border-danger-500 focus:ring-danger-500/10 dark:border-danger-500/40',
+            className
+          )}
+          {...props}
+        />
+
+        {rightAdornment}
+      </div>
+
+      <FieldError message={error} />
+
+      {hint && (
+        <p className="mt-1.5 text-xs text-slate-400 dark:text-ink-500">
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PasswordField({
+  id,
+  label = 'Password',
+  value,
+  onValueChange,
+  placeholder,
+  autoComplete,
+  error,
+  hint,
+  labelAction,
+  required = true,
+}: {
+  id: string;
+  label?: string;
   value: string;
-  onChange: (v: string) => void;
+  onValueChange: (v: string) => void;
   placeholder?: string;
+  autoComplete?: string;
+  error?: string;
+  hint?: React.ReactNode;
+  labelAction?: React.ReactNode;
+  required?: boolean;
 }) {
   const [show, setShow] = useState(false);
 
   return (
-    <div className="relative">
-      <Lock className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <label htmlFor={id} className="label mb-0">
+          {label}
+        </label>
 
-      <input
-        type={show ? 'text' : 'password'}
-        className="input pl-10 text-base sm:text-sm pr-11"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required
-        minLength={6}
-      />
+        {labelAction}
+      </div>
 
-      <button
-        type="button"
-        onClick={() => setShow(!show)}
-        className="absolute right-3 top-3 text-ink-400 transition-colors hover:text-ink-600 dark:hover:text-ink-200"
-        aria-label={show ? 'Hide password' : 'Show password'}
-      >
-        {show ? (
-          <EyeOff className="h-5 w-5" />
-        ) : (
-          <Eye className="h-5 w-5" />
-        )}
-      </button>
+      <div className="relative">
+        <Lock className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-ink-500" />
+
+        <input
+          id={id}
+          type={show ? 'text' : 'password'}
+          className={cn(
+            'input h-11 pl-11 pr-12 text-base sm:text-sm',
+            error &&
+              'border-danger-300 focus:border-danger-500 focus:ring-danger-500/10 dark:border-danger-500/40'
+          )}
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onValueChange(e.target.value)}
+          autoComplete={autoComplete}
+          aria-invalid={error ? true : undefined}
+          required={required}
+          minLength={required ? 6 : undefined}
+        />
+
+        <button
+          type="button"
+          onClick={() => setShow(!show)}
+          className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-ink-200"
+          aria-label={show ? 'Hide password' : 'Show password'}
+        >
+          {show ? (
+            <EyeOff className="h-[18px] w-[18px]" />
+          ) : (
+            <Eye className="h-[18px] w-[18px]" />
+          )}
+        </button>
+      </div>
+
+      <FieldError message={error} />
+
+      {hint && (
+        <p className="mt-1.5 text-xs text-slate-400 dark:text-ink-500">
+          {hint}
+        </p>
+      )}
     </div>
+  );
+}
+
+// ─── Premium role chooser card ──────────────────────────────────────────────
+
+function RoleChoiceCard({
+  selected,
+  icon: Icon,
+  title,
+  desc,
+  onSelect,
+}: {
+  selected: boolean;
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={cn(
+        'group relative flex w-full items-start gap-4 rounded-2xl border p-4 text-left transition-all duration-200',
+        selected
+          ? 'border-brand-500 bg-white shadow-soft ring-4 ring-brand-500/10 dark:bg-ink-900'
+          : 'border-slate-200 bg-white hover:border-brand-300 hover:shadow-card-hover dark:border-ink-700 dark:bg-ink-900 dark:hover:border-ink-600'
+      )}
+    >
+      <span
+        className={cn(
+          'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors',
+          selected
+            ? 'bg-brand-600 text-white'
+            : 'bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300'
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block font-semibold text-slate-900 dark:text-ink-50">
+          {title}
+        </span>
+
+        <span className="mt-1 block text-sm leading-5 text-slate-500 dark:text-ink-400">
+          {desc}
+        </span>
+      </span>
+
+      <span
+        aria-hidden="true"
+        className={cn(
+          'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors',
+          selected
+            ? 'border-brand-600 bg-brand-600 text-white'
+            : 'border-slate-300 dark:border-ink-600'
+        )}
+      >
+        {selected && <CheckCircle2 className="h-3 w-3" />}
+      </span>
+    </button>
   );
 }
 
 // ─── Signup Role Selection ───────────────────────────────────────────────────
 
 export function SignupRolePage() {
-  const [hovered, setHovered] = useState<AccountRole | null>(null);
+  const [selected, setSelected] = useState<AccountRole | null>(null);
   const navigate = useNavigate();
 
   const roles: {
@@ -310,28 +464,20 @@ export function SignupRolePage() {
     title: string;
     desc: string;
     icon: typeof User;
-    bg: string;
-    iconBg: string;
   }[] = [
-      {
-        id: 'customer',
-        title: 'Customer',
-        desc: 'Find and book trusted service providers for your events and projects.',
-        icon: User,
-        bg: 'hover:border-primary-300 hover:bg-primary-50/50 dark:hover:border-primary-700 dark:hover:bg-primary-950/30',
-        iconBg:
-          'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400',
-      },
-      {
-        id: 'provider',
-        title: 'Service Provider',
-        desc: 'Offer your services, receive bookings, and grow your client base.',
-        icon: Briefcase,
-        bg: 'hover:border-sky-300 hover:bg-sky-50/50 dark:hover:border-sky-700 dark:hover:bg-sky-950/30',
-        iconBg:
-          'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400',
-      },
-    ];
+    {
+      id: 'customer',
+      title: 'Customer',
+      desc: 'Find and book trusted service providers for your events and projects.',
+      icon: User,
+    },
+    {
+      id: 'provider',
+      title: 'Service Provider',
+      desc: 'Offer your services, receive bookings, and grow your client base.',
+      icon: Briefcase,
+    },
+  ];
 
   return (
     <AuthShell
@@ -352,50 +498,60 @@ export function SignupRolePage() {
         },
       ]}
     >
-      <div className="space-y-3">
-        {roles.map((role, i) => (
-          <motion.button
-            key={role.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            onHoverStart={() => setHovered(role.id)}
-            onHoverEnd={() => setHovered(null)}
-            onClick={() => navigate(`/signup/${role.id}`)}
-            className={`group flex w-full items-center gap-4 rounded-2xl border border-ink-200 bg-white p-4 text-left shadow-sm transition-all dark:border-ink-700 dark:bg-ink-900 ${role.bg}`}
-          >
-            <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${role.iconBg} transition-transform group-hover:scale-105`}
-            >
-              <role.icon className="h-5 w-5" />
-            </div>
+      <fieldset>
+        <legend className="sr-only">Choose your account type</legend>
 
-            <div className="flex-1">
-              <h3 className="font-semibold text-ink-900 dark:text-ink-50">
-                {role.title}
-              </h3>
-
-              <p className="mt-1 text-sm leading-5 text-ink-500 dark:text-ink-400">
-                {role.desc}
-              </p>
-            </div>
-
+        <div className="space-y-3">
+          {roles.map((role, i) => (
             <motion.div
-              animate={{
-                x: hovered === role.id ? 4 : 0,
-              }}
+              key={role.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08, duration: 0.35 }}
             >
-              <ArrowRight className="h-4 w-4 text-ink-400 dark:text-ink-600" />
+              <RoleChoiceCard
+                selected={selected === role.id}
+                icon={role.icon}
+                title={role.title}
+                desc={role.desc}
+                onSelect={() =>
+                  selected === role.id
+                    ? navigate(`/signup/${role.id}`)
+                    : setSelected(role.id)
+                }
+              />
             </motion.div>
-          </motion.button>
-        ))}
-      </div>
+          ))}
+        </div>
+      </fieldset>
 
-      <p className="mt-6 text-center text-sm text-ink-500 dark:text-ink-400">
+      <AnimatePresence>
+        {selected && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <Button
+              size="lg"
+              icon={ArrowRight}
+              className="mt-4 w-full"
+              onClick={() => navigate(`/signup/${selected}`)}
+            >
+              Continue as{' '}
+              {selected === 'customer' ? 'Customer' : 'Service Provider'}
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <p className="mt-6 text-center text-sm text-slate-500 dark:text-ink-400">
         Already have an account?{' '}
         <Link
           to="/login"
-          className="font-semibold text-ink-900 hover:text-primary-600 dark:text-ink-50"
+          className="font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
         >
           Login
         </Link>
@@ -430,67 +586,85 @@ export function SignupPage() {
   const isProvider = role === 'provider';
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  setError('');
+    setError('');
 
-  if (!gender) {
-    setError('Please select your gender.');
-    return;
-  }
-
-  if (phoneNumber.length !== 10) {
-    setError(
-      'Please enter a valid 10-digit Nigerian phone number.'
-    );
-    return;
-  }
-
-  if (password.length < 6) {
-    setError(
-      'Password must be at least 6 characters.'
-    );
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    // Create the account
-    await signup(
-      name.trim(),
-      matricNo.trim(),
-      email.trim(),
-      phoneNumber.trim(),
-      gender,
-      password,
-      role
-    );
-
-    // IMPORTANT:
-    // Signup does NOT log the user in.
-    // Redirect to the correct login page based on role.
-
-    if (role === 'customer') {
-      navigate('/login/customer');
-      
+    if (!gender) {
+      setError('Please select your gender.');
       return;
     }
 
-    if (role === 'provider') {
-      navigate('/login/provider');
+    if (phoneNumber.length !== 10) {
+      setError(
+        'Please enter a valid 10-digit Nigerian phone number.'
+      );
       return;
     }
 
-  } catch (error: any) {
-    setError(
-      error?.message ||
-        'Unable to create your account. Please try again.'
-    );
-  } finally {
-    setLoading(false);
-  }
-};
+    if (password.length < 6) {
+      setError(
+        'Password must be at least 6 characters.'
+      );
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // Create the account
+      await signup(
+        name.trim(),
+        matricNo.trim(),
+        email.trim(),
+        phoneNumber.trim(),
+        gender,
+        password,
+        role
+      );
+
+      // IMPORTANT:
+      // Signup does NOT log the user in.
+      // Redirect to the correct login page based on role.
+
+      if (role === 'customer') {
+        navigate('/login/customer');
+
+        return;
+      }
+
+      if (role === 'provider') {
+        navigate('/login/provider');
+        return;
+      }
+    } catch (error: any) {
+      setError(
+        error?.message ||
+          'Unable to create your account. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /*
+   * Inline field errors — same validation messages as before,
+   * rendered directly below the field they belong to.
+   */
+  const genderError =
+    error === 'Please select your gender.' ? error : undefined;
+  const phoneError =
+    error === 'Please enter a valid 10-digit Nigerian phone number.'
+      ? error
+      : undefined;
+  const passwordError =
+    error === 'Password must be at least 6 characters.'
+      ? error
+      : undefined;
+  const bannerError =
+    !genderError && !phoneError && !passwordError && error
+      ? error
+      : undefined;
 
   return (
     <AuthShell
@@ -544,16 +718,20 @@ export function SignupPage() {
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`flex items-center gap-3 rounded-xl border p-3 ${isProvider
+          className={cn(
+            'flex items-center gap-3 rounded-xl border p-3',
+            isProvider
               ? 'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30'
-              : 'border-primary-200 bg-primary-50 dark:border-primary-900 dark:bg-primary-950/30'
-            }`}
+              : 'border-brand-200 bg-lavender dark:border-brand-900 dark:bg-brand-950/40'
+          )}
         >
           <div
-            className={`flex h-9 w-9 items-center justify-center rounded-lg ${isProvider
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-lg',
+              isProvider
                 ? 'bg-sky-100 text-sky-600 dark:bg-sky-900/50 dark:text-sky-400'
-                : 'bg-primary-100 text-primary-600 dark:bg-primary-900/50 dark:text-primary-400'
-              }`}
+                : 'bg-brand-100 text-brand-600 dark:bg-brand-900/50 dark:text-brand-300'
+            )}
           >
             {isProvider ? (
               <Briefcase className="h-4 w-4" />
@@ -563,11 +741,11 @@ export function SignupPage() {
           </div>
 
           <div>
-            <p className="text-xs text-ink-500 dark:text-ink-400">
+            <p className="text-xs text-slate-500 dark:text-ink-400">
               Creating account as
             </p>
 
-            <p className="text-sm font-semibold capitalize text-ink-900 dark:text-ink-50">
+            <p className="text-sm font-semibold capitalize text-slate-900 dark:text-ink-50">
               {isProvider
                 ? 'Service Provider'
                 : 'Customer'}
@@ -576,15 +754,15 @@ export function SignupPage() {
 
           <Link
             to="/signup"
-            className="ml-auto text-xs font-medium text-primary-600 hover:text-primary-700"
+            className="ml-auto text-xs font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
           >
             Change
           </Link>
         </motion.div>
 
-        {/* Error message */}
+        {/* Error message (server / unmapped errors) */}
         <AnimatePresence>
-          {error && (
+          {bannerError && (
             <motion.div
               initial={{
                 opacity: 0,
@@ -601,78 +779,55 @@ export function SignupPage() {
                 height: 0,
                 y: -5,
               }}
-              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400"
+              role="alert"
+              className="overflow-hidden"
             >
-              {error}
+              <div className="flex items-start gap-2.5 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-500/25 dark:bg-danger-500/10 dark:text-danger-200">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{bannerError}</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Full Name */}
-        <motion.div
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.05 }}
-        >
-          <label className="label">Full Name</label>
-
-          <div className="relative">
-            <UserCircle className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
-
-            <input
-              className="input pl-10 text-base sm:text-sm"
-              placeholder="Enter your full name"
-              value={name}
-              onChange={(e) =>
-                setName(e.target.value)
-              }
-              autoComplete="name"
-              required
-            />
-          </div>
-        </motion.div>
+        <TextField
+          id="signup-name"
+          label="Full Name"
+          icon={UserCircle}
+          placeholder="Enter your full name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="name"
+          required
+        />
 
         {/* Matric Number + Gender */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Matric Number */}
-          <motion.div
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <label className="label">
-              Matric Number
+          <TextField
+            id="signup-matric"
+            label="Matric Number"
+            icon={GraduationCap}
+            className="uppercase"
+            placeholder="e.g. EU/20/1234"
+            value={matricNo}
+            onChange={(e) =>
+              setMatricNo(e.target.value.toUpperCase())
+            }
+            required
+          />
+
+          {/* Gender */}
+          <div>
+            <label htmlFor="signup-gender" className="label">
+              Gender
             </label>
 
             <div className="relative">
-              <GraduationCap className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
-
-              <input
-                className="input pl-10 text-base sm:text-sm uppercase"
-                placeholder="e.g. EU/20/1234"
-                value={matricNo}
-                onChange={(e) =>
-                  setMatricNo(
-                    e.target.value.toUpperCase()
-                  )
-                }
-                required
-              />
-            </div>
-          </motion.div>
-
-          {/* Gender */}
-          <motion.div
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <label className="label">Gender</label>
-
-            <div className="relative">
-              <Users className="pointer-events-none absolute left-3 top-3 h-5 w-5 text-ink-400" />
+              <Users className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-ink-500" />
 
               <select
+                id="signup-gender"
                 value={gender}
                 onChange={(e) =>
                   setGender(
@@ -683,7 +838,12 @@ export function SignupPage() {
                   )
                 }
                 required
-                className="input appearance-none pl-10 pr-4"
+                aria-invalid={genderError ? true : undefined}
+                className={cn(
+                  'input h-11 appearance-none pl-11 pr-10 text-base sm:text-sm',
+                  genderError &&
+                    'border-danger-300 focus:border-danger-500 focus:ring-danger-500/10 dark:border-danger-500/40'
+                )}
               >
                 <option value="">
                   Select gender
@@ -693,57 +853,57 @@ export function SignupPage() {
                   Female
                 </option>
               </select>
+
+              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-ink-500" />
             </div>
-          </motion.div>
+
+            <FieldError message={genderError} />
+          </div>
         </div>
 
         {/* Email + Phone */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Email */}
-          <motion.div
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            <label className="label">
-              Email Address
-            </label>
-
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
-
-              <input
-                type="email"
-                className="input pl-10 text-base sm:text-sm"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) =>
-                  setEmail(e.target.value)
-                }
-                autoComplete="email"
-                required
-              />
-            </div>
-          </motion.div>
+          <TextField
+            id="signup-email"
+            label="Email Address"
+            icon={Mail}
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
 
           {/* Phone */}
-          <motion.div
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            <label className="label">
+          <div>
+            <label htmlFor="signup-phone" className="label">
               Phone Number
             </label>
 
-            <div className="flex">
-              <div className="flex items-center rounded-l-lg border border-r-0 border-ink-200 bg-ink-50 px-3 text-sm font-medium text-ink-500 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-400">
+            <div className="relative">
+              <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-ink-500" />
+
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-10 top-1/2 h-5 w-px -translate-y-1/2 bg-slate-200 dark:bg-ink-700"
+              />
+
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-[3.25rem] top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500 dark:text-ink-400"
+              >
                 +234
               </div>
 
               <input
+                id="signup-phone"
                 type="tel"
-                className="input min-w-0 flex-1 rounded-l-none text-base sm:text-sm"
+                className={cn(
+                  'input h-11 pl-[5.75rem] pr-4 text-base sm:text-sm',
+                  phoneError &&
+                    'border-danger-300 focus:border-danger-500 focus:ring-danger-500/10 dark:border-danger-500/40'
+                )}
                 placeholder="8012345678"
                 value={phoneNumber}
                 onChange={(e) =>
@@ -755,37 +915,33 @@ export function SignupPage() {
                 }
                 autoComplete="tel"
                 inputMode="numeric"
+                aria-invalid={phoneError ? true : undefined}
                 required
               />
             </div>
-          </motion.div>
+
+            <FieldError message={phoneError} />
+          </div>
         </div>
 
         {/* Password */}
-        <motion.div
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <label className="label">Password</label>
-
-          <PasswordInput
-            value={password}
-            onChange={setPassword}
-            placeholder="Create a password"
-          />
-
-          <p className="mt-1.5 text-xs text-ink-400">
-            Use at least 6 characters.
-          </p>
-        </motion.div>
+        <PasswordField
+          id="signup-password"
+          label="Password"
+          value={password}
+          onValueChange={setPassword}
+          placeholder="Create a password"
+          autoComplete="new-password"
+          error={passwordError}
+          hint="Use at least 6 characters."
+        />
 
         {/* Provider notice */}
         {isProvider && (
           <motion.div
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25 }}
+            transition={{ delay: 0.2 }}
             className="flex items-start gap-3 rounded-xl border border-accent-200 bg-accent-50 p-3.5 text-xs leading-5 text-accent-700 dark:border-accent-900/50 dark:bg-accent-950/30 dark:text-accent-400"
           >
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
@@ -800,54 +956,29 @@ export function SignupPage() {
         )}
 
         {/* Terms */}
-        <p className="text-xs leading-5 text-ink-400 dark:text-ink-500">
+        <p className="text-xs leading-5 text-slate-400 dark:text-ink-500">
           By creating an account, you agree to use
           Servicely responsibly and provide accurate
           information.
         </p>
 
         {/* Submit */}
-        <motion.button
+        <Button
           type="submit"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          disabled={loading}
-          className="btn-primary btn-lg flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
-          whileHover={{
-            scale: loading ? 1 : 1.01,
-          }}
-          whileTap={{
-            scale: loading ? 1 : 0.99,
-          }}
+          size="lg"
+          loading={loading}
+          icon={ArrowRight}
+          className="w-full"
         >
-          {loading ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{
-                  duration: 0.8,
-                  repeat: Infinity,
-                  ease: 'linear',
-                }}
-                className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white"
-              />
-
-              Creating account...
-            </>
-          ) : (
-            <>
-              {isProvider
-                ? 'Continue to Onboarding'
-                : 'Create Account'}
-
-              <ArrowRight className="h-4 w-4" />
-            </>
-          )}
-        </motion.button>
+          {loading
+            ? 'Creating account...'
+            : isProvider
+              ? 'Continue to Onboarding'
+              : 'Create Account'}
+        </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-ink-500 dark:text-ink-400">
+      <p className="mt-6 text-center text-sm text-slate-500 dark:text-ink-400">
         Already have an account?{' '}
         <Link
           to={
@@ -855,7 +986,7 @@ export function SignupPage() {
               ? '/login/provider'
               : '/login/customer'
           }
-          className="font-semibold text-ink-900 hover:text-primary-600 dark:text-ink-50"
+          className="font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
         >
           Login
         </Link>
@@ -868,36 +999,30 @@ export function SignupPage() {
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [hovered, setHovered] =
-    useState<AccountRole | null>(null);
+  const [selected, setSelected] = useState<AccountRole | null>(null);
 
   const roles: {
     id: AccountRole;
     title: string;
     desc: string;
     icon: typeof User;
-    iconBg: string;
     path: string;
   }[] = [
-      {
-        id: 'customer',
-        title: 'Customer',
-        desc: 'Find and book trusted service providers.',
-        icon: User,
-        iconBg:
-          'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400',
-        path: '/login/customer',
-      },
-      {
-        id: 'provider',
-        title: 'Service Provider',
-        desc: 'Offer services and receive bookings.',
-        icon: Briefcase,
-        iconBg:
-          'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-400',
-        path: '/login/provider',
-      },
-    ];
+    {
+      id: 'customer',
+      title: 'Customer',
+      desc: 'Find and book trusted service providers.',
+      icon: User,
+      path: '/login/customer',
+    },
+    {
+      id: 'provider',
+      title: 'Service Provider',
+      desc: 'Offer services and receive bookings.',
+      icon: Briefcase,
+      path: '/login/provider',
+    },
+  ];
 
   return (
     <AuthShell
@@ -905,7 +1030,7 @@ export function LoginPage() {
       subtitle="Choose your account type to continue"
       benefits={[
         {
-          icon: ShieldCheck,
+          icon: ShoppingBag,
           text: 'Verified providers only',
         },
         {
@@ -918,55 +1043,66 @@ export function LoginPage() {
         },
       ]}
     >
-      <div className="space-y-3">
-        {roles.map((role, i) => (
-          <motion.button
-            key={role.id}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.08 }}
-            onHoverStart={() =>
-              setHovered(role.id)
-            }
-            onHoverEnd={() => setHovered(null)}
-            onClick={() => navigate(role.path)}
-            className="group flex w-full items-center gap-4 rounded-2xl border border-ink-200 bg-white p-4 text-left shadow-sm transition-all hover:border-ink-300 hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:hover:border-ink-600 dark:hover:bg-ink-800"
-          >
-            <div
-              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${role.iconBg} transition-transform group-hover:scale-105`}
-            >
-              <role.icon className="h-5 w-5" />
-            </div>
+      <fieldset>
+        <legend className="sr-only">Choose your account type</legend>
 
-            <div className="flex-1">
-              <h3 className="font-semibold text-ink-900 dark:text-ink-50">
-                {role.title}
-              </h3>
-
-              <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                {role.desc}
-              </p>
-            </div>
-
+        <div className="space-y-3">
+          {roles.map((role, i) => (
             <motion.div
-              animate={{
-                x:
-                  hovered === role.id
-                    ? 4
-                    : 0,
-              }}
+              key={role.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08, duration: 0.35 }}
             >
-              <ArrowRight className="h-4 w-4 text-ink-400 dark:text-ink-600" />
+              <RoleChoiceCard
+                selected={selected === role.id}
+                icon={role.icon}
+                title={role.title}
+                desc={role.desc}
+                onSelect={() =>
+                  selected === role.id
+                    ? navigate(role.path)
+                    : setSelected(role.id)
+                }
+              />
             </motion.div>
-          </motion.button>
-        ))}
-      </div>
+          ))}
+        </div>
+      </fieldset>
 
-      <p className="mt-6 text-center text-sm text-ink-500 dark:text-ink-400">
+      <AnimatePresence>
+        {selected && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <Button
+              size="lg"
+              icon={ArrowRight}
+              className="mt-4 w-full"
+              onClick={() =>
+                navigate(
+                  selected === 'customer'
+                    ? '/login/customer'
+                    : '/login/provider'
+                )
+              }
+            >
+              Continue as{' '}
+              {selected === 'customer' ? 'Customer' : 'Service Provider'}
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <p className="mt-6 text-center text-sm text-slate-500 dark:text-ink-400">
         Don't have an account?{' '}
         <Link
           to="/signup"
-          className="font-semibold text-ink-900 hover:text-primary-600 dark:text-ink-50"
+          className="font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
         >
           Sign up
         </Link>
@@ -1042,16 +1178,25 @@ export function RoleLoginPage() {
     }
   };
 
+  /*
+   * Inline field errors — same validation messages as before.
+   */
+  const credentialsError =
+    error === 'Please enter your email and password.'
+      ? error
+      : undefined;
+  const bannerError = credentialsError ? undefined : error || undefined;
+
   return (
     <AuthShell
       title={config.title}
       subtitle={config.subtitle}
       benefits={config.benefits}
       footer={
-        <div className="flex items-center justify-center gap-4 text-sm">
+        <div className="flex flex-col items-center gap-3 text-sm sm:flex-row sm:justify-between">
           <Link
             to="/login"
-            className="flex items-center gap-1 font-medium text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-50"
+            className="flex items-center gap-1 font-medium text-slate-500 transition-colors hover:text-slate-900 dark:text-ink-400 dark:hover:text-ink-50"
           >
             <ArrowLeft className="h-4 w-4" />
             All logins
@@ -1059,7 +1204,7 @@ export function RoleLoginPage() {
 
           <Link
             to={`/signup/${role}`}
-            className="font-semibold text-ink-900 hover:text-primary-600 dark:text-ink-50"
+            className="font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
           >
             Create {role} account
           </Link>
@@ -1080,27 +1225,26 @@ export function RoleLoginPage() {
             opacity: 1,
             scale: 1,
           }}
-          transition={{ delay: 0.05 }}
-          className="mb-6 flex items-center gap-3 rounded-xl border border-ink-100 bg-ink-50 p-4 dark:border-ink-800 dark:bg-ink-900"
+          className="flex items-center gap-3 rounded-xl border border-brand-100 bg-lavender p-3.5 dark:border-brand-900/60 dark:bg-brand-950/40"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-ink-900 text-white dark:bg-ink-50 dark:text-ink-900">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
             <config.icon className="h-5 w-5" />
-          </div>
+          </span>
 
-          <div>
-            <p className="text-sm font-semibold capitalize text-ink-900 dark:text-ink-50">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold capitalize text-slate-900 dark:text-ink-50">
               {role} Portal
             </p>
 
-            <p className="text-xs text-ink-500 dark:text-ink-400">
+            <p className="text-xs text-slate-500 dark:text-ink-400">
               {config.cta}
             </p>
           </div>
         </motion.div>
 
-        {/* Error */}
+        {/* Error (server errors) */}
         <AnimatePresence>
-          {error && (
+          {bannerError && (
             <motion.div
               initial={{
                 opacity: 0,
@@ -1114,163 +1258,68 @@ export function RoleLoginPage() {
                 opacity: 0,
                 height: 0,
               }}
-              className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400"
+              role="alert"
+              className="overflow-hidden"
             >
-              {error}
+              <div className="flex items-start gap-2.5 rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-500/25 dark:bg-danger-500/10 dark:text-danger-200">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{bannerError}</span>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Email */}
-        <motion.div
-          initial={{
-            opacity: 0,
-            x: -8,
-          }}
-          animate={{
-            opacity: 1,
-            x: 0,
-          }}
-          transition={{ delay: 0.1 }}
-        >
-          <label className="label">
-            Email Address
-          </label>
+        <TextField
+          id="login-email"
+          label="Email Address"
+          icon={Mail}
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          error={credentialsError}
+          required
+        />
 
-          <div className="relative">
-            <Mail className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
-
-            <input
-              type="email"
-              className="input pl-10 text-base sm:text-sm"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) =>
-                setEmail(e.target.value)
-              }
-              autoComplete="email"
-              required
-            />
-          </div>
-        </motion.div>
-
-        {/* Password */}
-        <motion.div
-          initial={{
-            opacity: 0,
-            x: -8,
-          }}
-          animate={{
-            opacity: 1,
-            x: 0,
-          }}
-          transition={{ delay: 0.15 }}
-        >
-          <div className="flex items-center justify-between">
-            <label className="label">
-              Password
-            </label>
-
+        <PasswordField
+          id="login-password"
+          label="Password"
+          value={password}
+          onValueChange={setPassword}
+          placeholder="Enter your password"
+          autoComplete="current-password"
+          error={credentialsError}
+          labelAction={
             <Link
               to="/forgot-password"
-              className="text-xs font-medium text-primary-600 hover:text-primary-700"
+              className="text-xs font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
             >
               Forgot password?
             </Link>
-          </div>
-
-          <PasswordInput
-            value={password}
-            onChange={setPassword}
-            placeholder="Enter your password"
-          />
-        </motion.div>
+          }
+        />
 
         {/* Remember me */}
-        <motion.label
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-center gap-2 text-sm text-ink-600 dark:text-ink-400"
-        >
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-600 dark:text-ink-400">
           <input
             type="checkbox"
-            className="h-4 w-4 rounded accent-primary-600"
+            className="h-4 w-4 rounded accent-brand-600"
           />
 
           Remember me on this device
-        </motion.label>
+        </label>
 
         {/* Submit */}
-        <motion.button
+        <Button
           type="submit"
-          initial={{
-            opacity: 0,
-            y: 8,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{ delay: 0.25 }}
-          disabled={loading}
-          className="btn-primary btn-lg flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-60"
-          whileHover={{
-            scale: loading ? 1 : 1.01,
-          }}
-          whileTap={{
-            scale: loading ? 1 : 0.99,
-          }}
+          size="lg"
+          loading={loading}
+          icon={ArrowRight}
+          className="w-full"
         >
-          <AnimatePresence mode="wait">
-            {loading ? (
-              <motion.span
-                key="loading"
-                initial={{
-                  opacity: 0,
-                }}
-                animate={{
-                  opacity: 1,
-                }}
-                exit={{
-                  opacity: 0,
-                }}
-                className="flex items-center gap-2"
-              >
-                <motion.div
-                  animate={{
-                    rotate: 360,
-                  }}
-                  transition={{
-                    duration: 0.8,
-                    repeat: Infinity,
-                    ease: 'linear',
-                  }}
-                  className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white"
-                />
-
-                Signing in...
-              </motion.span>
-            ) : (
-              <motion.span
-                key="idle"
-                initial={{
-                  opacity: 0,
-                }}
-                animate={{
-                  opacity: 1,
-                }}
-                exit={{
-                  opacity: 0,
-                }}
-                className="flex items-center gap-2"
-              >
-                Sign In
-                <ArrowRight className="h-4 w-4" />
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </motion.button>
+          {loading ? 'Signing in...' : 'Sign In'}
+        </Button>
       </form>
     </AuthShell>
   );
@@ -1287,7 +1336,7 @@ export function ForgotPasswordPage() {
       subtitle="Enter your email to receive a reset link"
       benefits={[
         {
-          icon: ShieldCheck,
+          icon: ShoppingBag,
           text: 'Verified providers only',
         },
         {
@@ -1310,17 +1359,18 @@ export function ForgotPasswordPage() {
             opacity: 1,
             scale: 1,
           }}
+          aria-live="polite"
           className="text-center"
         >
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900">
-            <CheckCircle2 className="h-7 w-7 text-primary-600" />
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-950">
+            <CheckCircle2 className="h-7 w-7 text-brand-600 dark:text-brand-300" />
           </div>
 
-          <h3 className="mt-4 text-lg font-semibold text-ink-900 dark:text-ink-50">
+          <h3 className="mt-4 text-lg font-semibold text-slate-900 dark:text-ink-50">
             Check your email
           </h3>
 
-          <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+          <p className="mt-1 text-sm text-slate-500 dark:text-ink-400">
             We've sent a password reset link to
             your email address.
           </p>
@@ -1340,42 +1390,29 @@ export function ForgotPasswordPage() {
             setSent(true);
           }}
         >
-          <div>
-            <label className="label">
-              Email Address
-            </label>
+          <TextField
+            id="forgot-email"
+            label="Email Address"
+            icon={Mail}
+            type="email"
+            placeholder="you@example.com"
+            required
+          />
 
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-5 w-5 text-ink-400" />
-
-              <input
-                type="email"
-                className="input pl-10 text-base sm:text-sm"
-                placeholder="you@example.com"
-                required
-              />
-            </div>
-          </div>
-
-          <motion.button
+          <Button
             type="submit"
-            className="btn-primary btn-lg flex w-full items-center justify-center gap-2"
-            whileHover={{
-              scale: 1.01,
-            }}
-            whileTap={{
-              scale: 0.99,
-            }}
+            size="lg"
+            icon={ArrowRight}
+            className="w-full"
           >
             Send Reset Link
-            <ArrowRight className="h-4 w-4" />
-          </motion.button>
+          </Button>
         </form>
       )}
 
       <Link
         to="/login"
-        className="mt-6 flex items-center justify-center gap-1 text-sm font-medium text-ink-500 hover:text-ink-900 dark:text-ink-400 dark:hover:text-ink-50"
+        className="mt-6 flex items-center justify-center gap-1 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900 dark:text-ink-400 dark:hover:text-ink-50"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to login
