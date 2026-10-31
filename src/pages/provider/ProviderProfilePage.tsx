@@ -535,7 +535,7 @@ export default function ProviderProfilePage() {
         }
 
         const response = await fetch(
-          `${API_URL}/provider/profile/${encodeURIComponent(
+          `${API_URL}/provider/eachprofiledetails/${encodeURIComponent(
             id
           )}`,
           {
@@ -575,7 +575,15 @@ export default function ProviderProfilePage() {
 
         if (cancelled) return;
 
-        setProvider(result.provider);
+        const completedBookings = Number(
+          result.provider.completedBookings
+        );
+        setProvider({
+          ...result.provider,
+          completedBookings: Number.isFinite(completedBookings)
+            ? completedBookings
+            : undefined,
+        });
 
         const profileServices =
           Array.isArray(result.services)
@@ -1655,12 +1663,11 @@ export default function ProviderProfilePage() {
 
               <div className="px-4 py-5 text-center sm:px-6">
                 <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
-                  {provider.completedBookings ||
-                    0}
+                  {provider.completedBookings ?? "—"}
                 </p>
 
                 <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
-                  Completed
+                  Completed bookings
                 </p>
               </div>
 
