@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Compass,
   Heart,
-  Lock,
   Search,
   SearchX,
   ShieldCheck,
@@ -23,6 +22,7 @@ import {
   Badge,
   Button,
   EmptyState,
+  ErrorState,
   MarketplaceProviderCard,
   SearchBar,
   SectionHeading,
@@ -32,39 +32,12 @@ import {
   type ServiceLike,
 } from '@/components/ui';
 import { Footer, PublicNavbar } from '@/components/shared';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { useApprovedServices } from '@/hooks/queries';
+import { getApiErrorMessage } from '@/lib/api';
 
 /* =========================================================
    SHARED HELPERS
 ========================================================= */
-
-/**
- * Fetches the public approved-services catalogue (no auth) and
- * derives a de-duplicated list of real providers from it.
- */
-async function fetchApprovedServices(): Promise<ServiceLike[]> {
-  const response = await fetch(`${API_URL}/provider/approved-services`);
-
-  let data: unknown = null;
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    const message = (data as { message?: string } | null)?.message;
-    throw new Error(message || 'Failed to load providers.');
-  }
-
-  const list = (data as { services?: unknown } | null)?.services;
-  if (!Array.isArray(list)) {
-    throw new Error('Received an unexpected response from the server.');
-  }
-
-  return list as ServiceLike[];
-}
 
 interface DerivedProvider extends ProviderLike {
   categories: string[];
@@ -211,29 +184,13 @@ function CtaBand({
 ========================================================= */
 
 export function ProvidersPage() {
-  const [providers, setProviders] = useState<DerivedProvider[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
   const [search, setSearch] = useState('');
+  const { data, isLoading, isError, error, refetch } = useApprovedServices();
 
-  const loadProviders = async () => {
-    setLoading(true);
-    setFailed(false);
-    try {
-      const services = await fetchApprovedServices();
-      setProviders(deriveProviders(services));
-    } catch {
-      setProviders([]);
-      setFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadProviders();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const providers = useMemo<DerivedProvider[]>(
+    () => deriveProviders(data ?? []),
+    [data]
+  );
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -257,33 +214,43 @@ export function ProvidersPage() {
       />
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        {loading ? (
+        {isLoading ? (
           <div>
             <p className="sr-only" role="status">
               Loading providers…
             </p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
                 <SkeletonCard key={i} />
               ))}
             </div>
           </div>
-        ) : failed ? (
-          <EmptyState
-            icon={Lock}
-            title="We couldn't load providers right now"
-            description="Sign in or browse the public service catalogue while we reconnect you."
-            action={
-              <div className="flex flex-col items-center gap-2 sm:flex-row">
-                <Link to="/login" className="btn-primary">
-                  Login
-                </Link>
-                <Link to="/services" className="btn-outline">
-                  Browse services
-                </Link>
-              </div>
-            }
-          />
+        ) : isError ? (
+          <div className="space-y-4">
+            <ErrorState
+              message={`We couldn't load the provider directory. ${getApiErrorMessage(
+                error
+              )}`}
+              onRetry={() => refetch()}
+            />
+            <p className="text-center text-sm text-slate-500 dark:text-ink-400">
+              You can still{' '}
+              <Link
+                to="/services"
+                className="font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+              >
+                browse the service catalogue
+              </Link>{' '}
+              or{' '}
+              <Link
+                to="/login"
+                className="font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+              >
+                sign in
+              </Link>
+              .
+            </p>
+          </div>
         ) : providers.length === 0 ? (
           <EmptyState
             icon={Store}
@@ -297,12 +264,14 @@ export function ProvidersPage() {
           />
         ) : (
           <>
-            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm backdrop-blur dark:border-ink-800 dark:bg-ink-900/60 sm:flex-row sm:items-center sm:justify-between">
               <p
                 aria-live="polite"
                 className="text-sm text-slate-500 dark:text-ink-400"
               >
-                {filtered.length}{' '}
+                <span className="font-semibold text-slate-900 dark:text-ink-50">
+                  {filtered.length}
+                </span>{' '}
                 {filtered.length === 1 ? 'provider' : 'providers'} found
               </p>
               <SearchBar
@@ -325,7 +294,7 @@ export function ProvidersPage() {
                 }
               />
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {filtered.map((provider, i) => (
                   <motion.div
                     key={providerId(provider)}

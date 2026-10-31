@@ -8,6 +8,7 @@ import {
 import { customerNavItems } from "@/data/customerNavItems";
 import { categories as staticCategories } from "@/data/mockData";
 import {
+  Badge,
   Button,
   EmptyState,
   ErrorState,
@@ -15,39 +16,25 @@ import {
   ServiceCard,
   Skeleton,
   cn,
+  type ServiceLike,
 } from "@/components/ui";
-import { RefreshCw, Search, Sparkles, X } from "lucide-react";
-
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+import { useApprovedServices } from "@/hooks/queries";
+import {
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  Search,
+  Sparkles,
+  X,
+} from "lucide-react";
 
 /* =========================================================
    TYPES
-   (type aliases so they stay assignable to the
-    backend-aware ServiceLike / ProviderLike shapes)
+   (ServiceLike is the backend-aware shape exported by the
+    design system, so cards and query data stay in sync)
 ========================================================= */
 
-type Provider = {
-  _id?: string;
-  fullName?: string;
-  name?: string;
-  avatar?: string;
-  profileImage?: string;
-};
-
-type Service = {
-  _id: string;
-  title: string;
-  category: string;
-  price: number;
-  duration: string;
-  description: string;
-  image: string;
-
-  createdAt?: string;
-
-  provider?: Provider;
-};
+type Service = ServiceLike;
 
 type DisplayService = Service & {
   providerServiceCount: number;
@@ -92,6 +79,24 @@ const getStoredUserId = (): string | null => {
   }
 };
 
+const getProviderId = (service: Service): string =>
+  String(service.provider?._id || service.provider?.id || "");
+
+const getServiceKey = (service: Service, index: number): string =>
+  String(service._id || service.id || `service-${index}`);
+
+const getCreatedAtTime = (service: Service): number => {
+  const value = service.createdAt;
+
+  if (typeof value !== "string" || !value) {
+    return 0;
+  }
+
+  const time = new Date(value).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+};
+
 /*
  * Search matches title, description, category and provider name —
  * same client-side filtering behaviour as before the redesign.
@@ -125,89 +130,28 @@ function matchesSearch(service: Service, rawQuery: string): boolean {
 ========================================================= */
 
 export function CustomerBrowse() {
-  const [services, setServices] = useState<Service[]>([]);
-
-  const [loading, setLoading] = useState(true);
-
-  const [error, setError] = useState("");
+  const { data, isLoading, isError, error, refetch, isFetching } =
+    useApprovedServices();
 
   const [search, setSearch] = useState("");
 
   const [selectedCategory, setSelectedCategory] = useState("All");
 
   const [sortBy, setSortBy] = useState("newest");
+  const [page, setPage] = useState(1);
 
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  /*
+   * Read the signed-in user once on mount. This is only used to
+   * keep a customer's own services out of the browse feed.
+   */
+  const [currentUserId] = useState<string | null>(() =>
+    getStoredUserId()
+  );
 
-  /* Increment to re-run the fetch (used by the retry buttons). */
-  const [reloadKey, setReloadKey] = useState(0);
-
-  /* =========================================================
-     GET CURRENT USER
-  ========================================================= */
-
-  useEffect(() => {
-    const userId = getStoredUserId();
-
-    setCurrentUserId(userId);
-  }, []);
-
-  /* =========================================================
-     FETCH SERVICES
-     GET /provider/approved-services (Bearer token)
-  ========================================================= */
-
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const token = sessionStorage.getItem("servicely_token");
-
-        if (!token) {
-          setError("Please log in to browse services.");
-
-          return;
-        }
-
-        const response = await fetch(
-          `${API_URL}/provider/approved-services`,
-          {
-            method: "GET",
-
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            result.message || "Failed to fetch services."
-          );
-        }
-
-        setServices(result.services || []);
-      } catch (error) {
-        console.error("Fetch customer services error:", error);
-
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Failed to load services."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchServices();
-  }, [reloadKey]);
-
-  const retry = () => setReloadKey((key) => key + 1);
+  const services = useMemo<Service[]>(
+    () => (Array.isArray(data) ? data : []),
+    [data]
+  );
 
   /* =========================================================
      REMOVE CURRENT USER'S OWN SERVICES
@@ -219,7 +163,7 @@ export function CustomerBrowse() {
     }
 
     return services.filter((service) => {
-      const providerId = service.provider?._id;
+      const providerId = getProviderId(service);
 
       if (!providerId) {
         return true;
@@ -253,6 +197,23 @@ export function CustomerBrowse() {
     return ["All", ...Array.from(names)];
   }, [servicesFromOtherUsers]);
 
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    servicesFromOtherUsers.forEach((service) => {
+      if (!service.category) {
+        return;
+      }
+
+      counts.set(
+        service.category,
+        (counts.get(service.category) ?? 0) + 1
+      );
+    });
+
+    return counts;
+  }, [servicesFromOtherUsers]);
+
   /* =========================================================
      FILTER + SEARCH + SORT + GROUP BY PROVIDER
   ========================================================= */
@@ -276,44 +237,38 @@ export function CustomerBrowse() {
 
     /* SORT SERVICES BEFORE GROUPING */
     if (sortBy === "price-low") {
-      result.sort((a, b) => a.price - b.price);
+      result.sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
     }
 
     if (sortBy === "price-high") {
-      result.sort((a, b) => b.price - a.price);
+      result.sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
     }
 
     if (sortBy === "name") {
-      result.sort((a, b) => a.title.localeCompare(b.title));
+      result.sort((a, b) =>
+        (a.title || "").localeCompare(b.title || "")
+      );
     }
 
     if (sortBy === "newest") {
-      result.sort((a, b) => {
-        const dateA = a.createdAt
-          ? new Date(a.createdAt).getTime()
-          : 0;
-
-        const dateB = b.createdAt
-          ? new Date(b.createdAt).getTime()
-          : 0;
-
-        return dateB - dateA;
-      });
+      result.sort(
+        (a, b) => getCreatedAtTime(b) - getCreatedAtTime(a)
+      );
     }
 
     /* GROUP SERVICES BY PROVIDER */
     const providerMap = new Map<string, DisplayService>();
 
-    result.forEach((service) => {
+    result.forEach((service, index) => {
       /*
        * If provider ID exists, use it.
        *
        * If for some reason the backend doesn't
-       * populate provider, fall back to service ID
+       * populate provider, fall back to the service ID
        * so the service is still displayed.
        */
       const providerKey =
-        service.provider?._id || `service-${service._id}`;
+        getProviderId(service) || `service-${getServiceKey(service, index)}`;
 
       const existing = providerMap.get(providerKey);
 
@@ -336,6 +291,24 @@ export function CustomerBrowse() {
 
     return Array.from(providerMap.values());
   }, [servicesFromOtherUsers, search, selectedCategory, sortBy]);
+
+  const pageSize = 4;
+  const totalPages = Math.ceil(filteredServices.length / pageSize);
+  const currentPage = Math.min(page, Math.max(totalPages, 1));
+  const paginatedServices = filteredServices.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+  const firstProviderOnPage =
+    filteredServices.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastProviderOnPage = Math.min(
+    currentPage * pageSize,
+    filteredServices.length
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedCategory, sortBy, servicesFromOtherUsers.length]);
 
   /* =========================================================
      RESULT COUNT (services matching search + category)
@@ -360,13 +333,17 @@ export function CustomerBrowse() {
   }, [servicesFromOtherUsers, search, selectedCategory]);
 
   /* =========================================================
-     CLEAR FILTERS
+     CLEAR FILTERS + RETRY
   ========================================================= */
 
   const clearFilters = () => {
     setSearch("");
     setSelectedCategory("All");
     setSortBy("newest");
+  };
+
+  const refresh = () => {
+    void refetch();
   };
 
   const hasActiveFilters =
@@ -382,6 +359,11 @@ export function CustomerBrowse() {
       ? "service available"
       : "services available";
 
+  const errorMessage =
+    error instanceof Error && error.message
+      ? error.message
+      : "We couldn't load the service catalogue. Please try again.";
+
   /* =========================================================
      RENDER
   ========================================================= */
@@ -394,25 +376,38 @@ export function CustomerBrowse() {
       <DashboardHeader
         title="Browse Services"
         subtitle="Find trusted providers for your needs"
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            icon={RefreshCw}
+            loading={isFetching && !isLoading}
+            disabled={isLoading}
+            onClick={refresh}
+            className="self-start sm:self-auto"
+          >
+            Refresh
+          </Button>
+        }
       />
 
       {/* =====================================================
-          PROMINENT SEARCH + CATEGORY CHIPS
+          SEARCH + FILTER BAR
       ===================================================== */}
 
       <section
         aria-label="Search and filter services"
-        className="mb-5 overflow-hidden rounded-2xl border border-slate-200/70 shadow-card dark:border-ink-800"
+        className="mb-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900"
       >
         {/* Brand banner */}
         <div className="flex flex-col gap-4 bg-gradient-to-br from-brand-600 via-brand-500 to-brand-700 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:from-brand-700 dark:via-brand-600 dark:to-brand-800">
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/20">
-                <Sparkles className="h-4 w-4 text-white dark:text-white" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/20">
+                <Sparkles className="h-4 w-4 text-white" />
               </span>
 
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80 dark:text-white/80">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
                 Servicely Marketplace
               </span>
             </div>
@@ -427,32 +422,62 @@ export function CustomerBrowse() {
           </div>
 
           <div className="flex items-baseline gap-2 rounded-2xl bg-white/15 px-4 py-3 sm:flex-col sm:items-end sm:gap-0">
-            <p className="text-2xl font-bold leading-none text-white">
-              {loading ? "—" : totalMatchingServices}
+            <p className="text-2xl font-bold leading-none text-white tabular-nums">
+              {isLoading ? "—" : totalMatchingServices}
             </p>
 
             <p className="text-xs font-medium text-white/80 sm:mt-1">
-              {loading ? "loading services" : countLabel}
+              {isLoading ? "loading services" : countLabel}
             </p>
           </div>
         </div>
 
-        {/* Search + chips panel */}
-        <div className="space-y-4 bg-white p-4 sm:p-5 dark:bg-ink-900">
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search services, categories or providers..."
-            className="w-full sm:flex-1"
-          />
+        {/* Search + sort + chips panel */}
+        <div className="bg-white p-4 sm:p-5 dark:bg-ink-900">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search services, categories or providers..."
+              className="min-w-0 flex-1"
+            />
+
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="browse-sort"
+                className="shrink-0 text-xs font-medium text-slate-500 dark:text-ink-400"
+              >
+                Sort by
+              </label>
+
+              <select
+                id="browse-sort"
+                value={sortBy}
+                aria-label="Sort services by"
+                onChange={(event) => setSortBy(event.target.value)}
+                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:w-auto dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200"
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
           <div
             role="group"
             aria-label="Filter by category"
-            className="flex flex-wrap gap-2"
+            className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
           >
             {categoryOptions.map((category) => {
               const active = selectedCategory === category;
+
+              const chipCount =
+                category === "All"
+                  ? servicesFromOtherUsers.length
+                  : categoryCounts.get(category) ?? 0;
 
               return (
                 <button
@@ -461,13 +486,26 @@ export function CustomerBrowse() {
                   aria-pressed={active}
                   onClick={() => setSelectedCategory(category)}
                   className={cn(
-                    "rounded-full px-3.5 py-1.5 text-xs font-semibold transition",
+                    "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors duration-200 active:scale-[0.98]",
                     active
-                      ? "bg-brand-600 text-white shadow-soft dark:bg-brand-500 dark:text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-lavender hover:text-brand-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700 dark:hover:text-ink-100"
+                      ? "border-brand-600 bg-brand-600 text-white shadow-soft dark:border-brand-500 dark:bg-brand-500 dark:text-white"
+                      : "border-slate-200 bg-slate-50 text-slate-600 hover:border-brand-200 hover:bg-lavender hover:text-brand-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50"
                   )}
                 >
                   {category}
+
+                  {chipCount > 0 && (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums",
+                        active
+                          ? "bg-white/20 text-white"
+                          : "bg-white text-slate-500 dark:bg-ink-900 dark:text-ink-400"
+                      )}
+                    >
+                      {chipCount}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -479,42 +517,21 @@ export function CustomerBrowse() {
           RESULTS TOOLBAR
       ===================================================== */}
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p
-          aria-live="polite"
-          className="text-sm text-slate-500 dark:text-ink-400"
-        >
-          <span className="font-semibold text-slate-900 dark:text-ink-50">
-            {totalMatchingServices}
-          </span>{" "}
-          {totalMatchingServices === 1 ? "service" : "services"} from{" "}
-          <span className="font-semibold text-slate-900 dark:text-ink-50">
-            {filteredServices.length}
-          </span>{" "}
-          {filteredServices.length === 1 ? "provider" : "providers"}
-        </p>
-
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <label
-            htmlFor="browse-sort"
-            className="text-xs text-slate-500 dark:text-ink-400"
+      {!isLoading && !isError && filteredServices.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p
+            aria-live="polite"
+            className="text-sm text-slate-500 dark:text-ink-400"
           >
-            Sort by
-          </label>
-
-          <select
-            id="browse-sort"
-            value={sortBy}
-            aria-label="Sort services"
-            onChange={(event) => setSortBy(event.target.value)}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 outline-none transition focus:border-brand-500 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200"
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <span className="font-semibold text-slate-900 dark:text-ink-50">
+              {totalMatchingServices}
+            </span>{" "}
+            {totalMatchingServices === 1 ? "service" : "services"} from{" "}
+            <span className="font-semibold text-slate-900 dark:text-ink-50">
+              {filteredServices.length}
+            </span>{" "}
+            {filteredServices.length === 1 ? "provider" : "providers"}
+          </p>
 
           {hasActiveFilters && (
             <Button
@@ -523,25 +540,26 @@ export function CustomerBrowse() {
               icon={X}
               aria-label="Clear all filters"
               onClick={clearFilters}
+              className="self-start sm:self-auto"
             >
-              Clear
+              Clear filters
             </Button>
           )}
         </div>
-      </div>
+      )}
 
       {/* =====================================================
           LOADING SKELETONS
       ===================================================== */}
 
-      {loading && (
+      {isLoading && (
         <div
           aria-busy="true"
-          className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
         >
           <span className="sr-only">Loading services…</span>
 
-          {Array.from({ length: 8 }).map((_, index) => (
+          {Array.from({ length: 6 }).map((_, index) => (
             <div
               key={index}
               className="card overflow-hidden"
@@ -562,7 +580,7 @@ export function CustomerBrowse() {
 
                 <div className="flex items-center justify-between pt-1">
                   <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-7 w-24 rounded-lg" />
+                  <Skeleton className="h-8 w-24 rounded-lg" />
                 </div>
               </div>
             </div>
@@ -574,22 +592,26 @@ export function CustomerBrowse() {
           ERROR
       ===================================================== */}
 
-      {!loading && error && (
-        <ErrorState message={error} onRetry={retry} />
+      {!isLoading && isError && (
+        <ErrorState message={errorMessage} onRetry={refresh} />
       )}
 
       {/* =====================================================
           EMPTY
       ===================================================== */}
 
-      {!loading && !error && filteredServices.length === 0 && (
+      {!isLoading && !isError && filteredServices.length === 0 && (
         <EmptyState
           icon={Search}
-          title="No services found"
+          title={
+            hasActiveFilters
+              ? "No services match your filters"
+              : "No services available yet"
+          }
           description={
             hasActiveFilters
-              ? "We couldn't find any services matching your search or filters."
-              : "There are no services available right now. Please check back soon."
+              ? "We couldn't find any services matching your search or filters. Try a different term or category."
+              : "There are no approved services to browse right now. Please check back soon."
           }
           action={
             hasActiveFilters ? (
@@ -597,7 +619,7 @@ export function CustomerBrowse() {
                 Clear filters
               </Button>
             ) : (
-              <Button variant="outline" icon={RefreshCw} onClick={retry}>
+              <Button variant="outline" icon={RefreshCw} onClick={refresh}>
                 Refresh
               </Button>
             )
@@ -609,27 +631,31 @@ export function CustomerBrowse() {
           SERVICES (grouped by provider)
       ===================================================== */}
 
-      {!loading && !error && filteredServices.length > 0 && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredServices.map((group, index) => {
-            const providerId = group.provider?._id;
+      {!isLoading && !isError && filteredServices.length > 0 && (
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {paginatedServices.map((group, index) => {
+            const providerId = getProviderId(group);
 
             const providerLabel =
               group.provider?.fullName ||
               group.provider?.name ||
               "provider";
 
-            const providerServices = servicesFromOtherUsers.filter(
-              (candidate) =>
-                candidate.provider?._id === group.provider?._id
-            );
+            const serviceId = String(group._id || group.id || "");
+
+            const providerServices = providerId
+              ? servicesFromOtherUsers.filter(
+                  (candidate) =>
+                    getProviderId(candidate) === providerId
+                )
+              : [group];
 
             return (
               <motion.div
                 key={
                   providerId
                     ? `provider-${providerId}`
-                    : `service-${group._id}`
+                    : `service-${getServiceKey(group, index)}`
                 }
                 initial={{ opacity: 0, y: 18 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -638,16 +664,17 @@ export function CustomerBrowse() {
                   delay: Math.min(index * 0.05, 0.4),
                   ease: "easeOut",
                 }}
-                className="relative"
+                className="relative h-full"
               >
                 <ServiceCard
                   service={group}
+                  className="h-full"
                   action={
                     providerId ? (
-                      <div className="flex flex-col items-end gap-1">
+                      <div className="flex shrink-0 flex-col items-end gap-1">
                         <Link
-                          to={`/book/${providerId}?service=${group._id}`}
-                          aria-label={`Book Now: ${group.title} with ${providerLabel}`}
+                          to={`/book/${providerId}?service=${serviceId}`}
+                          aria-label={`Book Now: ${group.title || "service"} with ${providerLabel}`}
                           className="btn-primary btn-sm whitespace-nowrap"
                         >
                           Book Now
@@ -656,7 +683,7 @@ export function CustomerBrowse() {
                         <Link
                           to={`/providers/${providerId}`}
                           state={{ providerServices }}
-                          className="text-[11px] font-semibold text-brand-600 transition hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                          className="rounded text-[11px] font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
                         >
                           View provider
                         </Link>
@@ -675,18 +702,72 @@ export function CustomerBrowse() {
                 />
 
                 {group.additionalServicesCount > 0 && (
-                  <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-brand-700 shadow-sm backdrop-blur dark:bg-ink-900/90 dark:text-brand-300">
+                  <Badge
+                    tone="brand"
+                    className="pointer-events-none absolute right-3 top-3 shadow-sm"
+                  >
                     +{group.additionalServicesCount} more
                     <span className="sr-only">
                       {" "}
                       services from this provider
                     </span>
-                  </span>
+                  </Badge>
                 )}
               </motion.div>
             );
           })}
         </div>
+      )}
+
+      {!isLoading && !isError && filteredServices.length > 0 && (
+        <nav
+          aria-label="Service results pagination"
+          className="mt-8 flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-ink-800 dark:bg-ink-900"
+        >
+          <p
+            aria-live="polite"
+            className="text-sm text-slate-500 dark:text-ink-400"
+          >
+            Showing{" "}
+            <span className="font-semibold text-slate-800 dark:text-ink-100">
+              {firstProviderOnPage}–{lastProviderOnPage}
+            </span>{" "}
+            of{" "}
+            <span className="font-semibold text-slate-800 dark:text-ink-100">
+              {filteredServices.length}
+            </span>{" "}
+            providers
+          </p>
+
+          <div className="flex items-center justify-between gap-3 sm:justify-end">
+            <span className="text-xs font-medium tabular-nums text-slate-500 dark:text-ink-400">
+              Page {currentPage} of {Math.max(totalPages, 1)}
+            </span>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Previous page"
+                title="Previous page"
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-brand-300 hover:bg-lavender hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+              >
+                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Next page"
+                title="Next page"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage(currentPage + 1)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-brand-300 hover:bg-lavender hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+              >
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </nav>
       )}
     </DashboardLayout>
   );

@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { SearchX, SlidersHorizontal, Sparkles, Store } from 'lucide-react';
+import {
+  RotateCcw,
+  SearchX,
+  SlidersHorizontal,
+  Sparkles,
+  Store,
+  X,
+} from 'lucide-react';
 import {
   Badge,
   Button,
@@ -13,15 +20,14 @@ import {
   SkeletonCard,
   cn,
   providerId,
-  type ServiceLike,
 } from '@/components/ui';
 import { Footer, PublicNavbar, ProviderCard } from '@/components/shared';
 import {
   categories as platformCategories,
   providers as mockProviders,
 } from '@/data/mockData';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import { useApprovedServices } from '@/hooks/queries';
+import { getApiErrorMessage } from '@/lib/api';
 
 function slugify(value: string): string {
   return value
@@ -31,69 +37,33 @@ function slugify(value: string): string {
     .replace(/(^-+|-+$)/g, '');
 }
 
+type ActiveFilter = {
+  key: string;
+  label: string;
+  onRemove: () => void;
+};
+
 /* =========================================================
    PUBLIC SERVICES CATALOG (/services)
 
-   Loads real approved services from the backend (no auth).
-   If the request fails, the page gracefully falls back to the
-   public provider-browse experience it has always shown.
+   Loads real approved services from the backend through the
+   shared React Query hook. If the request fails, the page
+   gracefully falls back to the public provider-browse
+   experience it has always shown.
 ========================================================= */
 
 export function ServicesPage() {
   const [params, setParams] = useSearchParams();
   const [search, setSearch] = useState(() => params.get('q') || '');
-  const [services, setServices] = useState<ServiceLike[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  const { data, isLoading, isError, error, refetch } = useApprovedServices();
+  const services = useMemo(() => data ?? [], [data]);
 
   const selectedCategory = params.get('category') || '';
   const minPrice = Number(params.get('minPrice') || 0);
   const minRating = Number(params.get('minRating') || 0);
   const verifiedOnly = params.get('verified') === '1';
-
-  /* ---------------------------------------------
-     Fetch approved services (public, no auth)
-  --------------------------------------------- */
-  const fetchServices = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`${API_URL}/provider/approved-services`);
-
-      let data: unknown = null;
-      try {
-        data = await response.json();
-      } catch {
-        data = null;
-      }
-
-      if (!response.ok) {
-        const message = (data as { message?: string } | null)?.message;
-        throw new Error(message || 'Failed to load services.');
-      }
-
-      const list = (data as { services?: unknown } | null)?.services;
-      if (!Array.isArray(list)) {
-        throw new Error('Received an unexpected response from the server.');
-      }
-
-      setServices(list as ServiceLike[]);
-    } catch (err) {
-      setServices([]);
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Could not reach Servicely right now.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
 
   /* ---------------------------------------------
      URL param helpers
@@ -180,6 +150,77 @@ export function ServicesPage() {
     });
   }, [selectedCategory, minPrice, minRating, verifiedOnly, search]);
 
+  /* ---------------------------------------------
+     Human-readable category label for chips
+  --------------------------------------------- */
+  const selectedCategoryLabel = useMemo(() => {
+    if (!selectedCategory) return '';
+
+    const platformCategory = platformCategories.find(
+      (category) => slugify(category.name) === slugify(selectedCategory)
+    );
+    if (platformCategory) return platformCategory.name;
+
+    return (
+      serviceChips.find(
+        (name) => slugify(name) === slugify(selectedCategory)
+      ) || selectedCategory
+    );
+  }, [selectedCategory, serviceChips]);
+
+  /* ---------------------------------------------
+     Active filter chips
+  --------------------------------------------- */
+  const activeFilters: ActiveFilter[] = [];
+
+  if (search.trim()) {
+    activeFilters.push({
+      key: 'q',
+      label: `“${search.trim()}”`,
+      onRemove: () => {
+        setSearch('');
+        updateParam('q', '');
+      },
+    });
+  }
+
+  if (selectedCategory) {
+    activeFilters.push({
+      key: 'category',
+      label: selectedCategoryLabel || selectedCategory,
+      onRemove: () => updateParam('category', ''),
+    });
+  }
+
+  if (minRating) {
+    activeFilters.push({
+      key: 'minRating',
+      label: `${minRating}+ rating`,
+      onRemove: () => updateParam('minRating', ''),
+    });
+  }
+
+  if (minPrice) {
+    activeFilters.push({
+      key: 'minPrice',
+      label: `From ₦${minPrice.toLocaleString()}`,
+      onRemove: () => updateParam('minPrice', ''),
+    });
+  }
+
+  if (verifiedOnly) {
+    activeFilters.push({
+      key: 'verified',
+      label: 'Verified only',
+      onRemove: () => updateParam('verified', ''),
+    });
+  }
+
+  const hasActiveFilters = activeFilters.length > 0;
+  const resultCount = isError
+    ? fallbackProviders.length
+    : filteredServices.length;
+
   const filterPanel = (
     <FilterPanel
       selectedCategory={selectedCategory}
@@ -225,7 +266,7 @@ export function ServicesPage() {
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
         {/* ============ Category chips ============ */}
-        {!loading && !error && serviceChips.length > 0 && (
+        {!isLoading && !isError && serviceChips.length > 0 && (
           <div
             role="group"
             aria-label="Filter services by category"
@@ -249,57 +290,136 @@ export function ServicesPage() {
           </div>
         )}
 
-        {/* ============ Toolbar ============ */}
-        {!loading && (
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <p
-              aria-live="polite"
-              className="text-sm text-slate-500 dark:text-ink-400"
-            >
-              {error
-                ? `${fallbackProviders.length} providers found`
-                : `${filteredServices.length} ${
-                    filteredServices.length === 1 ? 'service' : 'services'
-                  } found`}
-            </p>
-            {error && (
-              <button
-                onClick={() => setShowFilters(true)}
-                className="btn-outline btn-sm lg:hidden"
-              >
-                <SlidersHorizontal className="h-4 w-4" /> Filters
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ============ Content ============ */}
-        <div className="mt-4">
-          {loading ? (
-            <div
-              aria-busy="true"
-              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-            >
-              {Array.from({ length: 6 }).map((_, i) => (
-                <SkeletonCard key={i} />
-              ))}
+        <div className="mt-5 flex flex-col gap-6 lg:mt-6 lg:flex-row lg:gap-8">
+          {/* ============ Desktop filters ============ */}
+          <aside className="hidden w-64 shrink-0 lg:block">
+            <div className="card sticky top-24 p-5">
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+                  Filters
+                </h2>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Reset
+                  </button>
+                )}
+              </div>
+              {filterPanel}
             </div>
-          ) : error ? (
-            /* -------- Public fallback: browse verified providers -------- */
-            <div className="space-y-10">
-              <ErrorState
-                message="We couldn't load the live service catalogue right now. You can still browse our public provider directory below."
-                onRetry={fetchServices}
-              />
+          </aside>
 
-              <section aria-label="Provider directory">
-                <div className="flex gap-6">
-                  {/* Desktop filters */}
-                  <aside className="hidden w-60 shrink-0 lg:block">
-                    <div className="card sticky top-20 p-5">{filterPanel}</div>
-                  </aside>
+          <div className="min-w-0 flex-1">
+            {/* ============ Toolbar ============ */}
+            {!isLoading && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p
+                  aria-live="polite"
+                  className="text-sm text-slate-500 dark:text-ink-400"
+                >
+                  {isError
+                    ? `${fallbackProviders.length} ${
+                        fallbackProviders.length === 1
+                          ? 'provider'
+                          : 'providers'
+                      } found`
+                    : `${filteredServices.length} ${
+                        filteredServices.length === 1 ? 'service' : 'services'
+                      } found`}
+                </p>
 
-                  <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  {hasActiveFilters && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon={RotateCcw}
+                      onClick={clearFilters}
+                      className="hidden sm:inline-flex"
+                    >
+                      Clear all
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    icon={SlidersHorizontal}
+                    onClick={() => setShowFilters(true)}
+                    className="lg:hidden"
+                  >
+                    Filters
+                    {hasActiveFilters && (
+                      <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-[10px] font-bold text-white">
+                        {activeFilters.length}
+                      </span>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* ============ Active filter chips ============ */}
+            {!isLoading && hasActiveFilters && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium uppercase tracking-wide text-slate-400 dark:text-ink-500">
+                  Active
+                </span>
+                {activeFilters.map((filter) => (
+                  <ActiveFilterChip
+                    key={filter.key}
+                    label={filter.label}
+                    onRemove={filter.onRemove}
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-xs font-semibold text-brand-600 transition-colors hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+
+            {/* ============ Content ============ */}
+            <div className="mt-4">
+              {isLoading ? (
+                <div
+                  aria-busy="true"
+                  className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  <span className="sr-only" role="status">
+                    Loading services…
+                  </span>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))}
+                </div>
+              ) : isError ? (
+                /* -------- Inline error + public provider fallback -------- */
+                <div className="space-y-8">
+                  <ErrorState
+                    message={`We couldn't load the live service catalogue right now. ${getApiErrorMessage(
+                      error
+                    )}`}
+                    onRetry={() => refetch()}
+                  />
+
+                  <section aria-label="Provider directory">
+                    <div className="mb-4">
+                      <h2 className="text-lg font-semibold tracking-tight text-slate-900 dark:text-ink-50">
+                        Browse providers instead
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500 dark:text-ink-400">
+                        Our public provider directory is still available while
+                        the live catalogue reconnects.
+                      </p>
+                    </div>
+
                     {fallbackProviders.length === 0 ? (
                       <EmptyState
                         icon={Store}
@@ -312,7 +432,7 @@ export function ServicesPage() {
                         }
                       />
                     ) : (
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                         {fallbackProviders.map((provider, i) => (
                           <motion.div
                             key={provider.id}
@@ -328,79 +448,87 @@ export function ServicesPage() {
                         ))}
                       </div>
                     )}
-                  </div>
+                  </section>
                 </div>
-              </section>
+              ) : filteredServices.length === 0 ? (
+                <EmptyState
+                  icon={SearchX}
+                  title="No services found"
+                  description={
+                    services.length === 0
+                      ? 'No services have been published yet. Check back soon.'
+                      : 'Try a different search term or category.'
+                  }
+                  action={
+                    services.length === 0 ? (
+                      <Link to="/providers" className="btn-outline">
+                        Browse providers
+                      </Link>
+                    ) : (
+                      <Button variant="outline" onClick={clearFilters}>
+                        Clear search & filters
+                      </Button>
+                    )
+                  }
+                />
+              ) : (
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {filteredServices.map((service, i) => {
+                    const provider = service.provider;
+                    const pid = provider ? providerId(provider) : '';
+                    return (
+                      <motion.div
+                        key={service._id || service.id || `${i}`}
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          delay: Math.min(i, 11) * 0.04,
+                          duration: 0.35,
+                        }}
+                      >
+                        <ServiceCard
+                          service={service}
+                          action={
+                            pid ? (
+                              <Link
+                                to={`/providers/${pid}`}
+                                className="btn-outline btn-sm"
+                              >
+                                View provider
+                              </Link>
+                            ) : undefined
+                          }
+                        />
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          ) : filteredServices.length === 0 ? (
-            <EmptyState
-              icon={SearchX}
-              title="No services found"
-              description={
-                services.length === 0
-                  ? 'No services have been published yet. Check back soon.'
-                  : 'Try a different search term or category.'
-              }
-              action={
-                services.length === 0 ? (
-                  <Link to="/providers" className="btn-outline">
-                    Browse providers
-                  </Link>
-                ) : (
-                  <Button variant="outline" onClick={clearFilters}>
-                    Clear search & filters
-                  </Button>
-                )
-              }
-            />
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredServices.map((service, i) => {
-                const provider = service.provider;
-                const pid = provider ? providerId(provider) : '';
-                return (
-                  <motion.div
-                    key={service._id || service.id || `${i}`}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: Math.min(i, 11) * 0.04,
-                      duration: 0.35,
-                    }}
-                  >
-                    <ServiceCard
-                      service={service}
-                      action={
-                        pid ? (
-                          <Link
-                            to={`/providers/${pid}`}
-                            className="btn-outline btn-sm"
-                          >
-                            View provider
-                          </Link>
-                        ) : undefined
-                      }
-                    />
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
+          </div>
         </div>
       </main>
 
-      {/* ============ Mobile filter drawer ============ */}
+      {/* ============ Mobile filter sheet ============ */}
       <ResponsiveModal
         open={showFilters}
         onClose={() => setShowFilters(false)}
         title="Filters"
         footer={
-          <Button
-            className="w-full"
-            onClick={() => setShowFilters(false)}
-          >
-            Show {fallbackProviders.length} results
-          </Button>
+          <div className="flex gap-2">
+            {hasActiveFilters && (
+              <Button variant="outline" onClick={clearFilters}>
+                <RotateCcw className="h-4 w-4" />
+                Reset
+              </Button>
+            )}
+            <Button
+              className="flex-1"
+              onClick={() => setShowFilters(false)}
+            >
+              Show {resultCount} {resultCount === 1 ? 'result' : 'results'}
+            </Button>
+          </div>
         }
       >
         {filterPanel}
@@ -415,6 +543,26 @@ export function ServicesPage() {
    Small building blocks
 ========================================================= */
 
+function ActiveFilterChip({
+  label,
+  onRemove,
+}: {
+  label: string;
+  onRemove: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      aria-label={`Remove ${label} filter`}
+      className="group inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 transition-colors hover:border-brand-300 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/60 dark:text-brand-300 dark:hover:bg-brand-900/60"
+    >
+      <span className="max-w-[14rem] truncate">{label}</span>
+      <X className="h-3 w-3 shrink-0 opacity-60 transition-opacity group-hover:opacity-100" />
+    </button>
+  );
+}
+
 function ChipButton({
   active,
   onClick,
@@ -426,10 +574,11 @@ function ChipButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        'min-h-[38px] shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+        'min-h-[38px] shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-medium transition-all',
         active
           ? 'border-brand-600 bg-brand-600 text-white shadow-soft'
           : 'border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:bg-lavender dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:bg-ink-800'
@@ -480,12 +629,13 @@ function FilterPanel({
           {[0, 3, 4, 4.5].map((r) => (
             <button
               key={r}
+              type="button"
               onClick={() => onChange('minRating', r === 0 ? '' : String(r))}
               aria-pressed={minRating === r}
               className={cn(
                 'flex-1 rounded-lg px-2 py-2 text-xs font-medium transition-colors',
                 minRating === r
-                  ? 'bg-brand-600 text-white'
+                  ? 'bg-brand-600 text-white shadow-sm'
                   : 'bg-slate-100 text-slate-600 hover:bg-brand-50 hover:text-brand-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700'
               )}
             >
@@ -511,19 +661,20 @@ function FilterPanel({
           }
           className="w-full accent-brand-600"
         />
-        <p className="mt-1 text-xs text-slate-500 dark:text-ink-400">
-          {minPrice ? `From ₦${minPrice.toLocaleString()}` : 'Any price'}
-        </p>
+        <div className="mt-1 flex items-center justify-between text-xs text-slate-500 dark:text-ink-400">
+          <span>{minPrice ? `From ₦${minPrice.toLocaleString()}` : 'Any price'}</span>
+          <span>₦100,000</span>
+        </div>
       </div>
 
-      <label className="mt-5 flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-ink-300">
+      <label className="mt-5 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:border-brand-200 dark:border-ink-700 dark:bg-ink-800/60 dark:text-ink-300 dark:hover:border-ink-600">
+        <span>Verified only</span>
         <input
           type="checkbox"
           checked={verifiedOnly}
           onChange={(e) => onChange('verified', e.target.checked ? '1' : '')}
           className="h-4 w-4 rounded accent-brand-600"
         />
-        Verified only
       </label>
     </div>
   );
@@ -540,6 +691,7 @@ function FilterOption({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       aria-pressed={active}
       className={cn(

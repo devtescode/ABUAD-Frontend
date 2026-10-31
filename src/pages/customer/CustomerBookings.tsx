@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   CreditCard,
   Eye,
@@ -16,6 +18,7 @@ import {
   ShieldCheck,
   UserRound,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 import { customerNavItems } from "@/data/customerNavItems";
@@ -34,13 +37,10 @@ import {
   ResponsiveModal,
   Skeleton,
 } from "@/components/ui";
+import { getApiErrorMessage, hasUserToken } from "@/lib/api";
+import { useCustomerBookings } from "@/hooks/queries";
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000";
-
-const INVALID_BOOKINGS_KEY =
-  "servicely_invalid_bookings";
+const INVALID_BOOKINGS_KEY = "servicely_invalid_bookings";
 
 interface PaymentInfo {
   status: string;
@@ -101,16 +101,26 @@ type Filter =
   | "completed"
   | "cancelled";
 
+const TABS: {
+  id: Filter;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { id: "all", label: "All", icon: Receipt },
+  { id: "pending", label: "Pending", icon: Clock3 },
+  { id: "payment_pending", label: "Payment pending", icon: CreditCard },
+  { id: "paid", label: "Paid", icon: ShieldCheck },
+  { id: "completed", label: "Completed", icon: CheckCircle2 },
+  { id: "cancelled", label: "Cancelled", icon: XCircle },
+];
+
 /* ======================================================
    INVALID BOOKING STORAGE
 ====================================================== */
 
 function getInvalidBookingIds(): string[] {
   try {
-    const stored =
-      sessionStorage.getItem(
-        INVALID_BOOKINGS_KEY
-      );
+    const stored = sessionStorage.getItem(INVALID_BOOKINGS_KEY);
 
     if (!stored) {
       return [];
@@ -121,8 +131,7 @@ function getInvalidBookingIds(): string[] {
     return Array.isArray(parsed)
       ? parsed.filter(
         (id): id is string =>
-          typeof id === "string" &&
-          id.trim().length > 0
+          typeof id === "string" && id.trim().length > 0
       )
       : [];
   } catch {
@@ -130,29 +139,20 @@ function getInvalidBookingIds(): string[] {
   }
 }
 
-function markBookingAsInvalid(
-  bookingId: string
-) {
+function markBookingAsInvalid(bookingId: string) {
   if (!bookingId) return;
 
   try {
-    const existing =
-      getInvalidBookingIds();
+    const existing = getInvalidBookingIds();
 
     if (!existing.includes(bookingId)) {
       sessionStorage.setItem(
         INVALID_BOOKINGS_KEY,
-        JSON.stringify([
-          ...existing,
-          bookingId,
-        ])
+        JSON.stringify([...existing, bookingId])
       );
     }
   } catch (error) {
-    console.error(
-      "Unable to save invalid booking:",
-      error
-    );
+    console.error("Unable to save invalid booking:", error);
   }
 }
 
@@ -161,214 +161,55 @@ function markBookingAsInvalid(
 ====================================================== */
 
 export function CustomerBookings() {
-  const [bookings, setBookings] = useState<Booking[]>(
-    []
-  );
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useCustomerBookings();
 
-  const [filter, setFilter] =
-    useState<Filter>("all");
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [refreshing, setRefreshing] =
-    useState(false);
-
-  const [error, setError] =
-    useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [page, setPage] = useState(1);
 
   const [selectedBooking, setSelectedBooking] =
     useState<Booking | null>(null);
 
   /**
-   * --------------------------------------------------
-   * FETCH BOOKINGS
-   * --------------------------------------------------
+   * IDs reported as invalid after mount. The query cache may still hold
+   * them until the next successful refetch, so we dismiss them locally
+   * as well as persisting them for future loads.
    */
-  const fetchBookings = useCallback(
-    async (showRefresh = false) => {
-      try {
-        if (showRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        setError("");
-
-        const token =
-          sessionStorage.getItem(
-            "servicely_token"
-          );
-
-        if (!token) {
-          setError(
-            "Your session has expired. Please log in again."
-          );
-          return;
-        }
-
-        const response = await fetch(
-          `${API_URL}/bookings/my-bookings`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type":
-                "application/json",
-            },
-          }
-        );
-
-        const data =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-            "Unable to load bookings."
-          );
-        }
-
-        const fetchedBookings =
-          Array.isArray(data?.bookings)
-            ? data.bookings
-            : [];
-
-        /*
-         * IDs that the payment page has already
-         * confirmed as invalid / not found.
-         */
-        const invalidIds =
-          getInvalidBookingIds();
-
-        /*
-         * Remove:
-         * 1. Records without an ID.
-         * 2. Records previously confirmed as invalid.
-         * 3. Payment-pending records without
-         *    a valid service ID.
-         */
-        const validBookings =
-          fetchedBookings.filter(
-            (booking: Booking) => {
-              if (!booking?.id) {
-                return false;
-              }
-
-              if (
-                invalidIds.includes(
-                  booking.id
-                )
-              ) {
-                return false;
-              }
-
-              if (
-                (booking.paymentStatus ===
-                  "unpaid" ||
-                  booking.paymentStatus ===
-                  "pending") &&
-                !booking.serviceId
-              ) {
-                return false;
-              }
-
-              return true;
-            }
-          );
-
-        setBookings(validBookings);
-      } catch (err) {
-        console.error(
-          "FETCH CUSTOMER BOOKINGS ERROR:",
-          err
-        );
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load your bookings."
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    []
-  );
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
 
   /**
    * --------------------------------------------------
-   * INITIAL LOAD
+   * REMOVE INVALID BOOKING FROM CURRENT VIEW
    * --------------------------------------------------
    */
   useEffect(() => {
-    fetchBookings();
-  }, [fetchBookings]);
+    const handleInvalidBooking = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        bookingId?: string;
+      }>;
 
-  /**
-   * --------------------------------------------------
-   * REFRESH WHEN CUSTOMER RETURNS TO PAGE
-   * --------------------------------------------------
-   */
-  useEffect(() => {
-    const handleFocus = () => {
-      fetchBookings(true);
-    };
-
-    window.addEventListener(
-      "focus",
-      handleFocus
-    );
-
-    return () => {
-      window.removeEventListener(
-        "focus",
-        handleFocus
-      );
-    };
-  }, [fetchBookings]);
-
-  /**
-   * --------------------------------------------------
-   * REMOVE INVALID BOOKING FROM CURRENT STATE
-   * --------------------------------------------------
-   *
-   * This is useful when another part of the app
-   * reports that the booking no longer exists.
-   */
-  useEffect(() => {
-    const handleInvalidBooking = (
-      event: Event
-    ) => {
-      const customEvent =
-        event as CustomEvent<{
-          bookingId?: string;
-        }>;
-
-      const bookingId =
-        customEvent.detail?.bookingId;
+      const bookingId = customEvent.detail?.bookingId;
 
       if (!bookingId) {
         return;
       }
 
-      markBookingAsInvalid(
-        bookingId
-      );
+      markBookingAsInvalid(bookingId);
 
-      setBookings((current) =>
-        current.filter(
-          (booking) =>
-            booking.id !== bookingId
-        )
+      setDismissedIds((current) =>
+        current.includes(bookingId)
+          ? current
+          : [...current, bookingId]
       );
 
       setSelectedBooking((current) =>
-        current?.id === bookingId
-          ? null
-          : current
+        current?.id === bookingId ? null : current
       );
     };
 
@@ -387,35 +228,34 @@ export function CustomerBookings() {
 
   /**
    * --------------------------------------------------
-   * FILTER BOOKINGS
+   * VALID BOOKINGS
    * --------------------------------------------------
+   *
+   * Remove:
+   * 1. Records without an ID.
+   * 2. Records previously confirmed as invalid.
+   * 3. Payment-pending records without a valid service ID.
    */
-  const filteredBookings = useMemo(() => {
-    const invalidIds =
-      getInvalidBookingIds();
+  const validBookings = useMemo(() => {
+    const invalidIds = new Set([
+      ...getInvalidBookingIds(),
+      ...dismissedIds,
+    ]);
 
-    /*
-     * Always remove invalid bookings first.
-     */
-    const validBookings =
-      bookings.filter((booking) => {
+    return (data ?? [])
+      .map((record) => record as unknown as Booking)
+      .filter((booking) => {
         if (!booking?.id) {
           return false;
         }
 
-        if (
-          invalidIds.includes(
-            booking.id
-          )
-        ) {
+        if (invalidIds.has(booking.id)) {
           return false;
         }
 
         if (
-          (booking.paymentStatus ===
-            "unpaid" ||
-            booking.paymentStatus ===
-            "pending") &&
+          (booking.paymentStatus === "unpaid" ||
+            booking.paymentStatus === "pending") &&
           !booking.serviceId
         ) {
           return false;
@@ -423,28 +263,29 @@ export function CustomerBookings() {
 
         return true;
       });
+  }, [data, dismissedIds]);
 
+  /**
+   * --------------------------------------------------
+   * FILTER BOOKINGS
+   * --------------------------------------------------
+   */
+  const filteredBookings = useMemo(() => {
     if (filter === "all") {
       return validBookings;
     }
 
     if (filter === "pending") {
       return validBookings.filter(
-        (booking) =>
-          booking.bookingStatus ===
-          "pending"
+        (booking) => booking.bookingStatus === "pending"
       );
     }
 
-    if (
-      filter === "payment_pending"
-    ) {
+    if (filter === "payment_pending") {
       return validBookings.filter(
         (booking) =>
-          (booking.paymentStatus ===
-            "unpaid" ||
-            booking.paymentStatus ===
-            "pending") &&
+          (booking.paymentStatus === "unpaid" ||
+            booking.paymentStatus === "pending") &&
           Boolean(booking.id) &&
           Boolean(booking.serviceId)
       );
@@ -452,143 +293,104 @@ export function CustomerBookings() {
 
     if (filter === "paid") {
       return validBookings.filter(
-        (booking) =>
-          booking.paymentStatus ===
-          "paid"
+        (booking) => booking.paymentStatus === "paid"
       );
     }
 
     if (filter === "completed") {
       return validBookings.filter(
-        (booking) =>
-          booking.bookingStatus ===
-          "completed"
+        (booking) => booking.bookingStatus === "completed"
       );
     }
 
     if (filter === "cancelled") {
       return validBookings.filter(
-        (booking) =>
-          booking.bookingStatus ===
-          "cancelled"
+        (booking) => booking.bookingStatus === "cancelled"
       );
     }
 
     return validBookings;
-  }, [bookings, filter]);
+  }, [validBookings, filter]);
+
+  const bookingsPerPage = 4;
+  const totalPages = Math.ceil(filteredBookings.length / bookingsPerPage);
+  const currentPage = Math.min(page, Math.max(totalPages, 1));
+  const paginatedBookings = filteredBookings.slice(
+    (currentPage - 1) * bookingsPerPage,
+    currentPage * bookingsPerPage
+  );
+  const firstBookingOnPage =
+    filteredBookings.length === 0
+      ? 0
+      : (currentPage - 1) * bookingsPerPage + 1;
+  const lastBookingOnPage = Math.min(
+    currentPage * bookingsPerPage,
+    filteredBookings.length
+  );
 
   /**
    * --------------------------------------------------
    * COUNTS
    * --------------------------------------------------
    */
-  const counts = useMemo(() => {
-    const invalidIds =
-      getInvalidBookingIds();
-
-    const validBookings =
-      bookings.filter((booking) => {
-        if (!booking?.id) {
-          return false;
-        }
-
-        if (
-          invalidIds.includes(
-            booking.id
-          )
-        ) {
-          return false;
-        }
-
-        return true;
-      });
-
-    return {
+  const counts = useMemo(
+    () => ({
       all: validBookings.length,
 
-      pending:
-        validBookings.filter(
-          (booking) =>
-            booking.bookingStatus ===
-            "pending"
-        ).length,
+      pending: validBookings.filter(
+        (booking) => booking.bookingStatus === "pending"
+      ).length,
 
-      payment_pending:
-        validBookings.filter(
-          (booking) =>
-            (booking.paymentStatus ===
-              "unpaid" ||
-              booking.paymentStatus ===
-              "pending") &&
-            Boolean(booking.id) &&
-            Boolean(booking.serviceId)
-        ).length,
+      payment_pending: validBookings.filter(
+        (booking) =>
+          (booking.paymentStatus === "unpaid" ||
+            booking.paymentStatus === "pending") &&
+          Boolean(booking.id) &&
+          Boolean(booking.serviceId)
+      ).length,
 
-      paid:
-        validBookings.filter(
-          (booking) =>
-            booking.paymentStatus ===
-            "paid"
-        ).length,
+      paid: validBookings.filter(
+        (booking) => booking.paymentStatus === "paid"
+      ).length,
 
-      completed:
-        validBookings.filter(
-          (booking) =>
-            booking.bookingStatus ===
-            "completed"
-        ).length,
+      completed: validBookings.filter(
+        (booking) => booking.bookingStatus === "completed"
+      ).length,
 
-      cancelled:
-        validBookings.filter(
-          (booking) =>
-            booking.bookingStatus ===
-            "cancelled"
-        ).length,
-    };
-  }, [bookings]);
+      cancelled: validBookings.filter(
+        (booking) => booking.bookingStatus === "cancelled"
+      ).length,
+    }),
+    [validBookings]
+  );
 
-  /**
-   * --------------------------------------------------
-   * TABS
-   * --------------------------------------------------
-   */
-  const tabs: {
-    id: Filter;
-    label: string;
-  }[] = [
-      {
-        id: "all",
-        label: "All",
-      },
-      {
-        id: "pending",
-        label: "Pending",
-      },
-      {
-        id: "payment_pending",
-        label: "Payment Pending",
-      },
-      {
-        id: "paid",
-        label: "Paid",
-      },
-      {
-        id: "completed",
-        label: "Completed",
-      },
-      {
-        id: "cancelled",
-        label: "Cancelled",
-      },
-    ];
+  const activeTab = TABS.find((tab) => tab.id === filter);
 
-  const hasData =
-    filteredBookings.length > 0;
+  const sessionExpired = !hasUserToken();
+  const apiError = isError ? getApiErrorMessage(error) : "";
 
+  const hasData = filteredBookings.length > 0;
   const showFullError =
-    Boolean(error) &&
-    !loading &&
-    !hasData;
+    !isLoading &&
+    (sessionExpired || (!hasData && Boolean(apiError)));
+  const showRefreshError =
+    !isLoading && !sessionExpired && hasData && Boolean(apiError);
+  const showUpdating = isFetching && !isLoading;
+
+  const emptyTitle =
+    filter === "all"
+      ? "No bookings yet"
+      : `No ${activeTab?.label.toLowerCase() ?? "matching"} bookings`;
+
+  const emptyDescription =
+    filter === "all"
+      ? "Book a service to see your bookings, payment status and booking details here."
+      : filter === "payment_pending"
+        ? "You don't have any payments waiting to be completed."
+        : `You don't have any ${filter.replace(
+          "_",
+          " "
+        )} bookings.`;
 
   return (
     <DashboardLayout
@@ -603,10 +405,8 @@ export function CustomerBookings() {
             variant="outline"
             size="sm"
             icon={RefreshCw}
-            loading={refreshing}
-            onClick={() =>
-              fetchBookings(true)
-            }
+            loading={isFetching}
+            onClick={() => refetch()}
             aria-label="Refresh bookings"
           >
             Refresh
@@ -614,182 +414,192 @@ export function CustomerBookings() {
         }
       />
 
-      <div className="space-y-6">
+      <div className="space-y-6" aria-busy={isFetching}>
         {/* ==================================================
             SUMMARY
         ================================================== */}
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard
-            label="Total bookings"
-            value={String(counts.all)}
-            icon={Receipt}
-            color="brand"
-          />
+        {isLoading ? (
+          <SummarySkeleton />
+        ) : (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard
+              label="Total bookings"
+              value={String(counts.all)}
+              icon={Receipt}
+              color="brand"
+            />
 
-          <StatCard
-            label="Pending"
-            value={String(counts.pending)}
-            icon={Clock3}
-            color="warning"
-          />
+            <StatCard
+              label="Pending"
+              value={String(counts.pending)}
+              icon={Clock3}
+              color="warning"
+            />
 
-          <StatCard
-            label="Paid"
-            value={String(counts.paid)}
-            icon={CreditCard}
-            color="success"
-          />
+            <StatCard
+              label="Paid"
+              value={String(counts.paid)}
+              icon={CreditCard}
+              color="success"
+            />
 
-          <StatCard
-            label="Completed"
-            value={String(
-              counts.completed
-            )}
-            icon={CheckCircle2}
-            color="sky"
-          />
-        </div>
+            <StatCard
+              label="Completed"
+              value={String(counts.completed)}
+              icon={CheckCircle2}
+              color="sky"
+            />
+          </div>
+        )}
 
         {/* ==================================================
-            FILTER CHIPS
+            FILTER CHIPS + RESULT COUNT
         ================================================== */}
 
-        <div
-          role="group"
-          aria-label="Filter bookings"
-          className="no-scrollbar flex gap-2 overflow-x-auto pb-1"
-        >
-          {tabs.map((tab) => {
-            const count =
-              counts[tab.id];
+        <div className="space-y-3">
+          <div
+            role="group"
+            aria-label="Filter bookings"
+            className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+          >
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const active = filter === tab.id;
+              const count = counts[tab.id];
 
-            const active =
-              filter === tab.id;
-
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() =>
-                  setFilter(tab.id)
-                }
-                className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${active
-                  ? "bg-brand-600 text-white shadow-soft"
-                  : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:text-ink-50"
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  aria-pressed={active}
+                  aria-label={`${tab.label} (${count})`}
+                  onClick={() => {
+                    setFilter(tab.id);
+                    setPage(1);
+                  }}
+                  className={`flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all ${
+                    active
+                      ? "bg-brand-600 text-white shadow-soft"
+                      : "border border-slate-200 bg-white text-slate-600 hover:border-brand-300 hover:text-brand-700 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:text-ink-50"
                   }`}
-              >
-                {tab.label}
-
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] ${active
-                    ? "bg-white/20 text-white"
-                    : "bg-slate-100 text-slate-500 dark:bg-ink-800 dark:text-ink-400"
-                    }`}
                 >
-                  {count}
+                  <Icon
+                    className={`h-3.5 w-3.5 ${
+                      active
+                        ? "text-white"
+                        : "text-slate-400 dark:text-ink-500"
+                    }`}
+                  />
+
+                  {tab.label}
+
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                      active
+                        ? "bg-white/20 text-white"
+                        : "bg-slate-100 text-slate-500 dark:bg-ink-800 dark:text-ink-400"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
+            <p className="text-xs font-medium text-slate-500 dark:text-ink-400">
+              Showing{" "}
+              <span className="font-semibold text-slate-900 dark:text-ink-50">
+                {filteredBookings.length}
+              </span>{" "}
+              of {counts.all}{" "}
+              {counts.all === 1 ? "booking" : "bookings"}
+              {filter !== "all" && activeTab ? (
+                <span className="ml-1 text-slate-400 dark:text-ink-500">
+                  · {activeTab.label}
                 </span>
-              </button>
-            );
-          })}
+              ) : null}
+            </p>
+
+            {showUpdating ? (
+              <span
+                aria-live="polite"
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-600 dark:text-brand-300"
+              >
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Updating bookings…
+              </span>
+            ) : null}
+          </div>
         </div>
 
         {/* ==================================================
             REFRESH ERROR (data already on screen)
         ================================================== */}
 
-        {Boolean(error) &&
-          !loading &&
-          hasData && (
-            <div className="flex flex-col gap-3 rounded-2xl border border-danger-100 bg-danger-50/60 p-4 dark:border-danger-500/20 dark:bg-danger-500/5 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-200" />
+        {showRefreshError ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-danger-100 bg-danger-50/60 p-4 dark:border-danger-500/20 dark:bg-danger-500/5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-200" />
 
-                <div>
-                  <p className="text-sm font-semibold text-danger-700 dark:text-danger-200">
-                    Unable to refresh bookings
-                  </p>
+              <div>
+                <p className="text-sm font-semibold text-danger-700 dark:text-danger-200">
+                  Unable to refresh bookings
+                </p>
 
-                  <p className="mt-0.5 text-xs text-danger-600 dark:text-danger-200/80">
-                    {error}
-                  </p>
-                </div>
+                <p className="mt-0.5 text-xs text-danger-600 dark:text-danger-200/80">
+                  {apiError}
+                </p>
               </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                icon={RefreshCw}
-                onClick={() =>
-                  fetchBookings()
-                }
-                className="shrink-0"
-              >
-                Try again
-              </Button>
             </div>
-          )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
+              loading={isFetching}
+              onClick={() => refetch()}
+              className="shrink-0"
+            >
+              Try again
+            </Button>
+          </div>
+        ) : null}
 
         {/* ==================================================
-            LOADING
+            LOADING / ERROR / EMPTY / BOOKINGS
         ================================================== */}
 
-        {loading ? (
+        {isLoading ? (
           <BookingSkeleton />
         ) : showFullError ? (
-          /* ==================================================
-             ERROR
-          ================================================== */
           <ErrorState
-            message={error}
-            onRetry={() =>
-              fetchBookings()
+            message={
+              sessionExpired
+                ? "Your session has expired. Please log in again to view your bookings."
+                : apiError || "Unable to load your bookings."
+            }
+            onRetry={
+              sessionExpired ? undefined : () => refetch()
             }
           />
-        ) : filteredBookings.length ===
-          0 ? (
-          /* ==================================================
-             EMPTY STATE
-          ================================================== */
+        ) : !hasData ? (
           <EmptyState
             icon={Calendar}
-            title={
-              filter === "all"
-                ? "No bookings yet"
-                : `No ${tabs
-                  .find(
-                    (tab) =>
-                      tab.id === filter
-                  )
-                  ?.label.toLowerCase()} bookings`
-            }
-            description={
-              filter === "all"
-                ? "Book a service to see your bookings and payment details here."
-                : filter ===
-                  "payment_pending"
-                  ? "You don't have any payments waiting to be completed."
-                  : `You don't have any ${filter.replace(
-                    "_",
-                    " "
-                  )} bookings.`
-            }
+            title={emptyTitle}
+            description={emptyDescription}
             action={
               filter === "all" ? (
-                <Link
-                  to="/customer/browse"
-                  className="btn-primary"
-                >
+                <Link to="/customer/browse" className="btn-primary">
                   <Search className="h-4 w-4" />
                   Browse Services
                 </Link>
               ) : (
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    setFilter("all")
-                  }
+                  onClick={() => setFilter("all")}
                 >
                   Show all bookings
                 </Button>
@@ -797,234 +607,90 @@ export function CustomerBookings() {
             }
           />
         ) : (
-          /* ==================================================
-             BOOKINGS — desktop table + mobile cards
-          ================================================== */
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="space-y-4"
+            className="space-y-3"
           >
-            {/* Desktop table */}
-            <div className="hidden overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900 lg:block">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-slate-200/70 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:border-ink-800 dark:bg-ink-800/60 dark:text-ink-400">
-                    <th
-                      scope="col"
-                      className="px-5 py-3.5"
-                    >
-                      Service
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-5 py-3.5"
-                    >
-                      Provider
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-5 py-3.5"
-                    >
-                      Date &amp; time
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-5 py-3.5"
-                    >
-                      Amount
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-5 py-3.5"
-                    >
-                      Status
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-5 py-3.5 text-right"
-                    >
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody className="divide-y divide-slate-100 dark:divide-ink-800">
-                  {filteredBookings.map(
-                    (booking) => (
-                      <tr
-                        key={booking.id}
-                        className="transition-colors hover:bg-slate-50/70 dark:hover:bg-ink-800/40"
-                      >
-                        {/* SERVICE */}
-                        <td className="px-5 py-4 align-top">
-                          <p className="text-sm font-semibold text-slate-900 dark:text-ink-50">
-                            {booking.serviceName}
-                          </p>
-
-                          {booking
-                            .serviceDetails
-                            ?.category && (
-                              <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-400">
-                                {
-                                  booking
-                                    .serviceDetails
-                                    .category
-                                }
-                              </p>
-                            )}
-                        </td>
-
-                        {/* PROVIDER */}
-                        <td className="px-5 py-4 align-top">
-                          <div className="flex items-center gap-2.5">
-                            <Avatar
-                              src={
-                                booking.providerAvatar
-                              }
-                              name={
-                                booking.providerName
-                              }
-                              size="sm"
-                            />
-
-                            <span className="text-sm text-slate-600 dark:text-ink-300">
-                              {booking.providerName}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* DATE & TIME */}
-                        <td className="px-5 py-4 align-top">
-                          <p className="text-sm font-medium text-slate-700 dark:text-ink-200">
-                            {booking.date}
-                          </p>
-
-                          <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-500 dark:text-ink-400">
-                            <Clock3 className="h-3 w-3 shrink-0" />
-
-                            <span className="truncate">
-                              {booking.time}
-                              {booking.location
-                                ? ` · ${booking.location}`
-                                : ""}
-                            </span>
-                          </p>
-                        </td>
-
-                        {/* AMOUNT */}
-                        <td className="px-5 py-4 align-top">
-                          <p className="text-sm font-bold text-slate-900 dark:text-ink-50">
-                            {formatNaira(
-                              booking.price
-                            )}
-                          </p>
-
-                          <div className="mt-1">
-                            <PaymentBadge
-                              status={
-                                booking.paymentStatus
-                              }
-                            />
-                          </div>
-                        </td>
-
-                        {/* STATUS */}
-                        <td className="px-5 py-4 align-top">
-                          <BookingStatusBadge
-                            status={
-                              booking.bookingStatus
-                            }
-                          />
-                        </td>
-
-                        {/* ACTIONS */}
-                        <td className="px-5 py-4 align-top">
-                          <div className="flex flex-wrap items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelectedBooking(
-                                  booking
-                                )
-                              }
-                              className="btn-outline btn-sm"
-                              aria-label={`View details for ${booking.serviceName}`}
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              Details
-                            </button>
-
-                            {booking.paymentStatus ===
-                              "unpaid" ||
-                              booking.paymentStatus ===
-                              "pending" ? (
-                              <Link
-                                to={`/payment/${booking.id}`}
-                                className="btn-primary btn-sm"
-                              >
-                                <CreditCard className="h-3.5 w-3.5" />
-                                Pay now
-                              </Link>
-                            ) : null}
-
-                            {booking.bookingStatus ===
-                              "completed" ? (
-                              <Link
-                                to={`/review/${booking.id}`}
-                                className="btn-outline btn-sm"
-                              >
-                                Review
-                              </Link>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile cards */}
-            <div className="space-y-4 lg:hidden">
-              {filteredBookings.map(
-                (booking) => (
-                  <BookingCard
-                    key={booking.id}
-                    booking={booking}
-                    onView={() =>
-                      setSelectedBooking(
-                        booking
-                      )
-                    }
-                  />
-                )
-              )}
-            </div>
+            {paginatedBookings.map((booking) => (
+              <BookingCard
+                key={booking.id}
+                booking={booking}
+                onView={() => setSelectedBooking(booking)}
+              />
+            ))}
           </motion.div>
         )}
+
+        {!isLoading && !showFullError && hasData ? (
+          <nav
+            aria-label="Booking results pagination"
+            className="flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-ink-800 dark:bg-ink-900"
+          >
+            <p
+              aria-live="polite"
+              className="text-sm text-slate-500 dark:text-ink-400"
+            >
+              Showing{" "}
+              <span className="font-semibold text-slate-800 dark:text-ink-100">
+                {firstBookingOnPage}–{lastBookingOnPage}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-800 dark:text-ink-100">
+                {filteredBookings.length}
+              </span>{" "}
+              bookings
+            </p>
+
+            <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <span className="text-xs font-medium tabular-nums text-slate-500 dark:text-ink-400">
+                Page {currentPage} of {Math.max(totalPages, 1)}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  title="Previous page"
+                  disabled={currentPage === 1}
+                  onClick={() => setPage(currentPage - 1)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-brand-300 hover:bg-lavender hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+                >
+                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  title="Next page"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage(currentPage + 1)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-brand-300 hover:bg-lavender hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+                >
+                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          </nav>
+        ) : null}
       </div>
 
       {/* ==================================================
           DETAILS MODAL
       ================================================== */}
 
-      {selectedBooking && (
+      {selectedBooking ? (
         <BookingDetailsModal
           booking={selectedBooking}
-          onClose={() =>
-            setSelectedBooking(null)
-          }
+          onClose={() => setSelectedBooking(null)}
         />
-      )}
+      ) : null}
     </DashboardLayout>
   );
 }
 
 /* ======================================================
-   BOOKING CARD (mobile / tablet)
+   BOOKING CARD
 ====================================================== */
 
 function BookingCard({
@@ -1034,139 +700,165 @@ function BookingCard({
   booking: Booking;
   onView: () => void;
 }) {
-  const isPaid =
-    booking.paymentStatus === "paid";
+  const isPaid = booking.paymentStatus === "paid";
 
   const needsPayment =
-    booking.paymentStatus ===
-    "unpaid" ||
+    booking.paymentStatus === "unpaid" ||
     booking.paymentStatus === "pending";
 
-  const isCompleted =
-    booking.bookingStatus === "completed";
+  const isCompleted = booking.bookingStatus === "completed";
 
   return (
     <motion.article
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="card overflow-hidden transition-shadow hover:shadow-card-hover"
+      className="card group relative overflow-hidden transition-shadow hover:shadow-card-hover"
     >
-      <div className="p-4 sm:p-5">
-        <div className="flex items-start gap-3.5">
-          <Avatar
-            src={booking.providerAvatar}
-            name={booking.providerName}
-            size="lg"
-          />
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-0 left-0 w-1 ${bookingAccent(
+          booking.bookingStatus
+        )}`}
+      />
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
-                {booking.serviceName}
-              </h3>
+      <div className="p-4 pl-5 sm:p-5 sm:pl-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 flex-1 items-start gap-3.5">
+            <Avatar
+              src={booking.providerAvatar}
+              name={booking.providerName}
+              size="md"
+            />
 
-              <BookingStatusBadge
-                status={
-                  booking.bookingStatus
-                }
-              />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="min-w-0 truncate text-sm font-semibold text-slate-900 dark:text-ink-50 sm:text-base">
+                  {booking.serviceName}
+                </h3>
+
+                <BookingStatusBadge
+                  status={booking.bookingStatus}
+                />
+              </div>
+
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-ink-400">
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <UserRound className="h-3.5 w-3.5 shrink-0" />
+
+                  <span className="truncate">
+                    {booking.providerName}
+                  </span>
+                </span>
+
+                {booking.serviceDetails?.category ? (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="text-slate-300 dark:text-ink-600"
+                    >
+                      •
+                    </span>
+
+                    <span className="truncate text-slate-500 dark:text-ink-400">
+                      {booking.serviceDetails.category}
+                    </span>
+                  </>
+                ) : null}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {booking.date ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-2.5 py-1.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+                    <Calendar className="h-3 w-3" />
+                    {formatBookingDate(booking.date)}
+                  </span>
+                ) : null}
+
+                <InfoPill
+                  icon={<Clock3 />}
+                  text={booking.time}
+                />
+
+                <InfoPill
+                  icon={<MapPin />}
+                  text={booking.location}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-ink-800 sm:flex-col sm:border-0 sm:pt-0 sm:text-right">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-ink-500">
+                Total
+              </p>
+
+              <p className="mt-0.5 text-lg font-bold tracking-tight text-slate-900 dark:text-ink-50">
+                {formatNaira(booking.price)}
+              </p>
             </div>
 
-            <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-ink-400">
-              <UserRound className="h-3.5 w-3.5 shrink-0" />
-              {booking.providerName}
-            </p>
-
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              <InfoPill
-                icon={<Calendar />}
-                text={booking.date}
-              />
-
-              <InfoPill
-                icon={<Clock3 />}
-                text={booking.time}
-              />
-
-              <InfoPill
-                icon={<MapPin />}
-                text={booking.location}
-              />
-            </div>
+            <PaymentBadge status={booking.paymentStatus} />
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end justify-between gap-3 border-t border-slate-100 pt-4 dark:border-ink-800">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-ink-500">
-              Total
-            </p>
+        <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[11px] text-slate-400 dark:text-ink-500">
+            {booking.createdAt
+              ? `Booked ${formatDateTime(booking.createdAt)}`
+              : "Booking details available below"}
+          </p>
 
-            <p className="mt-0.5 text-lg font-bold text-slate-900 dark:text-ink-50">
-              {formatNaira(
-                booking.price
-              )}
-            </p>
-
-            <div className="mt-1.5">
-              <PaymentBadge
-                status={
-                  booking.paymentStatus
-                }
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap justify-end gap-2">
-            {needsPayment && (
+          <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:justify-end">
+            {needsPayment ? (
               <Link
                 to={`/payment/${booking.id}`}
-                className="btn-primary btn-sm"
+                className="btn-primary btn-sm w-full sm:w-auto"
+                aria-label={`Pay for ${booking.serviceName}`}
               >
                 <CreditCard className="h-3.5 w-3.5" />
                 Pay now
               </Link>
-            )}
+            ) : null}
 
             <button
               type="button"
               onClick={onView}
-              className="btn-outline btn-sm"
+              className="btn-outline btn-sm w-full sm:w-auto"
               aria-label={`View details for ${booking.serviceName}`}
             >
               <Eye className="h-3.5 w-3.5" />
               Details
             </button>
 
-            {isCompleted && (
+            {isCompleted ? (
               <Link
                 to={`/review/${booking.id}`}
-                className="btn-outline btn-sm"
+                className="btn-outline btn-sm w-full sm:w-auto"
               >
-                Review
+                Leave review
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
 
       {/* PAYMENT CONFIRMATION */}
-      {isPaid && (
+      {isPaid ? (
         <div className="flex flex-col gap-1.5 border-t border-success-100 bg-success-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-success-600/30 dark:bg-success-600/10">
           <div className="flex items-center gap-2 text-xs font-semibold text-success-700 dark:text-success-200">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
-
             Payment confirmed by Paystack
           </div>
 
-          {booking.payment.reference && (
+          {booking.payment?.reference ? (
             <span className="truncate font-mono text-[10px] text-success-600 dark:text-success-200/80">
               {booking.payment.reference}
             </span>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
     </motion.article>
   );
 }
@@ -1182,13 +874,15 @@ function BookingDetailsModal({
   booking: Booking;
   onClose: () => void;
 }) {
-  const isPaid =
-    booking.paymentStatus === "paid";
+  const isPaid = booking.paymentStatus === "paid";
 
   const needsPayment =
-    booking.paymentStatus ===
-    "unpaid" ||
+    booking.paymentStatus === "unpaid" ||
     booking.paymentStatus === "pending";
+
+  const isCompleted = booking.bookingStatus === "completed";
+
+  const payment = booking.payment ?? ({} as PaymentInfo);
 
   return (
     <ResponsiveModal
@@ -1197,7 +891,7 @@ function BookingDetailsModal({
       title="Booking details"
       footer={
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          {needsPayment && (
+          {needsPayment ? (
             <Link
               to={`/payment/${booking.id}`}
               onClick={onClose}
@@ -1206,7 +900,17 @@ function BookingDetailsModal({
               <CreditCard className="h-4 w-4" />
               Complete payment
             </Link>
-          )}
+          ) : null}
+
+          {isCompleted ? (
+            <Link
+              to={`/review/${booking.id}`}
+              onClick={onClose}
+              className="btn-outline w-full sm:w-auto"
+            >
+              Leave review
+            </Link>
+          ) : null}
 
           <button
             type="button"
@@ -1221,43 +925,33 @@ function BookingDetailsModal({
       <div className="space-y-5">
         {/* SERVICE */}
         <section className="overflow-hidden rounded-2xl border border-slate-200/70 dark:border-ink-800">
-          {booking.serviceDetails
-            ?.image && (
-              <img
-                src={
-                  booking.serviceDetails
-                    .image
-                }
-                alt={
-                  booking.serviceDetails
-                    .title
-                }
-                className="h-40 w-full object-cover"
-              />
-            )}
+          {booking.serviceDetails?.image ? (
+            <img
+              src={booking.serviceDetails.image}
+              alt={booking.serviceDetails.title}
+              className="h-40 w-full object-cover"
+            />
+          ) : null}
 
           <div className="p-4">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-semibold text-slate-900 dark:text-ink-50">
-                {booking.serviceDetails
-                  ?.title ||
+                {booking.serviceDetails?.title ||
                   booking.serviceName}
               </h3>
 
-              {booking.serviceDetails
-                ?.category && (
-                  <span className="badge bg-lavender text-brand-700 dark:bg-brand-950 dark:text-brand-300">
-                    {booking.serviceDetails.category}
-                  </span>
-                )}
+              {booking.serviceDetails?.category ? (
+                <span className="badge bg-lavender text-brand-700 dark:bg-brand-950 dark:text-brand-300">
+                  {booking.serviceDetails.category}
+                </span>
+              ) : null}
             </div>
 
-            {booking.serviceDetails
-              ?.description && (
-                <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-ink-400">
-                  {booking.serviceDetails.description}
-                </p>
-              )}
+            {booking.serviceDetails?.description ? (
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-ink-400">
+                {booking.serviceDetails.description}
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -1298,7 +992,7 @@ function BookingDetailsModal({
             <DetailItem
               icon={<Calendar />}
               label="Date"
-              value={booking.date}
+              value={formatBookingDate(booking.date)}
             />
 
             <DetailItem
@@ -1316,15 +1010,12 @@ function BookingDetailsModal({
             <div className="rounded-2xl bg-slate-50 p-3.5 dark:bg-ink-800/60">
               <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-ink-500">
                 <FileText className="h-3 w-3" />
-
                 Booking status
               </div>
 
               <div className="mt-2">
                 <BookingStatusBadge
-                  status={
-                    booking.bookingStatus
-                  }
+                  status={booking.bookingStatus}
                 />
               </div>
             </div>
@@ -1332,7 +1023,7 @@ function BookingDetailsModal({
         </section>
 
         {/* NOTES */}
-        {booking.notes && (
+        {booking.notes ? (
           <section>
             <SectionTitle
               icon={<FileText />}
@@ -1343,7 +1034,7 @@ function BookingDetailsModal({
               {booking.notes}
             </div>
           </section>
-        )}
+        ) : null}
 
         {/* PAYMENT */}
         <section>
@@ -1353,16 +1044,18 @@ function BookingDetailsModal({
           />
 
           <div
-            className={`mt-3 overflow-hidden rounded-2xl border ${isPaid
-              ? "border-success-100 dark:border-success-600/30"
-              : "border-slate-200 dark:border-ink-800"
-              }`}
+            className={`mt-3 overflow-hidden rounded-2xl border ${
+              isPaid
+                ? "border-success-100 dark:border-success-600/30"
+                : "border-slate-200 dark:border-ink-800"
+            }`}
           >
             <div
-              className={`flex items-center justify-between px-4 py-4 ${isPaid
-                ? "bg-success-50 dark:bg-success-600/10"
-                : "bg-slate-50 dark:bg-ink-800/50"
-                }`}
+              className={`flex items-center justify-between px-4 py-4 ${
+                isPaid
+                  ? "bg-success-50 dark:bg-success-600/10"
+                  : "bg-slate-50 dark:bg-ink-800/50"
+              }`}
             >
               <div className="flex items-center gap-2">
                 {isPaid ? (
@@ -1374,91 +1067,65 @@ function BookingDetailsModal({
                 <span className="text-sm font-semibold text-slate-900 dark:text-ink-50">
                   {isPaid
                     ? "Payment successful"
-                    : formatStatus(
-                      booking.paymentStatus
-                    )}
+                    : formatStatus(booking.paymentStatus)}
                 </span>
               </div>
 
-              {isPaid && (
+              {isPaid ? (
                 <ShieldCheck className="h-5 w-5 text-success-600 dark:text-success-200" />
-              )}
+              ) : null}
             </div>
 
             <div className="divide-y divide-slate-100 dark:divide-ink-800">
               <PaymentRow
-                label="Amount paid"
+                label={isPaid ? "Amount paid" : "Amount due"}
                 value={formatNaira(
-                  booking.payment
-                    .amount !== null &&
-                    booking.payment
-                      .amount !==
-                    undefined
-                    ? booking.payment
-                      .amount
+                  payment.amount !== null &&
+                    payment.amount !== undefined
+                    ? payment.amount
                     : booking.price
                 )}
                 strong
               />
 
-              {booking.payment
-                .reference && (
-                  <PaymentRow
-                    label="Payment reference"
-                    value={
-                      booking.payment
-                        .reference
-                    }
-                    mono
-                  />
-                )}
+              {payment.reference ? (
+                <PaymentRow
+                  label="Payment reference"
+                  value={payment.reference}
+                  mono
+                />
+              ) : null}
 
-              {booking.payment
-                .transactionId && (
-                  <PaymentRow
-                    label="Transaction ID"
-                    value={
-                      booking.payment
-                        .transactionId
-                    }
-                    mono
-                  />
-                )}
+              {payment.transactionId ? (
+                <PaymentRow
+                  label="Transaction ID"
+                  value={payment.transactionId}
+                  mono
+                />
+              ) : null}
 
-              {booking.payment
-                .channel && (
-                  <PaymentRow
-                    label="Payment channel"
-                    value={formatStatus(
-                      booking.payment
-                        .channel
-                    )}
-                  />
-                )}
+              {payment.channel ? (
+                <PaymentRow
+                  label="Payment channel"
+                  value={formatStatus(payment.channel)}
+                />
+              ) : null}
 
-              {booking.payment
-                .paidAt && (
-                  <PaymentRow
-                    label="Paid on"
-                    value={formatDateTime(
-                      booking.payment
-                        .paidAt
-                    )}
-                  />
-                )}
+              {payment.paidAt ? (
+                <PaymentRow
+                  label="Paid on"
+                  value={formatDateTime(payment.paidAt)}
+                />
+              ) : null}
 
               <PaymentRow
                 label="Servicely fee"
-                value={formatNaira(
-                  booking.platformFee
-                )}
+                value={formatNaira(booking.platformFee)}
               />
 
               <PaymentRow
                 label="Provider amount"
-                value={formatNaira(
-                  booking.providerAmount
-                )}
+                value={formatNaira(booking.providerAmount)}
               />
             </div>
           </div>
@@ -1487,9 +1154,7 @@ function InfoPill({
         {icon}
       </span>
 
-      <span className="truncate">
-        {text}
-      </span>
+      <span className="truncate">{text}</span>
     </span>
   );
 }
@@ -1568,11 +1233,13 @@ function PaymentRow({
       </span>
 
       <span
-        className={`break-all text-right text-xs ${mono ? "font-mono" : ""
-          } ${strong
+        className={`break-all text-right text-xs ${
+          mono ? "font-mono" : ""
+        } ${
+          strong
             ? "font-bold text-slate-900 dark:text-ink-50"
             : "font-semibold text-slate-700 dark:text-ink-300"
-          }`}
+        }`}
       >
         {value}
       </span>
@@ -1584,11 +1251,7 @@ function PaymentRow({
    PAYMENT BADGE
 ====================================================== */
 
-function PaymentBadge({
-  status,
-}: {
-  status: string;
-}) {
+function PaymentBadge({ status }: { status: string }) {
   if (status === "paid") {
     return (
       <span className="badge bg-success-50 text-success-700 dark:bg-success-600/15 dark:text-success-200">
@@ -1598,10 +1261,7 @@ function PaymentBadge({
     );
   }
 
-  if (
-    status === "pending" ||
-    status === "unpaid"
-  ) {
+  if (status === "pending" || status === "unpaid") {
     return (
       <span className="badge bg-warning-50 text-warning-700 dark:bg-warning-600/15 dark:text-warning-200">
         <Clock3 className="h-3 w-3" />
@@ -1627,41 +1287,84 @@ function PaymentBadge({
 }
 
 /* ======================================================
-   SKELETON
+   SKELETONS
 ====================================================== */
+
+function SummarySkeleton() {
+  return (
+    <div
+      className="grid grid-cols-2 gap-4 lg:grid-cols-4"
+      aria-hidden="true"
+    >
+      {[0, 1, 2, 3].map((item) => (
+        <div key={item} className="card p-5">
+          <Skeleton className="h-11 w-11 rounded-xl" />
+
+          <Skeleton className="mt-3 h-7 w-14 rounded-lg" />
+
+          <Skeleton className="mt-2 h-3 w-24 rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function BookingSkeleton() {
   return (
     <div
-      className="space-y-4"
-      aria-hidden="true"
+      className="space-y-3"
+      role="status"
+      aria-label="Loading bookings"
     >
       {[0, 1, 2].map((item) => (
         <div
           key={item}
-          className="card animate-pulse p-5"
+          aria-hidden="true"
+          className="card relative overflow-hidden p-5 pl-6"
         >
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-12 w-12 rounded-full" />
+          <div className="flex items-start gap-3.5">
+            <Skeleton className="h-10 w-10 rounded-full" />
 
             <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-1/3 rounded-lg" />
+              <div className="flex flex-wrap items-center gap-2">
+                <Skeleton className="h-4 w-40 rounded-lg" />
 
-              <Skeleton className="h-3 w-1/4 rounded-lg" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+
+              <Skeleton className="h-3 w-28 rounded-lg" />
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Skeleton className="h-7 w-28 rounded-lg" />
+
+                <Skeleton className="h-7 w-20 rounded-lg" />
+
+                <Skeleton className="h-7 w-24 rounded-lg" />
+              </div>
             </div>
 
-            <Skeleton className="h-6 w-24 rounded-full" />
+            <div className="hidden shrink-0 space-y-2 sm:block">
+              <Skeleton className="h-3 w-10 rounded-lg" />
+
+              <Skeleton className="h-6 w-20 rounded-lg" />
+
+              <Skeleton className="h-5 w-24 rounded-full" />
+            </div>
           </div>
 
-          <div className="mt-4 flex gap-2">
-            <Skeleton className="h-7 w-24 rounded-lg" />
+          <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-between">
+            <Skeleton className="h-3 w-32 rounded-lg" />
 
-            <Skeleton className="h-7 w-24 rounded-lg" />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Skeleton className="h-9 w-full rounded-lg sm:w-24" />
 
-            <Skeleton className="h-7 w-24 rounded-lg" />
+              <Skeleton className="h-9 w-full rounded-lg sm:w-24" />
+            </div>
           </div>
         </div>
       ))}
+
+      <span className="sr-only">Loading bookings…</span>
     </div>
   );
 }
@@ -1670,27 +1373,58 @@ function BookingSkeleton() {
    HELPERS
 ====================================================== */
 
-function formatStatus(
-  value: string
-) {
-  return String(value || "")
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) =>
-      char.toUpperCase()
-    );
+function bookingAccent(status: string) {
+  const accents: Record<string, string> = {
+    pending: "bg-warning-400",
+    accepted: "bg-sky-400",
+    payment_pending: "bg-warning-400",
+    paid: "bg-success-500",
+    completed: "bg-brand-500",
+    reviewed: "bg-brand-500",
+    rejected: "bg-danger-500",
+    cancelled: "bg-slate-300 dark:bg-ink-600",
+    disputed: "bg-danger-500",
+  };
+
+  return accents[status] || "bg-slate-300 dark:bg-ink-600";
 }
 
-function formatDateTime(
-  value: string
-) {
+function formatStatus(value: string) {
+  return String(value || "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatBookingDate(value: string) {
+  if (!value) return "";
+
   try {
-    return new Intl.DateTimeFormat(
-      "en-NG",
-      {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }
-    ).format(new Date(value));
+    const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+    const parsed = new Date(
+      dateOnly ? `${value}T00:00:00` : value
+    );
+
+    if (Number.isNaN(parsed.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat("en-NG", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(parsed);
+  } catch {
+    return value;
+  }
+}
+
+function formatDateTime(value: string) {
+  try {
+    return new Intl.DateTimeFormat("en-NG", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
   } catch {
     return value;
   }

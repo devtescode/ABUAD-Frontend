@@ -1,554 +1,636 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-    DashboardLayout,
-    DashboardHeader,
-} from "@/components/DashboardLayout";
-
-import { customerNavItems } from "@/data/customerNavItems";
-
-import {
-    Heart,
-    Search,
-    ArrowRight,
-    Loader2,
-    Users,
-    MapPin,
-    ShieldCheck,
-    ChevronRight,
-    User,
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  Heart,
+  HeartOff,
+  Loader2,
+  MapPin,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  User,
+  Users,
+  X,
 } from "lucide-react";
 
-import { Link } from "react-router-dom";
-
 import {
-    useEffect,
-    useState,
-} from "react";
-
+  DashboardHeader,
+  DashboardLayout,
+} from "@/components/DashboardLayout";
 import {
-    motion,
-    AnimatePresence,
-} from "framer-motion";
+  EmptyState,
+  ErrorState,
+  Skeleton,
+  cn,
+  providerAvatar,
+  providerId,
+  providerName,
+  type ProviderLike,
+} from "@/components/ui";
+import { customerNavItems } from "@/data/customerNavItems";
+import { getApiErrorMessage } from "@/lib/api";
+import {
+  useSavedProviders,
+  useToggleSavedProvider,
+} from "@/hooks/queries";
 
-const API_URL =
-    import.meta.env.VITE_API_URL ||
-    "http://localhost:5000";
+/* =========================================================
+   HELPERS
+========================================================= */
 
-interface SavedProvider {
-    _id: string;
-    name: string;
-    email: string;
-    avatar?: string;
-    about?: string;
-    location?: string;
-    status?: string;
-    role: "provider";
+type ToastState = {
+  type: "success" | "error";
+  message: string;
+};
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
-export function CustomerSaved() {
-    const [savedProviders, setSavedProviders] =
-        useState<SavedProvider[]>([]);
+function providerCover(provider: ProviderLike): string | undefined {
+  const portfolio = provider.portfolio;
 
-    const [isLoading, setIsLoading] =
-        useState(true);
+  if (!Array.isArray(portfolio)) return undefined;
 
-    const [error, setError] =
-        useState("");
+  const image = portfolio[0]?.image;
 
-    useEffect(() => {
-        const fetchSavedProviders =
-            async () => {
-                try {
-                    setIsLoading(true);
-                    setError("");
+  return typeof image === "string" && image.length > 0 ? image : undefined;
+}
 
-                    const token =
-                        sessionStorage.getItem(
-                            "servicely_token"
-                        );
+function providerCategories(provider: ProviderLike): string[] {
+  const raw = Array.isArray(provider.categories) ? provider.categories : [];
+  const single = typeof provider.category === "string" ? provider.category : "";
 
-                    if (!token) {
-                        throw new Error(
-                            "Please login to view your saved providers."
-                        );
-                    }
+  return (raw.length > 0 ? raw : single ? [single] : [])
+    .filter(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0
+    )
+    .slice(0, 2);
+}
 
-                    const response =
-                        await fetch(
-                            `${API_URL}/usercreative/providers/saved`,
-                            {
-                                method: "GET",
-                                headers: {
-                                    Authorization: `Bearer ${token}`,
-                                },
-                            }
-                        );
+/* =========================================================
+   PROVIDER AVATAR (with graceful image fallback)
+========================================================= */
 
-                    const data =
-                        await response.json();
+function ProviderMonogram({
+  name,
+  src,
+}: {
+  name: string;
+  src?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(src) && !imageFailed;
+  const label = initials(name);
 
-                    if (!response.ok) {
-                        throw new Error(
-                            data?.message ||
-                            "Failed to load saved providers."
-                        );
-                    }
+  return (
+    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[15px] bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 text-white shadow-inner">
+      {showImage ? (
+        <img
+          src={src}
+          alt={`${name} profile photo`}
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : label ? (
+        <span aria-hidden="true" className="text-lg font-bold tracking-wide">
+          {label}
+        </span>
+      ) : (
+        <User aria-hidden="true" className="h-7 w-7 stroke-[1.6]" />
+      )}
+    </div>
+  );
+}
 
-                    setSavedProviders(
-                        data.savedProviders || []
-                    );
-                } catch (error: any) {
-                    console.error(
-                        "Saved providers error:",
-                        error
-                    );
+/* =========================================================
+   COVER (portfolio image with brand fallback)
+========================================================= */
 
-                    setError(
-                        error?.message ||
-                        "Unable to load saved providers."
-                    );
-                } finally {
-                    setIsLoading(false);
-                }
-            };
+function ProviderCover({
+  provider,
+  name,
+}: {
+  provider: ProviderLike;
+  name: string;
+}) {
+  const cover = providerCover(provider);
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(cover) && !imageFailed;
 
-        fetchSavedProviders();
-    }, []);
+  return (
+    <div className="relative h-32 overflow-hidden bg-gradient-to-br from-brand-500 via-brand-600 to-brand-800 sm:h-36">
+      {showImage ? (
+        <img
+          src={cover}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <>
+          <span
+            aria-hidden="true"
+            className="absolute -right-10 -top-12 h-36 w-36 rounded-full bg-white/15 blur-2xl"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-14 -left-8 h-32 w-32 rounded-full bg-brand-300/20 blur-2xl"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute right-12 top-7 text-5xl font-black tracking-tight text-white/15"
+          >
+            {initials(name) || <User className="h-10 w-10" />}
+          </span>
+        </>
+      )}
 
-    return (
-        <DashboardLayout
-            role="customer"
-            navItems={customerNavItems}
-        >
-            <div className="relative space-y-8 pb-10">
-                <DashboardHeader
-                    title="Saved Providers"
-                    subtitle="Providers you've saved for future bookings"
+      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/50 via-slate-950/5 to-transparent" />
+    </div>
+  );
+}
+
+/* =========================================================
+   SAVED PROVIDER CARD
+========================================================= */
+
+function SavedProviderCard({
+  provider,
+  index,
+  removing,
+  onUnsave,
+}: {
+  provider: ProviderLike;
+  index: number;
+  removing: boolean;
+  onUnsave: (id: string, name: string) => void;
+}) {
+  const id = providerId(provider);
+  const name = providerName(provider);
+  const avatar = providerAvatar(provider);
+  const location =
+    typeof provider.location === "string" ? provider.location : "";
+  const about = typeof provider.about === "string" ? provider.about : "";
+  const categories = providerCategories(provider);
+  const isActive = provider.status === "active" || provider.verified === true;
+
+  const profileLink = id ? `/providers/${id}` : null;
+
+  return (
+    <motion.article
+      layout="position"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.96, y: -8 }}
+      transition={{
+        duration: 0.4,
+        delay: Math.min(index * 0.06, 0.36),
+        ease: "easeOut",
+      }}
+      whileHover={{ y: -4 }}
+      className="group relative h-full"
+    >
+      <div className="relative flex h-full flex-col overflow-hidden rounded-[24px] border border-slate-200/70 bg-white shadow-card transition-all duration-300 hover:border-brand-200 hover:shadow-card-hover dark:border-ink-800 dark:bg-ink-900 dark:hover:border-brand-900">
+        <div className="relative">
+          <ProviderCover provider={provider} name={name} />
+
+          {/* Saved indicator */}
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-danger-600 shadow-sm backdrop-blur dark:bg-ink-900/85 dark:text-danger-200">
+            <Heart aria-hidden="true" className="h-3 w-3 fill-current" />
+            Saved
+          </span>
+
+          {/* Quick unsave */}
+          <button
+            type="button"
+            onClick={() => id && onUnsave(id, name)}
+            disabled={removing || !id}
+            aria-label={`Remove ${name} from saved providers`}
+            title="Remove from saved"
+            className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/70 bg-white/90 text-danger-500 shadow-sm backdrop-blur transition hover:bg-danger-500 hover:text-white focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-ink-900/85 dark:text-danger-300 dark:hover:bg-danger-600 dark:hover:text-white"
+          >
+            {removing ? (
+              <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+            ) : (
+              <HeartOff aria-hidden="true" className="h-4 w-4" />
+            )}
+            <span className="sr-only">
+              {removing ? "Removing from saved providers" : "Unsave provider"}
+            </span>
+          </button>
+
+          {/* Avatar */}
+          <div className="absolute -bottom-7 left-5 rounded-[20px] bg-white p-1.5 shadow-lg dark:bg-ink-900">
+            <ProviderMonogram name={name} src={avatar} />
+          </div>
+        </div>
+
+        {/* Card body */}
+        <div className="flex flex-1 flex-col p-5 pt-10">
+          <div className="flex items-start gap-1.5">
+            <h3 className="min-w-0 flex-1 truncate text-base font-bold text-slate-900 dark:text-ink-50">
+              {name}
+            </h3>
+
+            {isActive && (
+              <span
+                title="Active provider"
+                className="mt-0.5 inline-flex shrink-0 items-center"
+              >
+                <ShieldCheck
+                  aria-hidden="true"
+                  className="h-4 w-4 text-brand-600 dark:text-brand-400"
                 />
+                <span className="sr-only">Active provider</span>
+              </span>
+            )}
+          </div>
 
-                <AnimatePresence mode="wait">
-                    {/* =========================
-                        BLUR LOADING STATE
-                    ========================== */}
-                    {isLoading && (
-                        <motion.div
-                            key="loading"
-                            initial={{
-                                opacity: 0,
-                                filter: "blur(10px)",
-                            }}
-                            animate={{
-                                opacity: 1,
-                                filter: "blur(0px)",
-                            }}
-                            exit={{
-                                opacity: 0,
-                                filter: "blur(10px)",
-                            }}
-                            transition={{
-                                duration: 0.45,
-                            }}
-                            className="relative"
-                        >
-                            {/* Soft background glow */}
-                            <div className="pointer-events-none absolute -top-10 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl" />
+          <div className="mt-1.5 flex items-center gap-1 text-xs text-slate-500 dark:text-ink-400">
+            <MapPin aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {location || "Not specified"}
+            </span>
+          </div>
 
-                            <div className="relative overflow-hidden rounded-[28px] border border-ink-200/70 bg-white/90 p-6 shadow-sm backdrop-blur-xl dark:border-ink-800 dark:bg-ink-900/90 sm:p-8">
-                                {/* Loading header */}
-                                <div className="mb-7 flex items-center justify-between">
-                                    <div className="space-y-2">
-                                        <div className="h-5 w-44 animate-pulse rounded-lg bg-ink-200 dark:bg-ink-800" />
-                                        <div className="h-3 w-28 animate-pulse rounded-lg bg-ink-100 dark:bg-ink-800/70" />
-                                    </div>
-
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-50 dark:bg-primary-950/40">
-                                        <Loader2 className="h-5 w-5 animate-spin text-primary-500" />
-                                    </div>
-                                </div>
-
-                                {/* Skeleton cards */}
-                                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                    {[1, 2, 3, 4].map(
-                                        (item) => (
-                                            <motion.div
-                                                key={item}
-                                                initial={{
-                                                    opacity: 0,
-                                                    y: 14,
-                                                }}
-                                                animate={{
-                                                    opacity: 1,
-                                                    y: 0,
-                                                }}
-                                                transition={{
-                                                    delay:
-                                                        item *
-                                                        0.07,
-                                                    duration:
-                                                        0.35,
-                                                }}
-                                                className="overflow-hidden rounded-[24px] border border-ink-200/70 bg-white dark:border-ink-800 dark:bg-ink-900"
-                                            >
-                                                {/* Image skeleton */}
-                                                <div className="relative h-40 animate-pulse bg-ink-100 dark:bg-ink-800">
-                                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent dark:via-white/5" />
-
-                                                    <div className="absolute bottom-4 left-4 h-16 w-16 rounded-2xl bg-white/70 dark:bg-ink-700/70" />
-                                                </div>
-
-                                                <div className="space-y-4 p-5">
-                                                    <div className="space-y-2">
-                                                        <div className="h-4 w-3/4 animate-pulse rounded-md bg-ink-200 dark:bg-ink-800" />
-                                                        <div className="h-3 w-1/2 animate-pulse rounded-md bg-ink-100 dark:bg-ink-800/70" />
-                                                    </div>
-
-                                                    <div className="space-y-2">
-                                                        <div className="h-3 w-full animate-pulse rounded-md bg-ink-100 dark:bg-ink-800/70" />
-                                                        <div className="h-3 w-5/6 animate-pulse rounded-md bg-ink-100 dark:bg-ink-800/70" />
-                                                    </div>
-
-                                                    <div className="h-11 w-full animate-pulse rounded-xl bg-ink-100 dark:bg-ink-800" />
-                                                </div>
-                                            </motion.div>
-                                        )
-                                    )}
-                                </div>
-
-                                {/* Loading overlay */}
-                                <div className="pointer-events-none absolute inset-0 bg-white/5 backdrop-blur-[1px] dark:bg-black/5" />
-                            </div>
-
-                            <div className="mt-5 flex items-center justify-center gap-2 text-sm font-medium text-ink-500 dark:text-ink-400">
-                                <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
-
-                                Preparing your saved providers...
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* =========================
-                        ERROR STATE
-                    ========================== */}
-                    {!isLoading && error && (
-                        <motion.div
-                            key="error"
-                            initial={{
-                                opacity: 0,
-                                y: 15,
-                                filter: "blur(8px)",
-                            }}
-                            animate={{
-                                opacity: 1,
-                                y: 0,
-                                filter: "blur(0px)",
-                            }}
-                            transition={{
-                                duration: 0.45,
-                            }}
-                            className="relative overflow-hidden rounded-[28px] border border-red-200 bg-white p-10 text-center shadow-sm dark:border-red-900/50 dark:bg-ink-900"
-                        >
-                            <div className="pointer-events-none absolute -top-20 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-red-500/10 blur-3xl" />
-
-                            <div className="relative">
-                                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-950/30">
-                                    <Heart className="h-7 w-7 text-red-500" />
-                                </div>
-
-                                <h3 className="mt-5 text-lg font-bold text-ink-900 dark:text-white">
-                                    Something went wrong
-                                </h3>
-
-                                <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-red-600 dark:text-red-400">
-                                    {error}
-                                </p>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        window.location.reload()
-                                    }
-                                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-500/20 transition-all duration-300 hover:-translate-y-0.5 hover:bg-red-700"
-                                >
-                                    Try again
-
-                                    <ArrowRight className="h-4 w-4" />
-                                </button>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* =========================
-                        EMPTY STATE
-                    ========================== */}
-                    {!isLoading &&
-                        !error &&
-                        savedProviders.length === 0 && (
-                            <motion.div
-                                key="empty"
-                                initial={{
-                                    opacity: 0,
-                                    y: 20,
-                                    filter: "blur(10px)",
-                                }}
-                                animate={{
-                                    opacity: 1,
-                                    y: 0,
-                                    filter: "blur(0px)",
-                                }}
-                                transition={{
-                                    duration: 0.55,
-                                    ease: "easeOut",
-                                }}
-                                className="relative overflow-hidden rounded-[32px] border border-ink-200/70 bg-white px-6 py-20 text-center shadow-sm dark:border-ink-800 dark:bg-ink-900"
-                            >
-                                {/* Decorative glow */}
-                                <div className="pointer-events-none absolute -left-20 -top-20 h-52 w-52 rounded-full bg-primary-500/10 blur-3xl" />
-
-                                <div className="pointer-events-none absolute -bottom-20 -right-20 h-52 w-52 rounded-full bg-primary-500/10 blur-3xl" />
-
-                                <div className="relative">
-                                    <motion.div
-                                        initial={{
-                                            scale: 0.8,
-                                            opacity: 0,
-                                        }}
-                                        animate={{
-                                            scale: 1,
-                                            opacity: 1,
-                                        }}
-                                        transition={{
-                                            delay: 0.15,
-                                            duration: 0.45,
-                                        }}
-                                        className="mx-auto flex h-24 w-24 items-center justify-center rounded-[28px] bg-gradient-to-br from-primary-50 to-primary-100 text-primary-500 shadow-inner dark:from-primary-950/40 dark:to-primary-900/30 dark:text-primary-400"
-                                    >
-                                        <Heart className="h-10 w-10" />
-                                    </motion.div>
-
-                                    <h3 className="mt-7 text-2xl font-bold tracking-tight text-ink-900 dark:text-white">
-                                        No saved providers yet
-                                    </h3>
-
-                                    <p className="mx-auto mt-3 max-w-md text-sm leading-7 text-ink-500 dark:text-ink-400">
-                                        Discover talented providers,
-                                        save the ones you love, and
-                                        easily come back to them when
-                                        you're ready to book.
-                                    </p>
-
-                                    <Link
-                                        to="/customer/browse"
-                                        className="group mt-8 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary-500/25"
-                                    >
-                                        <Search className="h-4 w-4" />
-
-                                        Browse Providers
-
-                                        <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-                                    </Link>
-                                </div>
-                            </motion.div>
-                        )}
-
-                    {/* =========================
-                        SAVED PROVIDERS
-                    ========================== */}
-                    {!isLoading &&
-                        !error &&
-                        savedProviders.length > 0 && (
-                            <motion.div
-                                key="providers"
-                                initial={{
-                                    opacity: 0,
-                                    filter: "blur(10px)",
-                                }}
-                                animate={{
-                                    opacity: 1,
-                                    filter: "blur(0px)",
-                                }}
-                                transition={{
-                                    duration: 0.6,
-                                }}
-                            >
-                                {/* Section heading */}
-                                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div>
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
-                                                <Users className="h-5 w-5 text-primary-500" />
-                                            </div>
-
-                                            <div>
-                                                <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-                                                    Your Saved Providers
-                                                </h2>
-
-                                                <p className="text-xs text-ink-500 dark:text-ink-400">
-                                                    People you're interested
-                                                    in booking
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="inline-flex w-fit items-center gap-2 rounded-full border border-ink-200/70 bg-white px-3.5 py-2 text-xs font-semibold text-ink-600 shadow-sm dark:border-ink-800 dark:bg-ink-900 dark:text-ink-300">
-                                        <Heart className="h-3.5 w-3.5 fill-current text-red-500" />
-
-                                        {savedProviders.length}{" "}
-                                        {savedProviders.length === 1
-                                            ? "provider"
-                                            : "providers"}{" "}
-                                        saved
-                                    </div>
-                                </div>
-
-                                {/* Provider cards */}
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                    {savedProviders.map(
-                                        (
-                                            provider,
-                                            index
-                                        ) => (
-                                            <motion.div
-                                                key={
-                                                    provider._id
-                                                }
-                                                initial={{
-                                                    opacity: 0,
-                                                    y: 24,
-                                                    filter: "blur(8px)",
-                                                }}
-                                                animate={{
-                                                    opacity: 1,
-                                                    y: 0,
-                                                    filter: "blur(0px)",
-                                                }}
-                                                transition={{
-                                                    delay:
-                                                        index *
-                                                        0.08,
-                                                    duration:
-                                                        0.5,
-                                                    ease: "easeOut",
-                                                }}
-                                                whileHover={{
-                                                    y: -6,
-                                                }}
-                                                className="group relative"
-                                            >
-                                                <div className="relative h-full overflow-hidden rounded-[26px] border border-ink-200/70 bg-white shadow-sm transition-all duration-500 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-500/10 dark:border-ink-800 dark:bg-ink-900 dark:hover:border-primary-900">
-                                                    {/* Top visual area */}
-                                                    <div className="relative h-36 overflow-hidden bg-gradient-to-br from-primary-100 via-primary-50 to-ink-100 dark:from-primary-950/50 dark:via-ink-900 dark:to-ink-800">
-                                                        {/* Background decoration */}
-                                                        <div className="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-primary-500/20 blur-2xl transition-transform duration-700 group-hover:scale-150" />
-
-                                                        <div className="absolute -bottom-10 -left-8 h-28 w-28 rounded-full bg-primary-400/10 blur-2xl" />
-
-                                                        {/* Saved badge */}
-                                                        <div className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-xl border border-white/60 bg-white/80 text-red-500 shadow-sm backdrop-blur-md dark:border-white/10 dark:bg-ink-900/70">
-                                                            <Heart className="h-4 w-4 fill-current" />
-                                                        </div>
-
-                                                        {/* Provider avatar */}
-                                                        <div className="absolute bottom-[-1px] left-5">
-                                                            <div className="rounded-[20px] bg-white p-1.5 shadow-xl dark:bg-ink-900">
-                                                                {provider.avatar ? (
-                                                                    <img
-                                                                        src={provider.avatar}
-                                                                        alt={provider.name}
-                                                                        className="h-16 w-16 rounded-[15px] object-cover"
-                                                                        onError={(event) => {
-                                                                            event.currentTarget.style.display = "none";
-                                                                        }}
-                                                                    />
-                                                                ) : (
-                                                                    <div
-                                                                        className="
-            flex
-            h-16
-            w-16
-            items-center
-            justify-center
-            rounded-[15px]
-            bg-gradient-to-br
-            from-primary-500
-            via-primary-600
-            to-primary-700
-            text-white
-            shadow-inner
-        "
-                                                                        aria-label={`${provider.name} profile`}
-                                                                    >
-                                                                        <User
-                                                                            className="h-8 w-8 stroke-[1.6]"
-                                                                        />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Card body */}
-                                                    <div className="p-5 pt-6">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <h3 className="truncate text-base font-bold text-ink-900 dark:text-white">
-                                                                        {
-                                                                            provider.name
-                                                                        }
-                                                                    </h3>
-
-                                                                    {provider.status ===
-                                                                        "active" && (
-                                                                            <ShieldCheck className="h-4 w-4 shrink-0 text-primary-500" />
-                                                                        )}
-                                                                </div>
-
-                                                                {provider.location ? (
-                                                                    <div className="mt-1.5 flex items-center gap-1 text-xs text-ink-500 dark:text-ink-400">
-                                                                        <MapPin className="h-3.5 w-3.5 shrink-0" />
-
-                                                                        <span className="truncate">
-                                                                            {
-                                                                                provider.location
-                                                                            }
-                                                                        </span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <p className="mt-1.5 text-xs text-ink-400">
-                                                                        Not specified
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-
-                                                        <p className="mt-4 min-h-[42px] line-clamp-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-                                                            {provider.about ||
-                                                                "Professional service provider on Servicely."}
-                                                        </p>
-
-                                                        {/* View profile */}
-                                                        <Link
-                                                            to={`/providers/${provider._id}`}
-                                                            className="group/button mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-primary-500/15 transition-all duration-300 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-500/20"
-                                                        >
-                                                            View Profile
-
-                                                            <ChevronRight className="h-4 w-4 transition-transform duration-300 group-hover/button:translate-x-0.5" />
-                                                        </Link>
-                                                    </div>
-
-                                                    {/* Bottom hover accent */}
-                                                    <div className="absolute bottom-0 left-0 h-1 w-0 bg-gradient-to-r from-primary-600 to-primary-400 transition-all duration-500 group-hover:w-full" />
-                                                </div>
-                                            </motion.div>
-                                        )
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
-                </AnimatePresence>
+          {categories.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {categories.map((category) => (
+                <span
+                  key={category}
+                  className="rounded-full bg-brand-50 px-2.5 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-950/60 dark:text-brand-300"
+                >
+                  {category}
+                </span>
+              ))}
             </div>
-        </DashboardLayout>
-    );
+          )}
+
+          <p className="mt-3 line-clamp-2 min-h-[42px] text-sm leading-6 text-slate-500 dark:text-ink-400">
+            {about || "Professional service provider on Servicely."}
+          </p>
+
+          <div className="mt-auto pt-5">
+            {profileLink ? (
+              <Link
+                to={profileLink}
+                className="btn-primary group/cta w-full"
+              >
+                View Profile
+                <ChevronRight
+                  aria-hidden="true"
+                  className="h-4 w-4 transition-transform duration-300 group-hover/cta:translate-x-0.5"
+                />
+              </Link>
+            ) : (
+              <span className="btn-outline w-full cursor-not-allowed opacity-60">
+                Profile unavailable
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.article>
+  );
+}
+
+/* =========================================================
+   SKELETON GRID
+========================================================= */
+
+function SavedProvidersSkeleton() {
+  return (
+    <div
+      aria-busy="true"
+      className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      <span className="sr-only">Loading your saved providers…</span>
+
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div
+          key={index}
+          aria-hidden="true"
+          className="overflow-hidden rounded-[24px] border border-slate-200/70 bg-white shadow-card dark:border-ink-800 dark:bg-ink-900"
+        >
+          <div className="h-32 animate-pulse bg-slate-100 dark:bg-ink-800 sm:h-36" />
+
+          <div className="space-y-3 p-5">
+            <Skeleton className="h-4 w-3/5" />
+            <Skeleton className="h-3 w-2/5" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-5/6" />
+            <Skeleton className="mt-2 h-10 w-full rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+export function CustomerSaved() {
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useSavedProviders();
+  const toggleSavedProvider = useToggleSavedProvider();
+
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const savedProviders = Array.isArray(data?.savedProviders)
+    ? data.savedProviders.filter(Boolean)
+    : [];
+
+  const count = savedProviders.length;
+  const removingId = toggleSavedProvider.isPending
+    ? toggleSavedProvider.variables
+    : undefined;
+
+  /* Auto-dismiss toast */
+  useEffect(() => {
+    if (!toast) return;
+
+    const timer = window.setTimeout(() => setToast(null), 4000);
+
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const handleUnsave = (id: string, name: string) => {
+    toggleSavedProvider.mutate(id, {
+      onSuccess: () => {
+        setToast({
+          type: "success",
+          message: `${name} was removed from your saved providers.`,
+        });
+      },
+      onError: (mutationError) => {
+        setToast({
+          type: "error",
+          message:
+            getApiErrorMessage(mutationError) ||
+            `Could not remove ${name}. Please try again.`,
+        });
+      },
+    });
+  };
+
+  const errorMessage = isError
+    ? getApiErrorMessage(error)
+    : "";
+
+  return (
+    <DashboardLayout role="customer" navItems={customerNavItems}>
+      <div className="relative space-y-6 pb-10">
+        <DashboardHeader
+          title="Saved Providers"
+          subtitle="Providers you've saved for future bookings"
+          action={
+            <Link
+              to="/customer/browse"
+              className="btn-outline hidden w-fit items-center gap-2 sm:inline-flex"
+            >
+              <Search aria-hidden="true" className="h-4 w-4" />
+              Browse providers
+            </Link>
+          }
+        />
+
+        <AnimatePresence mode="wait" initial={false}>
+          {/* =========================
+              LOADING
+          ========================== */}
+          {isLoading && (
+            <motion.div
+              key="loading"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              <SavedProvidersSkeleton />
+            </motion.div>
+          )}
+
+          {/* =========================
+              ERROR
+          ========================== */}
+          {!isLoading && isError && (
+            <motion.div
+              key="error"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="space-y-4"
+            >
+              <ErrorState
+                message={errorMessage}
+                onRetry={() => void refetch()}
+              />
+
+              <div className="flex justify-center">
+                <Link
+                  to="/customer/browse"
+                  className="btn-outline inline-flex items-center gap-2"
+                >
+                  <Search aria-hidden="true" className="h-4 w-4" />
+                  Browse providers
+                </Link>
+              </div>
+            </motion.div>
+          )}
+
+          {/* =========================
+              EMPTY
+          ========================== */}
+          {!isLoading && !isError && count === 0 && (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            >
+              <EmptyState
+                icon={Heart}
+                title="No saved providers yet"
+                description="Discover talented providers, save the ones you love, and easily come back to them when you're ready to book."
+                action={
+                  <Link
+                    to="/customer/browse"
+                    className="btn-primary inline-flex items-center gap-2"
+                  >
+                    <Search aria-hidden="true" className="h-4 w-4" />
+                    Browse Providers
+                    <ArrowRight
+                      aria-hidden="true"
+                      className="h-4 w-4"
+                    />
+                  </Link>
+                }
+              />
+            </motion.div>
+          )}
+
+          {/* =========================
+              SAVED PROVIDERS
+          ========================== */}
+          {!isLoading && !isError && count > 0 && (
+            <motion.div
+              key="providers"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              {/* Count header */}
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+                    <Users aria-hidden="true" className="h-5 w-5" />
+                  </div>
+
+                  <div>
+                    <h2 className="text-lg font-bold tracking-tight text-slate-900 dark:text-ink-50">
+                      Your Saved Providers
+                    </h2>
+                    <p className="text-xs text-slate-500 dark:text-ink-400">
+                      People you're interested in booking
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    aria-live="polite"
+                    className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200/70 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 shadow-sm dark:border-ink-800 dark:bg-ink-900 dark:text-ink-300"
+                  >
+                    <Heart
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 fill-current text-danger-500"
+                    />
+                    {count} {count === 1 ? "provider" : "providers"} saved
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => void refetch()}
+                    disabled={isFetching}
+                    aria-label="Refresh saved providers"
+                    title="Refresh"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-500 shadow-sm transition hover:border-brand-200 hover:text-brand-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-400 dark:hover:border-brand-900 dark:hover:text-brand-300"
+                  >
+                    <RefreshCw
+                      aria-hidden="true"
+                      className={cn(
+                        "h-4 w-4",
+                        isFetching && "animate-spin"
+                      )}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Cards */}
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <AnimatePresence initial={false}>
+                  {savedProviders.map((provider, index) => {
+                    const id = providerId(provider);
+
+                    return (
+                      <SavedProviderCard
+                        key={id || `saved-${index}`}
+                        provider={provider}
+                        index={index}
+                        removing={
+                          Boolean(removingId) && removingId === id
+                        }
+                        onUnsave={handleUnsave}
+                      />
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* =========================
+            TOAST
+        ========================== */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              key="toast"
+              role={toast.type === "error" ? "alert" : "status"}
+              aria-live={toast.type === "error" ? "assertive" : "polite"}
+              aria-atomic="true"
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+              className="fixed bottom-6 left-4 right-4 z-[60] mx-auto flex max-w-sm items-start gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-xl dark:border-ink-700 dark:bg-ink-900 sm:left-auto sm:right-6 sm:mx-0"
+            >
+              <span
+                className={cn(
+                  "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                  toast.type === "success"
+                    ? "bg-success-50 text-success-600 dark:bg-success-600/15 dark:text-success-200"
+                    : "bg-danger-50 text-danger-600 dark:bg-danger-500/15 dark:text-danger-200"
+                )}
+              >
+                {toast.type === "success" ? (
+                  <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                ) : (
+                  <AlertCircle aria-hidden="true" className="h-4 w-4" />
+                )}
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+                  {toast.type === "success"
+                    ? "Provider removed"
+                    : "Something went wrong"}
+                </p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-ink-400">
+                  {toast.message}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setToast(null)}
+                aria-label="Dismiss notification"
+                className="shrink-0 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-ink-200"
+              >
+                <X aria-hidden="true" className="h-4 w-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </DashboardLayout>
+  );
 }

@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, BookingProvider, isTokenExpired, useAuth } from '@/context/AppContext';
+import { queryClient } from '@/lib/queryClient';
 import { useEffect, useState } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { HomePage } from '@/pages/public/HomePage';
@@ -214,14 +216,16 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <BookingProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </BookingProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AuthProvider>
+          <BookingProvider>
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </BookingProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

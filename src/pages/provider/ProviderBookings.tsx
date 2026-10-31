@@ -4,6 +4,8 @@ import {
     RefreshCw,
     Loader2,
     CalendarDays,
+    ChevronLeft,
+    ChevronRight,
     Clock3,
     MapPin,
     Mail,
@@ -88,6 +90,9 @@ export function ProviderBookings() {
 
     const [filter, setFilter] =
         useState("all");
+
+    const [page, setPage] =
+        useState(1);
 
     const [loading, setLoading] =
         useState(true);
@@ -211,6 +216,27 @@ export function ProviderBookings() {
                 booking.status === filter
         );
     }, [bookings, filter]);
+
+    const bookingsPerPage = 4;
+    const totalPages = Math.ceil(
+        filteredBookings.length / bookingsPerPage
+    );
+    const currentPage = Math.min(
+        page,
+        Math.max(totalPages, 1)
+    );
+    const paginatedBookings = filteredBookings.slice(
+        (currentPage - 1) * bookingsPerPage,
+        currentPage * bookingsPerPage
+    );
+    const firstBookingOnPage =
+        filteredBookings.length === 0
+            ? 0
+            : (currentPage - 1) * bookingsPerPage + 1;
+    const lastBookingOnPage = Math.min(
+        currentPage * bookingsPerPage,
+        filteredBookings.length
+    );
 
     const totalBookings =
         bookings.length;
@@ -504,7 +530,10 @@ export function ProviderBookings() {
                             key={tab}
                             type="button"
                             onClick={() =>
-                                setFilter(tab)
+                                {
+                                    setFilter(tab);
+                                    setPage(1);
+                                }
                             }
                             className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold capitalize transition ${
                                 filter === tab
@@ -550,7 +579,7 @@ export function ProviderBookings() {
                         </p>
                     </div>
                 ) : (
-                    filteredBookings.map(
+                    paginatedBookings.map(
                         (booking) => {
                             const isExpanded =
                                 expandedBooking ===
@@ -1080,6 +1109,63 @@ export function ProviderBookings() {
                     )
                 )}
             </div>
+
+            {filteredBookings.length > 0 && (
+                <nav
+                    aria-label="Booking results pagination"
+                    className="mt-5 flex flex-col gap-3 rounded-2xl border border-ink-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-ink-800 dark:bg-ink-900"
+                >
+                    <p
+                        aria-live="polite"
+                        className="text-sm text-ink-500"
+                    >
+                        Showing{" "}
+                        <span className="font-semibold text-ink-800 dark:text-ink-100">
+                            {firstBookingOnPage}–{lastBookingOnPage}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-semibold text-ink-800 dark:text-ink-100">
+                            {filteredBookings.length}
+                        </span>{" "}
+                        bookings
+                    </p>
+
+                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                        <span className="text-xs font-medium tabular-nums text-ink-500">
+                            Page {currentPage} of {Math.max(totalPages, 1)}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                aria-label="Previous page"
+                                title="Previous page"
+                                disabled={currentPage === 1}
+                                onClick={() => setPage(currentPage - 1)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-ink-200 disabled:hover:bg-white disabled:hover:text-ink-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+                            >
+                                <ChevronLeft
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Next page"
+                                title="Next page"
+                                disabled={currentPage >= totalPages}
+                                onClick={() => setPage(currentPage + 1)}
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-ink-200 disabled:hover:bg-white disabled:hover:text-ink-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+                            >
+                                <ChevronRight
+                                    className="h-4 w-4"
+                                    aria-hidden="true"
+                                />
+                            </button>
+                        </div>
+                    </div>
+                </nav>
+            )}
         </DashboardLayout>
     );
 }

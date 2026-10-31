@@ -3,8 +3,12 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSavedProviders, useToggleSavedProvider, useUpdateProviderProfile } from '@/hooks/queries';
+import { USER_KEY, USER_TOKEN_KEY, apiSend } from '@/lib/api';
 
 import type { UserRole, Booking } from '@/data/mockData';
 
@@ -114,6 +118,9 @@ export function AuthProvider({
 }: {
   children: ReactNode;
 }) {
+  const queryClient = useQueryClient();
+  const updateProfileMutation = useUpdateProviderProfile();
+
   // const [user, setUser] = useState<User | null>(() => {
   //   try {
   //     const storedUser =
@@ -186,19 +193,18 @@ export function AuthProvider({
     }
   });
 
-  const [savedProviders, setSavedProviders] = useState<string[]>([]);
-
   useEffect(() => {
     if (!user) {
       return;
     }
 
-    const token = sessionStorage.getItem("servicely_token");
+    const token = sessionStorage.getItem(USER_TOKEN_KEY);
 
     if (!token || isTokenExpired(token)) {
       setUser(null);
-      sessionStorage.removeItem("servicely_user");
-      sessionStorage.removeItem("servicely_token");
+      sessionStorage.removeItem(USER_KEY);
+      sessionStorage.removeItem(USER_TOKEN_KEY);
+      queryClient.clear();
       return;
     }
 
@@ -212,55 +218,29 @@ export function AuthProvider({
 
     const expiryTimer = window.setTimeout(() => {
       setUser(null);
-      sessionStorage.removeItem("servicely_user");
-      sessionStorage.removeItem("servicely_token");
+      sessionStorage.removeItem(USER_KEY);
+      sessionStorage.removeItem(USER_TOKEN_KEY);
+      queryClient.clear();
     }, Math.max(0, tokenPayload.exp * 1000 - Date.now()));
 
     return () => window.clearTimeout(expiryTimer);
-  }, [user]);
+  }, [user, queryClient]);
 
-  // 👇 PASTE fetchSavedProviders HERE
-  const fetchSavedProviders = async () => {
-    try {
-      const token =
-        sessionStorage.getItem("servicely_token");
+  // Clear private cached data whenever the API reports a dead session.
+  useEffect(() => {
+    const onUnauthorized = (event: Event) => {
+      const mode = (event as CustomEvent<{ mode?: string }>).detail?.mode;
 
-      if (!token) {
-        return;
+      if (mode === 'user' || mode === 'optional') {
+        setUser(null);
+        queryClient.clear();
       }
+    };
 
-      const response = await fetch(
-        `${API_URL}/usercreative/providers/saved`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-          "Failed to fetch saved providers"
-        );
-      }
-
-      const providerIds =
-        data.savedProviders?.map(
-          (provider: any) => provider._id
-        ) || [];
-
-      setSavedProviders(providerIds);
-    } catch (error) {
-      console.error(
-        "Fetch saved providers error:",
-        error
-      );
-    }
-  };
+    window.addEventListener('servicely:unauthorized', onUnauthorized);
+    return () =>
+      window.removeEventListener('servicely:unauthorized', onUnauthorized);
+  }, [queryClient]);
 
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -302,33 +282,25 @@ export function AuthProvider({
     role: SignupRole
   ) => {
     try {
-      const response = await fetch(
-        `${API_URL}/usercreative/signup`,
+      const data = await apiSend<{
+        success?: boolean;
+        message?: string;
+        token?: string;
+        user?: User;
+      }>(
+        '/usercreative/signup',
+        'POST',
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name,
-            matricNo,
-            email,
-            phoneNumber,
-            gender,
-            password,
-            role,
-          }),
-        }
+          name,
+          matricNo,
+          email,
+          phoneNumber,
+          gender,
+          password,
+          role,
+        },
+        { auth: 'none' }
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-          'Unable to create account'
-        );
-      }
 
       return data;
     } catch (error: any) {
@@ -351,29 +323,12 @@ export function AuthProvider({
     role: LoginRole
   ) => {
     try {
-      const response = await fetch(
-        `${API_URL}/usercreative/login`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email,
-            password,
-            role,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-          'Invalid email or password.'
-        );
-      }
+      const data = await apiSend<{
+        success?: boolean;
+        message?: string;
+        token?: string;
+        user?: User;
+      }>('/usercreative/login', 'POST', { email, password, role }, { auth: 'none' });
 
       if (!data?.user) {
         throw new Error(
@@ -382,18 +337,15 @@ export function AuthProvider({
       }
 
       if (data.token) {
-        sessionStorage.setItem(
-          'servicely_token',
-          data.token
-        );
+        sessionStorage.setItem(USER_TOKEN_KEY, data.token);
       }
 
-      sessionStorage.setItem(
-        'servicely_user',
-        JSON.stringify(data.user)
-      );
+      sessionStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
       setUser(data.user);
+
+      // A different account may have different saved items / bookings.
+      queryClient.invalidateQueries();
 
       return data;
     } catch (error: any) {
@@ -544,92 +496,27 @@ export function AuthProvider({
   //   }
   // };
 
-  const updateProfile = async ({
-    name,
-    about,
-    location,
-    avatar,
-  }: UpdateProfileData) => {
+  const updateProfile = async (profileData: UpdateProfileData) => {
     try {
-      const token =
-        sessionStorage.getItem("servicely_token");
-
-      if (!token) {
-        throw new Error(
-          "You are not logged in."
-        );
-      }
-
-      const formData = new FormData();
-
-      formData.append("name", name);
-      formData.append("about", about);
-      formData.append("location", location);
-
-      if (avatar instanceof File) {
-        formData.append("avatar", avatar);
-      }
-
-      const response = await fetch(
-        `${API_URL}/usercreative/provider/profile`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
-
-      const data = await response.json();
-
-      console.log(
-        "Profile update response:",
-        data
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-          "Failed to update profile."
-        );
-      }
+      const data = await updateProfileMutation.mutateAsync(profileData);
 
       if (!data?.user) {
         throw new Error(
-          "Profile was updated, but the backend did not return the updated user."
+          'Profile was updated, but the backend did not return the updated user.'
         );
       }
 
-      /*
-       * IMPORTANT:
-       * Update React state with the complete backend user.
-       */
-      setUser(data.user);
+      const updatedUser = data.user as User;
 
-      /*
-       * IMPORTANT:
-       * Persist the complete backend user.
-       *
-       * This is what allows the avatar to still exist
-       * when AppContext restores the user after refresh.
-       */
-      sessionStorage.setItem(
-        "servicely_user",
-        JSON.stringify(data.user)
-      );
+      setUser(updatedUser);
+      sessionStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
 
       return data;
-
     } catch (error: any) {
-      console.error(
-        "Profile update error:",
-        error
-      );
+      console.error('Profile update error:', error);
 
       throw new Error(
-        error?.message ||
-        "Unable to update your profile. Please try again."
+        error?.message || 'Unable to update your profile. Please try again.'
       );
     }
   };
@@ -640,13 +527,11 @@ export function AuthProvider({
   const logout = () => {
     setUser(null);
 
-    sessionStorage.removeItem(
-      'servicely_user'
-    );
+    sessionStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(USER_TOKEN_KEY);
+    sessionStorage.removeItem('servicely_bookings');
 
-    sessionStorage.removeItem(
-      'servicely_token'
-    );
+    queryClient.clear();
   };
 
   return (
@@ -721,108 +606,36 @@ export function BookingProvider({
   const [bookings, setBookings] =
     useState<Booking[]>([]);
 
-  const [savedProviders, setSavedProviders] =
-    useState<string[]>([]);
+  const { user } = useAuth();
+
+  const savedProvidersQuery = useSavedProviders({
+    enabled: user?.role === 'customer',
+  });
+  const toggleSavedProviderMutation = useToggleSavedProvider();
+
+  const savedProviders = useMemo(
+    () =>
+      (savedProvidersQuery.data?.savedProviders || [])
+        .map((provider) => String(provider?._id || provider?.id || ''))
+        .filter(Boolean),
+    [savedProvidersQuery.data]
+  );
 
   // ───────────────────────────────────────────────────────────────────────────
-  // RESTORE BOOKINGS + FETCH SAVED PROVIDERS
+  // RESTORE BOOKINGS
   // ───────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const restoreData = async () => {
-      // Restore existing bookings
-      const storedBookings =
-        sessionStorage.getItem(
-          'servicely_bookings'
-        );
+    const storedBookings =
+      sessionStorage.getItem('servicely_bookings');
 
-      if (storedBookings) {
-        try {
-          setBookings(
-            JSON.parse(storedBookings)
-          );
-        } catch (error) {
-          console.error(
-            'Failed to restore bookings:',
-            error
-          );
-        }
-      }
+    if (!storedBookings) return;
 
-      // Fetch saved providers from database
-      try {
-        const token =
-          sessionStorage.getItem(
-            'servicely_token'
-          );
-
-        if (!token) {
-          setSavedProviders([]);
-          return;
-        }
-
-        const storedUser =
-          sessionStorage.getItem(
-            'servicely_user'
-          );
-
-        if (!storedUser) {
-          setSavedProviders([]);
-          return;
-        }
-
-        const currentUser =
-          JSON.parse(storedUser);
-
-        // Only customers have saved providers
-        if (currentUser?.role !== 'customer') {
-          setSavedProviders([]);
-          return;
-        }
-
-        const response = await fetch(
-          `${API_URL}/usercreative/providers/saved`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-            'Failed to fetch saved providers'
-          );
-        }
-
-        const providerIds =
-          data.savedProviders
-            ?.filter(
-              (provider: any) =>
-                provider &&
-                provider._id
-            )
-            .map(
-              (provider: any) =>
-                provider._id
-            ) || [];
-
-        setSavedProviders(providerIds);
-      } catch (error) {
-        console.error(
-          'Fetch saved providers error:',
-          error
-        );
-
-        setSavedProviders([]);
-      }
-    };
-
-    restoreData();
+    try {
+      setBookings(JSON.parse(storedBookings));
+    } catch (error) {
+      console.error('Failed to restore bookings:', error);
+    }
   }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -882,84 +695,22 @@ export function BookingProvider({
     saved: boolean;
   }> => {
     try {
-      const token =
-        sessionStorage.getItem(
-          'servicely_token'
-        );
-
-      if (!token) {
-        throw new Error(
-          'You are not logged in.'
-        );
-      }
-
       if (!id) {
-        throw new Error(
-          'Provider ID is missing.'
-        );
+        throw new Error('Provider ID is missing.');
       }
 
-      const response = await fetch(
-        `${API_URL}/usercreative/providers/${id}/save`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-          'Failed to update saved provider.'
-        );
-      }
-
-      /*
-       * Backend returns:
-       *
-       * {
-       *   success: true,
-       *   saved: true/false,
-       *   providerId: "..."
-       * }
-       */
-
-      if (data.saved) {
-        setSavedProviders((prev) => {
-          if (prev.includes(id)) {
-            return prev;
-          }
-
-          return [
-            ...prev,
-            id,
-          ];
-        });
-      } else {
-        setSavedProviders((prev) =>
-          prev.filter(
-            (providerId) =>
-              providerId !== id
-          )
-        );
-      }
+      const wasSaved = savedProviders.includes(id);
+      const data = await toggleSavedProviderMutation.mutateAsync(id);
 
       return {
-        saved: Boolean(data.saved),
+        saved:
+          typeof data?.saved === 'boolean' ? data.saved : !wasSaved,
       };
     } catch (error: any) {
-      console.error(
-        'Toggle saved provider error:',
-        error
-      );
+      console.error('Toggle saved provider error:', error);
 
       throw new Error(
-        error?.message ||
-        'Unable to update saved provider.'
+        error?.message || 'Unable to update saved provider.'
       );
     }
   };
