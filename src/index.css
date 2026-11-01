@@ -4,6 +4,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Prevent iOS automatic zoom on input focus */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+
+/* Ensure form elements remain readable on mobile */
+@media screen and (max-width: 768px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
