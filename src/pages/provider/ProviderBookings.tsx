@@ -1,1171 +1,1440 @@
-
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import {
-    RefreshCw,
-    Loader2,
-    CalendarDays,
-    ChevronLeft,
-    ChevronRight,
-    Clock3,
-    MapPin,
-    Mail,
-    Phone,
-    User,
-    WalletCards,
-    FileText,
-    ChevronDown,
-    ChevronUp,
-    AlertCircle,
-    CheckCircle2,
-    XCircle,
-    CircleDollarSign,
-    Image as ImageIcon,
-    User2Icon,
-} from "lucide-react";
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  CircleDollarSign,
+  Clock3,
+  FileText,
+  Image as ImageIcon,
+  Inbox,
+  Mail,
+  MapPin,
+  Phone,
+  RefreshCw,
+  User,
+  UserRound,
+  WalletCards,
+  type LucideIcon,
+} from 'lucide-react';
 
 import {
-    DashboardLayout,
-    DashboardHeader,
-} from "../../components/DashboardLayout";
+  DashboardLayout,
+  DashboardHeader,
+  StatCard,
+} from '../../components/DashboardLayout';
+import {
+  Avatar,
+  Badge,
+  Button,
+  EmptyState,
+  ErrorState,
+  SearchBar,
+  Skeleton,
+} from '../../components/ui';
+import { StatusBadge } from '../../components/shared';
+import { providerNavItems } from '../../data/providerNavItems';
+import { formatNaira } from '../../data/mockData';
+import { getApiErrorMessage, hasUserToken } from '../../lib/api';
+import { useProviderBookings } from '@/hooks/queries';
 
-import { providerNavItems } from "../../data/providerNavItems";
+/* =========================================================
+   DATA SHAPES
+   The API returns loosely-typed booking documents, so the
+   normaliser below supports both flattened and populated
+   (nested service/customer/provider) payloads.
+========================================================= */
 
-import { StatusBadge } from "../../components/shared";
+type RawBooking = Record<string, unknown>;
 
-import { formatNaira } from "../../data/mockData";
+interface ProviderBooking {
+  id: string;
 
-const API_URL =
-    import.meta.env.VITE_API_URL ||
-    "http://localhost:5000";
+  serviceId: string;
+  serviceName: string;
+  serviceImage?: string;
 
-type ProviderBooking = {
-    id: string;
+  providerId: string;
+  providerName: string;
+  providerAvatar?: string;
 
-    serviceId: string;
-    serviceName: string;
-    serviceImage: string;
+  customerId: string;
+  customerName: string;
+  customerEmail?: string;
+  customerAvatar?: string;
+  customerPhone?: string;
+  customerGender?: string;
 
-    providerId: string;
-    providerName: string;
-    providerAvatar: string;
+  date: string;
+  time: string;
+  location: string;
 
-    customerId: string;
-    customerName: string;
-    customerEmail: string;
-    customerAvatar: string;
-    customerPhone: string;
-    customerGender: string;
+  price: number;
+  notes?: string;
 
-    date: string;
-    time: string;
-    location: string;
+  status: string;
+  paymentStatus: string;
+  paymentReference?: string | null;
 
-    price: number;
-    notes: string;
+  platformFee?: number;
+  providerAmount?: number;
 
-    status: string;
-    paymentStatus: string;
-    paymentReference?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
-    platformFee: number;
-    providerAmount: number;
+function asRecord(value: unknown): RawBooking {
+  return value !== null && typeof value === 'object'
+    ? (value as RawBooking)
+    : {};
+}
 
-    createdAt: string;
-    updatedAt: string;
-};
+function pickString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+
+    if (typeof value === 'number') {
+      return String(value);
+    }
+  }
+
+  return '';
+}
+
+function pickNumber(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    if (value === null || value === undefined || value === '') {
+      continue;
+    }
+
+    const parsed = typeof value === 'number' ? value : Number(value);
+
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeBooking(
+  rawValue: unknown,
+  index: number
+): ProviderBooking {
+  const raw = asRecord(rawValue);
+  const service = asRecord(raw.service);
+  const customer = asRecord(raw.customer);
+  const user = asRecord(raw.user);
+  const provider = asRecord(raw.provider);
+
+  return {
+    id:
+      pickString(raw.id, raw._id, raw.bookingId, raw.booking_id) ||
+      `booking-${index}`,
+
+    serviceId: pickString(
+      raw.serviceId,
+      raw.service_id,
+      service.id,
+      service._id
+    ),
+    serviceName:
+      pickString(
+        raw.serviceName,
+        raw.service_name,
+        service.title,
+        service.name,
+        service.serviceName
+      ) || 'Service',
+    serviceImage:
+      pickString(
+        raw.serviceImage,
+        raw.serviceImageUrl,
+        service.image,
+        service.imageUrl,
+        service.coverImage
+      ) || undefined,
+
+    providerId: pickString(
+      raw.providerId,
+      raw.provider_id,
+      provider.id,
+      provider._id
+    ),
+    providerName:
+      pickString(
+        raw.providerName,
+        provider.fullName,
+        provider.name
+      ) || 'Provider',
+    providerAvatar:
+      pickString(
+        raw.providerAvatar,
+        provider.avatar,
+        provider.profileImage
+      ) || undefined,
+
+    customerId: pickString(
+      raw.customerId,
+      raw.customer_id,
+      customer.id,
+      customer._id,
+      user.id,
+      user._id,
+      raw.userId
+    ),
+    customerName:
+      pickString(
+        raw.customerName,
+        raw.customer_name,
+        customer.fullName,
+        customer.name,
+        user.fullName,
+        user.name
+      ) || 'Customer',
+    customerEmail:
+      pickString(
+        raw.customerEmail,
+        customer.email,
+        user.email
+      ) || undefined,
+    customerAvatar:
+      pickString(
+        raw.customerAvatar,
+        customer.avatar,
+        customer.profileImage,
+        user.avatar,
+        user.profileImage
+      ) || undefined,
+    customerPhone:
+      pickString(
+        raw.customerPhone,
+        raw.customer_phone,
+        customer.phone,
+        customer.phoneNumber,
+        user.phone,
+        user.phoneNumber
+      ) || undefined,
+    customerGender:
+      pickString(
+        raw.customerGender,
+        raw.customer_gender,
+        customer.gender,
+        user.gender
+      ) || undefined,
+
+    date:
+      pickString(
+        raw.date,
+        raw.bookingDate,
+        raw.scheduledDate,
+        raw.appointmentDate
+      ) || 'Date to be confirmed',
+    time:
+      pickString(
+        raw.time,
+        raw.bookingTime,
+        raw.scheduledTime
+      ) || 'Time to be confirmed',
+    location: pickString(
+      raw.location,
+      raw.address,
+      raw.serviceLocation,
+      raw.customerAddress,
+      customer.location
+    ),
+
+    price:
+      pickNumber(raw.price, raw.amount, raw.totalAmount, service.price) ?? 0,
+    notes:
+      pickString(raw.notes, raw.note, raw.customerNote) || undefined,
+
+    status: (pickString(raw.status) || 'pending').toLowerCase(),
+    paymentStatus: (
+      pickString(raw.paymentStatus, raw.payment_status) || 'unpaid'
+    ).toLowerCase(),
+    paymentReference:
+      pickString(
+        raw.paymentReference,
+        raw.payment_reference,
+        raw.txRef
+      ) || null,
+
+    platformFee: pickNumber(
+      raw.platformFee,
+      raw.platform_fee,
+      raw.serviceFee
+    ),
+    providerAmount: pickNumber(
+      raw.providerAmount,
+      raw.provider_amount,
+      raw.earnings,
+      raw.providerEarnings
+    ),
+
+    createdAt: pickString(raw.createdAt, raw.created_at) || undefined,
+    updatedAt: pickString(raw.updatedAt, raw.updated_at) || undefined,
+  };
+}
+
+/* =========================================================
+   PRESENTATION HELPERS
+========================================================= */
+
+const PAGE_SIZE = 4;
 
 const tabs = [
-    "all",
-    "pending",
-    "confirmed",
-    "paid",
-    "completed",
-    "cancelled",
+  'all',
+  'pending',
+  'confirmed',
+  'paid',
+  'completed',
+  'cancelled',
+] as const;
+
+type BookingTab = (typeof tabs)[number];
+
+type SortKey = 'newest' | 'oldest' | 'amount-high' | 'amount-low';
+
+const sortOptions: Array<{ value: SortKey; label: string }> = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'amount-high', label: 'Amount: high to low' },
+  { value: 'amount-low', label: 'Amount: low to high' },
 ];
 
-export function ProviderBookings() {
-    const [bookings, setBookings] = useState<
-        ProviderBooking[]
-    >([]);
+function toTimestamp(value?: string): number {
+  if (!value) return 0;
 
-    const [filter, setFilter] =
-        useState("all");
+  const parsed = new Date(value).getTime();
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
 
-    const [page, setPage] =
-        useState(1);
+function formatShortDate(value?: string): string {
+  if (!value) return '';
 
-    const [loading, setLoading] =
-        useState(true);
+  const date = new Date(value);
 
-    const [refreshing, setRefreshing] =
-        useState(false);
+  if (Number.isNaN(date.getTime())) return '';
 
-    const [error, setError] =
-        useState("");
+  return date.toLocaleDateString('en-NG', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
 
-    const [expandedBooking, setExpandedBooking] =
-        useState<string | null>(null);
+function SummarySkeleton() {
+  return (
+    <div
+      aria-hidden="true"
+      className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+    >
+      {[0, 1, 2, 3].map((item) => (
+        <div key={item} className="card p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-7 w-16" />
+            </div>
+            <Skeleton className="h-11 w-11 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-    const token =
-        sessionStorage.getItem(
-            "servicely_token"
-        );
+function BookingsSkeleton() {
+  return (
+    <div className="mt-4 space-y-3" aria-hidden="true">
+      {[0, 1, 2, 3].map((item) => (
+        <div key={item} className="card p-4 sm:p-5">
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 rounded-full" />
 
-    const loadBookings = useCallback(
-        async (showLoader = true) => {
-            try {
-                if (showLoader) {
-                    setLoading(true);
-                } else {
-                    setRefreshing(true);
-                }
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-2/5" />
+              <Skeleton className="h-3 w-3/5" />
+            </div>
 
-                setError("");
+            <Skeleton className="hidden h-6 w-20 rounded-full sm:block" />
+          </div>
 
-                if (!token) {
-                    setError(
-                        "Your session has expired. Please login again."
-                    );
-                    return;
-                }
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-28" />
+            <Skeleton className="h-3 w-24" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
-                const response = await fetch(
-                    `${API_URL}/bookings/provider-bookings`,
-                    {
-                        method: "GET",
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    }
-                );
+function ServiceThumb({ booking }: { booking: ProviderBooking }) {
+  return (
+    <div className="h-11 w-11 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-ink-800">
+      {booking.serviceImage ? (
+        <img
+          src={booking.serviceImage}
+          alt={booking.serviceName}
+          loading="lazy"
+          className="h-full w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.style.display = 'none';
+          }}
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-slate-400 dark:text-ink-500">
+          <ImageIcon className="h-5 w-5" />
+        </div>
+      )}
+    </div>
+  );
+}
 
-                const data =
-                    await response.json();
+function DetailRow({
+  icon: Icon,
+  label,
+  value,
+  href,
+}: {
+  icon?: LucideIcon;
+  label: string;
+  value: ReactNode;
+  href?: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      {Icon && (
+        <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-ink-500" />
+      )}
 
-                if (
-                    !response.ok ||
-                    !data.success
-                ) {
-                    throw new Error(
-                        data.message ||
-                        "Unable to load bookings."
-                    );
-                }
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+          {label}
+        </p>
 
-                console.log(
-                    "PROVIDER BOOKINGS RESPONSE:",
-                    data
-                );
+        {href ? (
+          <a
+            href={href}
+            className="mt-0.5 block break-all text-sm font-medium text-slate-700 underline-offset-2 transition hover:text-brand-600 hover:underline dark:text-ink-300 dark:hover:text-brand-300"
+          >
+            {value}
+          </a>
+        ) : (
+          <p className="mt-0.5 break-words text-sm font-medium text-slate-700 dark:text-ink-300">
+            {value}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
-                setBookings(
-                    Array.isArray(data.bookings)
-                        ? data.bookings
-                        : []
-                );
-            } catch (err: any) {
-                console.error(
-                    "PROVIDER BOOKINGS ERROR:",
-                    err
-                );
+function DetailPanel({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 dark:border-ink-800 dark:bg-ink-900">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+          <Icon className="h-4 w-4" />
+        </span>
 
-                setError(
-                    err.message ||
-                    "Unable to load your bookings."
-                );
-            } finally {
-                setLoading(false);
-                setRefreshing(false);
-            }
-        },
-        [token]
-    );
+        <h4 className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+          {title}
+        </h4>
+      </div>
 
-    useEffect(() => {
-        loadBookings(true);
-    }, [loadBookings]);
+      <div className="mt-4 space-y-3">{children}</div>
+    </div>
+  );
+}
 
-    /*
-     * Automatically check for new bookings
-     * every 10 seconds.
-     */
-    useEffect(() => {
-        const interval = setInterval(() => {
-            loadBookings(false);
-        }, 10000);
+function BookingDetails({ booking }: { booking: ProviderBooking }) {
+  const isPaid = booking.paymentStatus === 'paid';
+  const bookedOn = formatShortDate(booking.createdAt);
 
-        return () => {
-            clearInterval(interval);
-        };
-    }, [loadBookings]);
+  return (
+    <div className="space-y-4">
+      {/* SERVICE PREVIEW */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white dark:border-ink-800 dark:bg-ink-900">
+        <div className="grid gap-0 md:grid-cols-[220px_1fr]">
+          <div className="h-44 overflow-hidden bg-slate-100 md:h-full md:min-h-[200px] dark:bg-ink-800">
+            {booking.serviceImage ? (
+              <img
+                src={booking.serviceImage}
+                alt={booking.serviceName}
+                loading="lazy"
+                className="h-full w-full object-cover"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
+              />
+            ) : (
+              <div className="flex h-full min-h-[176px] items-center justify-center text-slate-400 dark:text-ink-500">
+                <div className="text-center">
+                  <ImageIcon className="mx-auto h-7 w-7" />
 
-    const filteredBookings = useMemo(() => {
-        if (filter === "all") {
-            return bookings;
-        }
-
-        if (filter === "paid") {
-            return bookings.filter(
-                (booking) =>
-                    booking.paymentStatus ===
-                    "paid"
-            );
-        }
-
-        return bookings.filter(
-            (booking) =>
-                booking.status === filter
-        );
-    }, [bookings, filter]);
-
-    const bookingsPerPage = 4;
-    const totalPages = Math.ceil(
-        filteredBookings.length / bookingsPerPage
-    );
-    const currentPage = Math.min(
-        page,
-        Math.max(totalPages, 1)
-    );
-    const paginatedBookings = filteredBookings.slice(
-        (currentPage - 1) * bookingsPerPage,
-        currentPage * bookingsPerPage
-    );
-    const firstBookingOnPage =
-        filteredBookings.length === 0
-            ? 0
-            : (currentPage - 1) * bookingsPerPage + 1;
-    const lastBookingOnPage = Math.min(
-        currentPage * bookingsPerPage,
-        filteredBookings.length
-    );
-
-    const totalBookings =
-        bookings.length;
-
-    const pendingBookings =
-        bookings.filter(
-            (booking) =>
-                booking.status === "pending"
-        ).length;
-
-    const paidBookings =
-        bookings.filter(
-            (booking) =>
-                booking.paymentStatus === "paid"
-        ).length;
-
-    const completedBookings =
-        bookings.filter(
-            (booking) =>
-                booking.status === "completed"
-        ).length;
-
-    const totalEarnings =
-        bookings
-            .filter(
-                (booking) =>
-                    booking.paymentStatus ===
-                    "paid"
-            )
-            .reduce(
-                (total, booking) =>
-                    total +
-                    Number(
-                        booking.providerAmount || 0
-                    ),
-                0
-            );
-
-    const toggleBooking = (
-        bookingId: string
-    ) => {
-        setExpandedBooking(
-            (current) =>
-                current === bookingId
-                    ? null
-                    : bookingId
-        );
-    };
-
-    const getInitials = (
-        name: string
-    ) => {
-        if (!name) return "C";
-
-        return name
-            .split(" ")
-            .filter(Boolean)
-            .slice(0, 2)
-            .map(
-                (part) =>
-                    part[0]?.toUpperCase()
-            )
-            .join("");
-    };
-
-    const getStatusIcon = (
-        status: string
-    ) => {
-        switch (status) {
-            case "completed":
-                return (
-                    <CheckCircle2 className="h-4 w-4" />
-                );
-
-            case "cancelled":
-            case "rejected":
-                return (
-                    <XCircle className="h-4 w-4" />
-                );
-
-            case "confirmed":
-                return (
-                    <CheckCircle2 className="h-4 w-4" />
-                );
-
-            default:
-                return (
-                    <AlertCircle className="h-4 w-4" />
-                );
-        }
-    };
-
-    if (loading) {
-        return (
-            <DashboardLayout
-                role="provider"
-                navItems={providerNavItems}
-            >
-                <DashboardHeader
-                    title="My Bookings"
-                    subtitle="View and manage bookings from your customers"
-                />
-
-                <div className="mt-6 space-y-4">
-                    {[1, 2, 3].map((item) => (
-                        <div
-                            key={item}
-                            className="card animate-pulse p-5"
-                        >
-                            <div className="flex gap-4">
-                                <div className="h-12 w-12 rounded-full bg-ink-100 dark:bg-ink-800" />
-
-                                <div className="flex-1 space-y-3">
-                                    <div className="h-4 w-48 rounded bg-ink-100 dark:bg-ink-800" />
-
-                                    <div className="h-3 w-72 rounded bg-ink-100 dark:bg-ink-800" />
-
-                                    <div className="h-3 w-40 rounded bg-ink-100 dark:bg-ink-800" />
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                  <p className="mt-2 text-xs">No service image</p>
                 </div>
-            </DashboardLayout>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 sm:p-5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+                <ImageIcon className="h-4 w-4" />
+              </span>
+
+              <p className="text-[11px] font-bold uppercase tracking-widest text-brand-600 dark:text-brand-300">
+                Service booked
+              </p>
+            </div>
+
+            <h3 className="mt-2 text-lg font-bold text-slate-900 dark:text-ink-50">
+              {booking.serviceName}
+            </h3>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-ink-400">
+              This is the exact service selected by the customer when
+              creating this booking.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge tone="neutral">{formatNaira(booking.price)}</Badge>
+
+              <Badge
+                tone={isPaid ? 'success' : 'warning'}
+                icon={isPaid ? CheckCircle2 : Clock3}
+              >
+                {isPaid ? 'Paid' : 'Payment pending'}
+              </Badge>
+
+              <StatusBadge status={booking.status} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CUSTOMER / BOOKING / PAYMENT */}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <DetailPanel icon={UserRound} title="Customer information">
+          <DetailRow
+            icon={User}
+            label="Name"
+            value={booking.customerName}
+          />
+
+          <DetailRow
+            icon={Mail}
+            label="Email"
+            value={booking.customerEmail || 'Not available'}
+            href={
+              booking.customerEmail
+                ? `mailto:${booking.customerEmail}`
+                : undefined
+            }
+          />
+
+          <DetailRow
+            icon={Phone}
+            label="Phone"
+            value={booking.customerPhone || 'Not available'}
+            href={
+              booking.customerPhone
+                ? `tel:${booking.customerPhone}`
+                : undefined
+            }
+          />
+
+          <DetailRow
+            icon={UserRound}
+            label="Gender"
+            value={booking.customerGender || 'Not available'}
+          />
+        </DetailPanel>
+
+        <DetailPanel icon={CalendarDays} title="Booking information">
+          <DetailRow
+            icon={CalendarDays}
+            label="Date"
+            value={booking.date}
+          />
+
+          <DetailRow icon={Clock3} label="Time" value={booking.time} />
+
+          <DetailRow
+            icon={MapPin}
+            label="Location"
+            value={booking.location || 'Not provided'}
+          />
+
+          <DetailRow
+            icon={ImageIcon}
+            label="Service"
+            value={booking.serviceName}
+          />
+        </DetailPanel>
+
+        <DetailPanel icon={WalletCards} title="Payment details">
+          <DetailRow
+            label="Booking amount"
+            value={formatNaira(booking.price)}
+          />
+
+          <DetailRow
+            label="Servicely fee"
+            value={formatNaira(booking.platformFee ?? 0)}
+          />
+
+          <div className="border-t border-slate-100 pt-3 dark:border-ink-800">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+              Your earnings
+            </p>
+
+            <p className="mt-0.5 text-lg font-bold text-success-600 dark:text-success-200">
+              {formatNaira(booking.providerAmount ?? 0)}
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+              Payment status
+            </p>
+
+            <Badge
+              tone={isPaid ? 'success' : 'warning'}
+              icon={isPaid ? CheckCircle2 : Clock3}
+              className="capitalize"
+            >
+              {booking.paymentStatus || 'unpaid'}
+            </Badge>
+          </div>
+        </DetailPanel>
+      </div>
+
+      {/* CUSTOMER NOTE */}
+      {booking.notes && (
+        <div className="rounded-2xl border border-slate-200/70 bg-white p-4 dark:border-ink-800 dark:bg-ink-900">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300">
+              <FileText className="h-4 w-4" />
+            </span>
+
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+              Customer note
+            </h4>
+          </div>
+
+          <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-ink-300">
+            {booking.notes}
+          </p>
+        </div>
+      )}
+
+      {/* META / REQUEST LINK */}
+      <div className="flex flex-col gap-3 text-xs text-slate-400 dark:text-ink-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-x-5 gap-y-1">
+          <span>
+            Booking ID:{' '}
+            <span className="font-mono text-slate-500 dark:text-ink-400">
+              {booking.id}
+            </span>
+          </span>
+
+          {booking.paymentReference && (
+            <span>
+              Payment reference:{' '}
+              <span className="font-mono text-slate-500 dark:text-ink-400">
+                {booking.paymentReference}
+              </span>
+            </span>
+          )}
+
+          {bookedOn && <span>Booked {bookedOn}</span>}
+        </div>
+
+        <Link
+          to="/provider/requests"
+          className="inline-flex w-fit items-center gap-1.5 font-semibold text-brand-600 underline-offset-2 transition hover:text-brand-700 hover:underline dark:text-brand-300 dark:hover:text-brand-200"
+        >
+          <Inbox className="h-3.5 w-3.5" />
+          Booking requests
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+export function ProviderBookings() {
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useProviderBookings();
+
+  const [filter, setFilter] = useState<BookingTab>('all');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortKey>('newest');
+  const [page, setPage] = useState(1);
+  const [expandedBooking, setExpandedBooking] = useState<string | null>(
+    null
+  );
+
+  const hasSession = hasUserToken();
+
+  const bookings = useMemo(
+    () => (Array.isArray(data) ? data.map(normalizeBooking) : []),
+    [data]
+  );
+
+  const counts = useMemo<Record<BookingTab, number>>(() => {
+    const next: Record<BookingTab, number> = {
+      all: bookings.length,
+      pending: 0,
+      confirmed: 0,
+      paid: 0,
+      completed: 0,
+      cancelled: 0,
+    };
+
+    bookings.forEach((booking) => {
+      if (booking.status === 'pending') next.pending += 1;
+      if (booking.status === 'confirmed') next.confirmed += 1;
+      if (booking.status === 'completed') next.completed += 1;
+      if (booking.status === 'cancelled') next.cancelled += 1;
+      if (booking.paymentStatus === 'paid') next.paid += 1;
+    });
+
+    return next;
+  }, [bookings]);
+
+  const stats = useMemo(() => {
+    let pending = 0;
+    let paid = 0;
+    let earnings = 0;
+
+    bookings.forEach((booking) => {
+      if (booking.status === 'pending') pending += 1;
+
+      if (booking.paymentStatus === 'paid') {
+        paid += 1;
+        earnings += Number(booking.providerAmount ?? 0);
+      }
+    });
+
+    return { total: bookings.length, pending, paid, earnings };
+  }, [bookings]);
+
+  const filteredBookings = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    let list = bookings;
+
+    if (filter === 'paid') {
+      list = list.filter(
+        (booking) => booking.paymentStatus === 'paid'
+      );
+    } else if (filter !== 'all') {
+      list = list.filter((booking) => booking.status === filter);
+    }
+
+    if (term) {
+      list = list.filter((booking) =>
+        [
+          booking.id,
+          booking.customerName,
+          booking.customerEmail,
+          booking.customerPhone,
+          booking.serviceName,
+          booking.location,
+          booking.paymentReference,
+        ].some((value) =>
+          (value || '').toLowerCase().includes(term)
+        )
+      );
+    }
+
+    const sorted = [...list];
+
+    switch (sort) {
+      case 'oldest':
+        sorted.sort(
+          (a, b) =>
+            toTimestamp(a.createdAt) - toTimestamp(b.createdAt)
+        );
+        break;
+
+      case 'amount-high':
+        sorted.sort((a, b) => b.price - a.price);
+        break;
+
+      case 'amount-low':
+        sorted.sort((a, b) => a.price - b.price);
+        break;
+
+      default:
+        sorted.sort(
+          (a, b) =>
+            toTimestamp(b.createdAt) - toTimestamp(a.createdAt)
         );
     }
 
-    return (
-        <DashboardLayout
-            role="provider"
-            navItems={providerNavItems}
+    return sorted;
+  }, [bookings, filter, search, sort]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredBookings.length / PAGE_SIZE)
+  );
+  const currentPage = Math.min(page, totalPages);
+  const paginatedBookings = filteredBookings.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+  const firstBookingOnPage =
+    filteredBookings.length === 0
+      ? 0
+      : (currentPage - 1) * PAGE_SIZE + 1;
+  const lastBookingOnPage = Math.min(
+    currentPage * PAGE_SIZE,
+    filteredBookings.length
+  );
+
+  const queryErrorMessage = !hasSession
+    ? 'Authentication required. Please log in again.'
+    : getApiErrorMessage(error) || 'Unable to load your bookings.';
+
+  const updateFilter = (tab: BookingTab) => {
+    setFilter(tab);
+    setPage(1);
+  };
+
+  const updateSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const updateSort = (value: SortKey) => {
+    setSort(value);
+    setPage(1);
+  };
+
+  const toggleBooking = (bookingId: string) => {
+    setExpandedBooking((current) =>
+      current === bookingId ? null : bookingId
+    );
+  };
+
+  const clearFilters = () => {
+    setSearch('');
+    setFilter('all');
+    setSort('newest');
+    setPage(1);
+  };
+
+  const hasSearch = Boolean(search.trim());
+
+  const emptyTitle =
+    bookings.length === 0
+      ? 'No bookings yet'
+      : 'No matching bookings';
+
+  const emptyDescription =
+    bookings.length === 0
+      ? "You don't have any customer bookings yet. New bookings will appear here."
+      : hasSearch
+        ? `No bookings match "${search.trim()}"${
+            filter !== 'all'
+              ? ` in the ${
+                  filter === 'paid' ? 'paid' : filter
+                } tab`
+              : ''
+          }.`
+        : `You don't have any ${
+            filter === 'paid' ? 'paid' : filter
+          } bookings.`;
+
+  return (
+    <DashboardLayout
+      role="provider"
+      navItems={providerNavItems}
+    >
+      <DashboardHeader
+        title="My Bookings"
+        subtitle="Your complete booking history, payments and customer details"
+        action={
+          <Link
+            to="/provider/requests"
+            className="btn-outline btn-sm w-fit"
+          >
+            <Inbox className="h-4 w-4" />
+            Booking requests
+          </Link>
+        }
+      />
+
+      {/* SUMMARY */}
+      {isLoading ? (
+        <SummarySkeleton />
+      ) : hasSession && !(isError && bookings.length === 0) ? (
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="Total bookings"
+            value={String(stats.total)}
+            icon={CalendarDays}
+            color="brand"
+            trend="All time"
+          />
+
+          <StatCard
+            label="Pending"
+            value={String(stats.pending)}
+            icon={Clock3}
+            color="warning"
+            trend="Awaiting action"
+          />
+
+          <StatCard
+            label="Paid bookings"
+            value={String(stats.paid)}
+            icon={CircleDollarSign}
+            color="success"
+            trend="Payment confirmed"
+          />
+
+          <StatCard
+            label="Provider earnings"
+            value={formatNaira(stats.earnings)}
+            icon={WalletCards}
+            color="sky"
+            trend="Paid bookings only"
+          />
+        </div>
+      ) : null}
+
+      {/* SEARCH / SORT / FILTER BAR */}
+      <div className="sticky top-16 z-20 mt-6 rounded-2xl border border-slate-200/70 bg-white/95 p-3 shadow-card backdrop-blur supports-[backdrop-filter]:bg-white/80 sm:p-4 lg:top-4 dark:border-ink-800 dark:bg-ink-900/95 dark:supports-[backdrop-filter]:bg-ink-900/85">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <SearchBar
+            value={search}
+            onChange={updateSearch}
+            placeholder="Search customer, service or booking ID…"
+            className="min-w-0 sm:flex-1"
+          />
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="booking-sort" className="sr-only">
+              Sort bookings
+            </label>
+
+            <select
+              id="booking-sort"
+              value={sort}
+              onChange={(event) =>
+                updateSort(event.target.value as SortKey)
+              }
+              className="h-11 min-w-0 flex-1 cursor-pointer rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 sm:flex-none dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200"
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <Button
+              variant="outline"
+              size="md"
+              icon={RefreshCw}
+              loading={isFetching}
+              onClick={() => void refetch()}
+              disabled={!hasSession}
+              className="h-11 shrink-0"
+            >
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div
+          role="group"
+          className="no-scrollbar mt-3 flex items-center gap-1.5 overflow-x-auto pb-0.5"
+          aria-label="Filter bookings by status"
         >
-            <DashboardHeader
-                title="My Bookings"
-                subtitle="View and manage bookings from your customers"
-            />
+          {tabs.map((tab) => {
+            const active = filter === tab;
 
-            {/* TOP STATS */}
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            return (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => updateFilter(tab)}
+                aria-pressed={active}
+                className={`flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold capitalize transition ${
+                  active
+                    ? 'bg-brand-600 text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700'
+                }`}
+              >
+                {tab}
 
-                {/* TOTAL */}
-                <div className="card p-5">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-ink-500">
-                                Total bookings
-                            </p>
-
-                            <p className="mt-2 text-2xl font-bold text-ink-900 dark:text-ink-50">
-                                {totalBookings}
-                            </p>
-                        </div>
-
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary-100 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
-                            <CalendarDays className="h-5 w-5" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* PENDING */}
-                <div className="card p-5">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-ink-500">
-                                Pending
-                            </p>
-
-                            <p className="mt-2 text-2xl font-bold text-ink-900 dark:text-ink-50">
-                                {pendingBookings}
-                            </p>
-                        </div>
-
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400">
-                            <Clock3 className="h-5 w-5" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* PAID */}
-                <div className="card p-5">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-ink-500">
-                                Paid bookings
-                            </p>
-
-                            <p className="mt-2 text-2xl font-bold text-ink-900 dark:text-ink-50">
-                                {paidBookings}
-                            </p>
-                        </div>
-
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                            <CircleDollarSign className="h-5 w-5" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* EARNINGS */}
-                <div className="card p-5">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-medium text-ink-500">
-                                Provider earnings
-                            </p>
-
-                            <p className="mt-2 text-xl font-bold text-ink-900 dark:text-ink-50">
-                                {formatNaira(
-                                    totalEarnings
-                                )}
-                            </p>
-                        </div>
-
-                        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
-                            <WalletCards className="h-5 w-5" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* HEADER / REFRESH */}
-            <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 className="text-lg font-bold text-ink-900 dark:text-ink-50">
-                        Customer bookings
-                    </h2>
-
-                    <p className="mt-1 text-sm text-ink-500">
-                        Bookings update automatically every 10 seconds.
-                    </p>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={() =>
-                        loadBookings(false)
-                    }
-                    disabled={refreshing}
-                    className="inline-flex w-fit items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm font-semibold text-ink-700 transition hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
+                    active
+                      ? 'bg-white/20 text-white'
+                      : 'bg-white text-slate-500 dark:bg-ink-700 dark:text-ink-300'
+                  }`}
                 >
-                    {refreshing ? (
-                        <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Refreshing...
-                        </>
-                    ) : (
-                        <>
-                            <RefreshCw className="h-4 w-4" />
-                            Refresh
-                        </>
-                    )}
-                </button>
-            </div>
+                  {counts[tab]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
-            {/* ERROR */}
-            {error && (
-                <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+      {/* PARTIAL ERROR (stale data still visible) */}
+      {isError && bookings.length > 0 && (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-danger-100 bg-danger-50/70 p-4 text-sm text-danger-700 dark:border-danger-500/20 dark:bg-danger-500/5 dark:text-danger-200 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{queryErrorMessage}</p>
+          </div>
 
-                    <div>
-                        <p className="font-semibold">
-                            Unable to load bookings
-                        </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void refetch()}
+          >
+            Try again
+          </Button>
+        </div>
+      )}
 
-                        <p className="mt-1">
-                            {error}
-                        </p>
-                    </div>
-                </div>
-            )}
+      {/* CONTENT */}
+      {isLoading ? (
+        <BookingsSkeleton />
+      ) : !hasSession ? (
+        <div className="mt-4">
+          <ErrorState message={queryErrorMessage} />
+        </div>
+      ) : isError && bookings.length === 0 ? (
+        <div className="mt-4">
+          <ErrorState
+            message={queryErrorMessage}
+            onRetry={() => void refetch()}
+          />
+        </div>
+      ) : filteredBookings.length === 0 ? (
+        <div className="mt-4">
+          <EmptyState
+            icon={CalendarDays}
+            title={emptyTitle}
+            description={emptyDescription}
+            action={
+              bookings.length === 0 ? (
+                <Link
+                  to="/provider/requests"
+                  className="btn-outline btn-sm"
+                >
+                  View booking requests
+                </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                >
+                  Clear filters
+                </Button>
+              )
+            }
+          />
+        </div>
+      ) : (
+        <>
+          {/* =================================================
+              DESKTOP TABLE
+          ================================================== */}
+          <div className="mt-4 hidden overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-card lg:block dark:border-ink-800 dark:bg-ink-900">
+            <table className="w-full border-collapse text-left">
+              <caption className="sr-only">
+                Your customer bookings
+              </caption>
 
-            {/* FILTERS */}
-            <div className="mt-5 flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-                {tabs.map((tab) => {
-                    const count =
-                        tab === "all"
-                            ? bookings.length
-                            : tab === "paid"
-                                ? bookings.filter(
-                                    (booking) =>
-                                        booking.paymentStatus ===
-                                        "paid"
-                                ).length
-                                : bookings.filter(
-                                    (booking) =>
-                                        booking.status ===
-                                        tab
-                                ).length;
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] uppercase tracking-wider text-slate-400 dark:border-ink-800 dark:bg-ink-800/40 dark:text-ink-500">
+                  <th
+                    scope="col"
+                    className="px-5 py-3 font-semibold"
+                  >
+                    Customer
+                  </th>
 
-                    return (
-                        <button
-                            key={tab}
-                            type="button"
-                            onClick={() =>
-                                {
-                                    setFilter(tab);
-                                    setPage(1);
-                                }
-                            }
-                            className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold capitalize transition ${
-                                filter === tab
-                                    ? "bg-primary-600 text-white shadow-sm"
-                                    : "bg-ink-100 text-ink-600 hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
+                  <th
+                    scope="col"
+                    className="px-5 py-3 font-semibold"
+                  >
+                    Service
+                  </th>
+
+                  <th
+                    scope="col"
+                    className="px-5 py-3 font-semibold"
+                  >
+                    Schedule
+                  </th>
+
+                  <th
+                    scope="col"
+                    className="px-5 py-3 text-right font-semibold"
+                  >
+                    Amount
+                  </th>
+
+                  <th
+                    scope="col"
+                    className="px-5 py-3 font-semibold"
+                  >
+                    Status
+                  </th>
+
+                  <th
+                    scope="col"
+                    className="px-5 py-3 text-right"
+                  >
+                    <span className="sr-only">
+                      Booking details
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100 dark:divide-ink-800">
+                {paginatedBookings.map((booking) => {
+                  const isExpanded =
+                    expandedBooking === booking.id;
+                  const detailsId = `desktop-booking-details-${booking.id}`;
+                  const isPaid =
+                    booking.paymentStatus === 'paid';
+
+                  return (
+                    <Fragment key={booking.id}>
+                      <tr
+                        onClick={() => toggleBooking(booking.id)}
+                        className="group cursor-pointer transition-colors hover:bg-brand-50/40 dark:hover:bg-ink-800/40"
+                      >
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              src={booking.customerAvatar}
+                              name={booking.customerName}
+                              size="md"
+                            />
+
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
+                                {booking.customerName}
+                              </p>
+
+                              <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-ink-400">
+                                {booking.customerEmail ||
+                                  'No email available'}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <ServiceThumb booking={booking} />
+
+                            <div className="min-w-0">
+                              <p className="max-w-[180px] truncate text-sm font-medium text-slate-800 dark:text-ink-200">
+                                {booking.serviceName}
+                              </p>
+
+                              {booking.location && (
+                                <p className="mt-0.5 flex max-w-[180px] items-center gap-1 text-[11px] text-slate-400 dark:text-ink-500">
+                                  <MapPin className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">
+                                    {booking.location}
+                                  </span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-medium text-slate-800 dark:text-ink-200">
+                            {booking.date}
+                          </p>
+
+                          <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-slate-500 dark:text-ink-400">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {booking.time}
+                          </p>
+                        </td>
+
+                        <td className="px-5 py-4 text-right">
+                          <p className="text-sm font-bold text-slate-900 dark:text-ink-50">
+                            {formatNaira(booking.price)}
+                          </p>
+
+                          <p
+                            className={`mt-0.5 text-[11px] font-semibold ${
+                              isPaid
+                                ? 'text-success-600 dark:text-success-200'
+                                : 'text-warning-600 dark:text-warning-200'
                             }`}
-                        >
-                            {tab.replace(
-                                "_",
-                                " "
+                          >
+                            {isPaid
+                              ? 'Payment received'
+                              : 'Payment pending'}
+                          </p>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <StatusBadge status={booking.status} />
+                        </td>
+
+                        <td className="px-5 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleBooking(booking.id);
+                            }}
+                            aria-expanded={isExpanded}
+                            aria-controls={detailsId}
+                            aria-label={
+                              isExpanded
+                                ? 'Hide booking details'
+                                : 'View booking details'
+                            }
+                            title={
+                              isExpanded
+                                ? 'Hide booking details'
+                                : 'View booking details'
+                            }
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-brand-100 hover:text-brand-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-brand-950/40 dark:hover:text-brand-300"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
                             )}
+                          </button>
+                        </td>
+                      </tr>
 
-                            <span
-                                className={`rounded-full px-1.5 py-0.5 text-[10px] ${
-                                    filter === tab
-                                        ? "bg-white/20 text-white"
-                                        : "bg-white text-ink-500 dark:bg-ink-700 dark:text-ink-300"
-                                }`}
-                            >
-                                {count}
-                            </span>
-                        </button>
-                    );
+                      {isExpanded && (
+                        <tr
+                          id={detailsId}
+                          className="bg-slate-50/60 dark:bg-ink-800/20"
+                        >
+                          <td
+                            colSpan={6}
+                            className="px-5 py-5"
+                          >
+                            <BookingDetails booking={booking} />
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
                 })}
-            </div>
+              </tbody>
+            </table>
+          </div>
 
-            {/* BOOKINGS */}
-            <div className="mt-4 space-y-4">
-                {filteredBookings.length === 0 ? (
-                    <div className="card p-10 text-center">
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-ink-100 text-ink-400 dark:bg-ink-800">
-                            <CalendarDays className="h-6 w-6" />
+          {/* =================================================
+              MOBILE CARDS
+          ================================================== */}
+          <div className="mt-4 space-y-3 lg:hidden">
+            {paginatedBookings.map((booking) => {
+              const isExpanded =
+                expandedBooking === booking.id;
+              const detailsId = `mobile-booking-details-${booking.id}`;
+              const isPaid =
+                booking.paymentStatus === 'paid';
+
+              return (
+                <article
+                  key={booking.id}
+                  className="card overflow-hidden transition-shadow hover:shadow-card-hover"
+                >
+                  <div className="p-4">
+                    <div className="flex items-start gap-3">
+                      <Avatar
+                        src={booking.customerAvatar}
+                        name={booking.customerName}
+                        size="md"
+                      />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <StatusBadge status={booking.status} />
+
+                          <Badge
+                            tone={isPaid ? 'success' : 'warning'}
+                            icon={isPaid ? CheckCircle2 : Clock3}
+                          >
+                            {isPaid ? 'Paid' : 'Payment pending'}
+                          </Badge>
                         </div>
 
-                        <h3 className="mt-4 font-semibold text-ink-900 dark:text-ink-50">
-                            No bookings found
+                        <h3 className="mt-1.5 truncate text-sm font-bold text-slate-900 dark:text-ink-50">
+                          {booking.customerName}
                         </h3>
 
-                        <p className="mt-1 text-sm text-ink-500">
-                            {filter === "all"
-                                ? "You don't have any customer bookings yet."
-                                : `You don't have any ${filter} bookings.`}
+                        <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-ink-400">
+                          {booking.customerEmail ||
+                            'No email available'}
                         </p>
+                      </div>
                     </div>
-                ) : (
-                    paginatedBookings.map(
-                        (booking) => {
-                            const isExpanded =
-                                expandedBooking ===
-                                booking.id;
 
-                            console.log(
-                                "BOOKING:",
-                                booking
-                            );
-
-                            console.log(
-                                "CUSTOMER PHONE:",
-                                booking.customerPhone
-                            );
-
-                            return (
-                                <div
-                                    key={booking.id}
-                                    className="card overflow-hidden"
-                                >
-                                    {/* MAIN BOOKING */}
-                                    <div className="p-5">
-                                        <div className="flex flex-col gap-5 lg:flex-row lg:items-center">
-
-                                            {/* CUSTOMER */}
-                                            <div className="flex min-w-0 flex-1 items-center gap-3">
-                                                {booking.customerAvatar ? (
-                                                    <img
-                                                        src={
-                                                            booking.customerAvatar
-                                                        }
-                                                        alt={
-                                                            booking.customerName
-                                                        }
-                                                        className="h-12 w-12 shrink-0 rounded-full object-cover"
-                                                    />
-                                                ) : (
-                                                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400">
-                                                        {getInitials(
-                                                            booking.customerName
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                <div className="min-w-0">
-                                                    <h3 className="truncate font-bold text-ink-900 dark:text-ink-50">
-                                                        {
-                                                            booking.customerName
-                                                        }
-                                                    </h3>
-
-                                                    <p className="mt-0.5 truncate text-xs text-ink-500">
-                                                        {booking.customerEmail ||
-                                                            "No email available"}
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* BOOKED SERVICE */}
-                                            <div className="flex min-w-0 items-center gap-3 lg:w-64">
-                                                <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-ink-100 dark:bg-ink-800">
-                                                    {booking.serviceImage ? (
-                                                        <img
-                                                            src={
-                                                                booking.serviceImage
-                                                            }
-                                                            alt={
-                                                                booking.serviceName
-                                                            }
-                                                            className="h-full w-full object-cover"
-                                                            onError={(
-                                                                event
-                                                            ) => {
-                                                                event.currentTarget.style.display =
-                                                                    "none";
-                                                            }}
-                                                        />
-                                                    ) : (
-                                                        <div className="flex h-full w-full items-center justify-center text-ink-400">
-                                                            <ImageIcon className="h-5 w-5" />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="min-w-0">
-                                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">
-                                                        Service booked
-                                                    </p>
-
-                                                    <p className="mt-1 truncate text-sm font-semibold text-ink-800 dark:text-ink-200">
-                                                        {
-                                                            booking.serviceName
-                                                        }
-                                                    </p>
-                                                </div>
-                                            </div>
-
-                                            {/* DATE */}
-                                            <div className="lg:w-40">
-                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">
-                                                    Schedule
-                                                </p>
-
-                                                <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                                                    {booking.date}
-                                                </p>
-
-                                                <p className="mt-0.5 text-xs text-ink-500">
-                                                    {booking.time}
-                                                </p>
-                                            </div>
-
-                                            {/* PRICE */}
-                                            <div className="lg:w-32 lg:text-right">
-                                                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">
-                                                    Amount
-                                                </p>
-
-                                                <p className="mt-1 font-bold text-ink-900 dark:text-ink-50">
-                                                    {formatNaira(
-                                                        booking.price
-                                                    )}
-                                                </p>
-
-                                                <p
-                                                    className={`mt-1 text-[11px] font-semibold ${
-                                                        booking.paymentStatus ===
-                                                        "paid"
-                                                            ? "text-emerald-600"
-                                                            : "text-amber-600"
-                                                    }`}
-                                                >
-                                                    {booking.paymentStatus ===
-                                                    "paid"
-                                                        ? "Payment received"
-                                                        : "Payment pending"}
-                                                </p>
-                                            </div>
-
-                                            {/* STATUS */}
-                                            <div className="flex items-center gap-3 lg:w-36 lg:justify-end">
-                                                <StatusBadge
-                                                    status={
-                                                        booking.status
-                                                    }
-                                                />
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() =>
-                                                        toggleBooking(
-                                                            booking.id
-                                                        )
-                                                    }
-                                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink-100 text-ink-500 transition hover:bg-ink-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700"
-                                                    title={
-                                                        isExpanded
-                                                            ? "Hide booking details"
-                                                            : "View booking details"
-                                                    }
-                                                >
-                                                    {isExpanded ? (
-                                                        <ChevronUp className="h-4 w-4" />
-                                                    ) : (
-                                                        <ChevronDown className="h-4 w-4" />
-                                                    )}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* EXPANDED DETAILS */}
-                                    {isExpanded && (
-                                        <div className="border-t border-ink-100 bg-ink-50/60 p-5 dark:border-ink-800 dark:bg-ink-900/40">
-
-                                            {/* BOOKED SERVICE PREVIEW */}
-                                            <div className="mb-5 overflow-hidden rounded-2xl bg-white dark:bg-ink-900">
-                                                <div className="grid gap-0 md:grid-cols-[240px_1fr]">
-
-                                                    {/* SERVICE IMAGE */}
-                                                    <div className="h-56 overflow-hidden bg-ink-100 md:h-full md:min-h-[220px] dark:bg-ink-800">
-                                                        {booking.serviceImage ? (
-                                                            <img
-                                                                src={
-                                                                    booking.serviceImage
-                                                                }
-                                                                alt={
-                                                                    booking.serviceName
-                                                                }
-                                                                className="h-full w-full object-cover"
-                                                                onError={(
-                                                                    event
-                                                                ) => {
-                                                                    event.currentTarget.style.display =
-                                                                        "none";
-                                                                }}
-                                                            />
-                                                        ) : (
-                                                            <div className="flex h-full min-h-[220px] items-center justify-center text-sm text-ink-400">
-                                                                <div className="text-center">
-                                                                    <ImageIcon className="mx-auto h-8 w-8" />
-
-                                                                    <p className="mt-2">
-                                                                        No service image
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* SERVICE DETAILS */}
-                                                    <div className="p-5">
-                                                        <div className="flex items-center gap-2">
-                                                            <ImageIcon className="h-4 w-4 text-primary-600" />
-
-                                                            <p className="text-xs font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-400">
-                                                                Service booked
-                                                            </p>
-                                                        </div>
-
-                                                        <h3 className="mt-2 text-xl font-bold text-ink-900 dark:text-ink-50">
-                                                            {
-                                                                booking.serviceName
-                                                            }
-                                                        </h3>
-
-                                                        <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-                                                            This is the exact service selected by the customer when creating this booking.
-                                                        </p>
-
-                                                        <div className="mt-4 flex flex-wrap gap-2">
-                                                            <span className="rounded-full bg-ink-100 px-3 py-1.5 text-xs font-medium text-ink-600 dark:bg-ink-800 dark:text-ink-300">
-                                                                {formatNaira(
-                                                                    booking.price
-                                                                )}
-                                                            </span>
-
-                                                            <span
-                                                                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                                                                    booking.paymentStatus ===
-                                                                    "paid"
-                                                                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
-                                                                        : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
-                                                                }`}
-                                                            >
-                                                                {booking.paymentStatus ===
-                                                                "paid"
-                                                                    ? "Paid"
-                                                                    : "Payment pending"}
-                                                            </span>
-
-                                                            <span className="rounded-full bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400">
-                                                                {booking.status.replace(
-                                                                    "_",
-                                                                    " "
-                                                                )}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* CUSTOMER / BOOKING / PAYMENT */}
-                                            <div className="grid gap-5 lg:grid-cols-3">
-
-                                                {/* CUSTOMER INFORMATION */}
-                                                <div className="rounded-2xl bg-white p-5 dark:bg-ink-900">
-                                                    <div className="flex items-center gap-2">
-                                                        <User className="h-4 w-4 text-primary-600" />
-
-                                                        <h4 className="font-semibold text-ink-900 dark:text-ink-50">
-                                                            Customer information
-                                                        </h4>
-                                                    </div>
-
-                                                    <div className="mt-4 space-y-3">
-
-                                                        {/* NAME */}
-                                                        <div>
-                                                            <p className="text-xs text-ink-400">
-                                                                Name
-                                                            </p>
-
-                                                            <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                                                                {
-                                                                    booking.customerName
-                                                                }
-                                                            </p>
-                                                        </div>
-
-                                                        {/* EMAIL */}
-                                                        <div className="flex items-start gap-2">
-                                                            <Mail className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-
-                                                            <div className="min-w-0">
-                                                                <p className="text-xs text-ink-400">
-                                                                    Email
-                                                                </p>
-
-                                                                <p className="mt-1 break-all text-sm text-ink-700 dark:text-ink-300">
-                                                                    {booking.customerEmail ||
-                                                                        "Not available"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* PHONE */}
-                                                        <div className="flex items-start gap-2">
-                                                            <Phone className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-
-                                                            <div>
-                                                                <p className="text-xs text-ink-400">
-                                                                    Phone
-                                                                </p>
-
-                                                                <p className="mt-1 text-sm text-ink-700 dark:text-ink-300">
-                                                                    {booking.customerPhone ||
-                                                                        "Not available"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="flex items-start gap-2">
-                                                            <User2Icon className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-
-                                                            <div>
-                                                                <p className="text-xs text-ink-400">
-                                                                    Gender
-                                                                </p>
-
-                                                                <p className="mt-1 text-sm text-ink-700 dark:text-ink-300">
-                                                                    {booking.customerGender ||
-                                                                        "Not available"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                    </div>
-                                                </div>
-
-                                                {/* BOOKING INFORMATION */}
-                                                <div className="rounded-2xl bg-white p-5 dark:bg-ink-900">
-                                                    <div className="flex items-center gap-2">
-                                                        <CalendarDays className="h-4 w-4 text-primary-600" />
-
-                                                        <h4 className="font-semibold text-ink-900 dark:text-ink-50">
-                                                            Booking information
-                                                        </h4>
-                                                    </div>
-
-                                                    <div className="mt-4 space-y-3">
-
-                                                        {/* DATE */}
-                                                        <div className="flex items-start gap-2">
-                                                            <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-
-                                                            <div>
-                                                                <p className="text-xs text-ink-400">
-                                                                    Date
-                                                                </p>
-
-                                                                <p className="mt-1 text-sm font-medium text-ink-700 dark:text-ink-300">
-                                                                    {booking.date}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* TIME */}
-                                                        <div className="flex items-start gap-2">
-                                                            <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-
-                                                            <div>
-                                                                <p className="text-xs text-ink-400">
-                                                                    Time
-                                                                </p>
-
-                                                                <p className="mt-1 text-sm font-medium text-ink-700 dark:text-ink-300">
-                                                                    {booking.time}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* LOCATION */}
-                                                        <div className="flex items-start gap-2">
-                                                            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" />
-
-                                                            <div>
-                                                                <p className="text-xs text-ink-400">
-                                                                    Location
-                                                                </p>
-
-                                                                <p className="mt-1 text-sm font-medium text-ink-700 dark:text-ink-300">
-                                                                    {booking.location ||
-                                                                        "Not provided"}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* SERVICE */}
-                                                        <div>
-                                                            <p className="text-xs text-ink-400">
-                                                                Service
-                                                            </p>
-
-                                                            <p className="mt-1 text-sm font-medium text-ink-700 dark:text-ink-300">
-                                                                {
-                                                                    booking.serviceName
-                                                                }
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                {/* PAYMENT */}
-                                                <div className="rounded-2xl bg-white p-5 dark:bg-ink-900">
-                                                    <div className="flex items-center gap-2">
-                                                        <WalletCards className="h-4 w-4 text-primary-600" />
-
-                                                        <h4 className="font-semibold text-ink-900 dark:text-ink-50">
-                                                            Payment details
-                                                        </h4>
-                                                    </div>
-
-                                                    <div className="mt-4 space-y-3">
-
-                                                        {/* BOOKING AMOUNT */}
-                                                        <div>
-                                                            <p className="text-xs text-ink-400">
-                                                                Booking amount
-                                                            </p>
-
-                                                            <p className="mt-1 text-sm font-bold text-ink-800 dark:text-ink-200">
-                                                                {formatNaira(
-                                                                    booking.price
-                                                                )}
-                                                            </p>
-                                                        </div>
-
-                                                        {/* SERVICELY FEE */}
-                                                        <div>
-                                                            <p className="text-xs text-ink-400">
-                                                                Servicely fee
-                                                            </p>
-
-                                                            <p className="mt-1 text-sm text-ink-700 dark:text-ink-300">
-                                                                {formatNaira(
-                                                                    booking.platformFee
-                                                                )}
-                                                            </p>
-                                                        </div>
-
-                                                        {/* PROVIDER EARNINGS */}
-                                                        <div className="border-t border-ink-100 pt-3 dark:border-ink-800">
-                                                            <p className="text-xs text-ink-400">
-                                                                Your earnings
-                                                            </p>
-
-                                                            <p className="mt-1 text-lg font-bold text-emerald-600">
-                                                                {formatNaira(
-                                                                    booking.providerAmount
-                                                                )}
-                                                            </p>
-                                                        </div>
-
-                                                        {/* PAYMENT STATUS */}
-                                                        <div>
-                                                            <p className="text-xs text-ink-400">
-                                                                Payment status
-                                                            </p>
-
-                                                            <p
-                                                                className={`mt-1 text-sm font-semibold capitalize ${
-                                                                    booking.paymentStatus ===
-                                                                    "paid"
-                                                                        ? "text-emerald-600"
-                                                                        : "text-amber-600"
-                                                                }`}
-                                                            >
-                                                                {
-                                                                    booking.paymentStatus
-                                                                }
-                                                            </p>
-                                                        </div>
-
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* CUSTOMER NOTE */}
-                                            {booking.notes && (
-                                                <div className="mt-5 rounded-2xl bg-white p-5 dark:bg-ink-900">
-                                                    <div className="flex items-center gap-2">
-                                                        <FileText className="h-4 w-4 text-primary-600" />
-
-                                                        <h4 className="font-semibold text-ink-900 dark:text-ink-50">
-                                                            Customer note
-                                                        </h4>
-                                                    </div>
-
-                                                    <p className="mt-3 text-sm leading-6 text-ink-600 dark:text-ink-300">
-                                                        {booking.notes}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {/* BOOKING META */}
-                                            <div className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-ink-400">
-                                                <span>
-                                                    Booking ID:{" "}
-                                                    {booking.id}
-                                                </span>
-
-                                                {booking.paymentReference && (
-                                                    <span>
-                                                        Payment reference:{" "}
-                                                        {
-                                                            booking.paymentReference
-                                                        }
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        }
-                    )
-                )}
-            </div>
-
-            {filteredBookings.length > 0 && (
-                <nav
-                    aria-label="Booking results pagination"
-                    className="mt-5 flex flex-col gap-3 rounded-2xl border border-ink-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-ink-800 dark:bg-ink-900"
-                >
-                    <p
-                        aria-live="polite"
-                        className="text-sm text-ink-500"
+                    <div className="mt-3 flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-2.5 dark:border-ink-800 dark:bg-ink-800/30">
+                      <ServiceThumb booking={booking} />
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold text-slate-800 dark:text-ink-200">
+                          {booking.serviceName}
+                        </p>
+
+                        <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-slate-500 dark:text-ink-400">
+                          <CalendarDays className="h-3 w-3 shrink-0" />
+                          <span className="truncate">
+                            {booking.date} · {booking.time}
+                          </span>
+                        </p>
+                      </div>
+
+                      <p className="shrink-0 text-sm font-bold text-slate-900 dark:text-ink-50">
+                        {formatNaira(booking.price)}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleBooking(booking.id)}
+                      aria-expanded={isExpanded}
+                      aria-controls={detailsId}
+                      className="mt-3 flex w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-brand-300 hover:bg-brand-50/50 hover:text-brand-700 dark:border-ink-700 dark:bg-ink-800/40 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-800 dark:hover:text-brand-300"
                     >
-                        Showing{" "}
-                        <span className="font-semibold text-ink-800 dark:text-ink-100">
-                            {firstBookingOnPage}–{lastBookingOnPage}
-                        </span>{" "}
-                        of{" "}
-                        <span className="font-semibold text-ink-800 dark:text-ink-100">
-                            {filteredBookings.length}
-                        </span>{" "}
-                        bookings
-                    </p>
+                      <span>
+                        {isExpanded
+                          ? 'Hide details'
+                          : 'View details'}
+                      </span>
 
-                    <div className="flex items-center justify-between gap-3 sm:justify-end">
-                        <span className="text-xs font-medium tabular-nums text-ink-500">
-                            Page {currentPage} of {Math.max(totalPages, 1)}
-                        </span>
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
 
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                aria-label="Previous page"
-                                title="Previous page"
-                                disabled={currentPage === 1}
-                                onClick={() => setPage(currentPage - 1)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-ink-200 disabled:hover:bg-white disabled:hover:text-ink-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
-                            >
-                                <ChevronLeft
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />
-                            </button>
-                            <button
-                                type="button"
-                                aria-label="Next page"
-                                title="Next page"
-                                disabled={currentPage >= totalPages}
-                                onClick={() => setPage(currentPage + 1)}
-                                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-600 transition hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-ink-200 disabled:hover:bg-white disabled:hover:text-ink-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
-                            >
-                                <ChevronRight
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />
-                            </button>
-                        </div>
+                  {isExpanded && (
+                    <div
+                      id={detailsId}
+                      className="border-t border-slate-100 bg-slate-50/60 p-4 dark:border-ink-800 dark:bg-ink-900/40"
+                    >
+                      <BookingDetails booking={booking} />
                     </div>
-                </nav>
-            )}
-        </DashboardLayout>
-    );
+                  )}
+                </article>
+              );
+            })}
+          </div>
+
+          {/* PAGINATION */}
+          <nav
+            aria-label="Booking results pagination"
+            className="mt-5 flex flex-col gap-3 rounded-2xl border border-slate-200/70 bg-white px-4 py-3 shadow-card sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-ink-800 dark:bg-ink-900"
+          >
+            <p
+              aria-live="polite"
+              className="text-sm text-slate-500 dark:text-ink-400"
+            >
+              Showing{' '}
+              <span className="font-semibold text-slate-800 dark:text-ink-100">
+                {firstBookingOnPage}–{lastBookingOnPage}
+              </span>{' '}
+              of{' '}
+              <span className="font-semibold text-slate-800 dark:text-ink-100">
+                {filteredBookings.length}
+              </span>{' '}
+              bookings
+            </p>
+
+            <div className="flex items-center justify-between gap-3 sm:justify-end">
+              <span className="text-xs font-medium tabular-nums text-slate-500 dark:text-ink-400">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Previous page"
+                  title="Previous page"
+                  disabled={currentPage === 1}
+                  onClick={() => setPage(currentPage - 1)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+                >
+                  <ChevronLeft
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  />
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="Next page"
+                  title="Next page"
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setPage(currentPage + 1)}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-700 dark:hover:text-ink-50 dark:disabled:hover:border-ink-700 dark:disabled:hover:bg-ink-800 dark:disabled:hover:text-ink-300"
+                >
+                  <ChevronRight
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
+            </div>
+          </nav>
+        </>
+      )}
+    </DashboardLayout>
+  );
 }
+

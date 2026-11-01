@@ -475,7 +475,7 @@ export function useCreateReview() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.reviews.all });
       client.invalidateQueries({ queryKey: queryKeys.bookings.all });
-      client.invalidateQueries({ queryKey: queryKeys.providers.recommended(6) });
+      client.invalidateQueries({ queryKey: ['providers', 'recommended'] });
     },
   });
 }
@@ -492,6 +492,7 @@ export function useUpdateReview() {
       ),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.reviews.all });
+      client.invalidateQueries({ queryKey: ['providers', 'recommended'] });
     },
   });
 }
@@ -507,6 +508,7 @@ export function useDeleteReview() {
       ),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.reviews.all });
+      client.invalidateQueries({ queryKey: ['providers', 'recommended'] });
     },
   });
 }

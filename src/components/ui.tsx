@@ -5,7 +5,14 @@
  * product visually consistent. Every component supports light + dark
  * themes and includes proper focus/keyboard accessibility.
  */
-import { Component, useEffect, type ReactNode } from 'react';
+import {
+  Component,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -33,21 +40,21 @@ type ButtonSize = 'sm' | 'md' | 'lg';
 
 const buttonVariants: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-600 text-white hover:bg-brand-700 shadow-sm hover:shadow-soft',
+    'bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow-soft active:bg-brand-800',
   secondary:
-    'bg-lavender text-brand-700 hover:bg-brand-100 dark:bg-brand-950/60 dark:text-brand-300 dark:hover:bg-brand-950',
+    'bg-lavender text-brand-700 hover:bg-brand-100 active:bg-brand-200 dark:bg-brand-950/60 dark:text-brand-300 dark:hover:bg-brand-950 dark:active:bg-brand-900',
   outline:
-    'border border-slate-200 dark:border-ink-700 bg-white dark:bg-transparent text-slate-700 dark:text-ink-300 hover:border-brand-300 dark:hover:border-ink-600 hover:bg-lavender dark:hover:bg-ink-800',
+    'border border-slate-200 bg-white text-slate-700 shadow-xs hover:border-brand-300 hover:bg-lavender hover:text-brand-700 active:bg-brand-100 dark:border-ink-700 dark:bg-transparent dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-800 dark:hover:text-ink-50 dark:active:bg-ink-700',
   ghost:
-    'text-slate-600 dark:text-ink-400 hover:text-slate-900 dark:hover:text-ink-50 hover:bg-slate-100 dark:hover:bg-ink-800',
+    'text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-50 dark:active:bg-ink-700',
   danger:
-    'bg-danger-600 text-white hover:bg-danger-700 shadow-sm',
+    'bg-danger-600 text-white shadow-sm hover:bg-danger-700 hover:shadow-soft active:bg-danger-700',
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
-  sm: 'px-3.5 py-2 text-xs rounded-lg gap-1.5',
-  md: 'px-5 py-2.5 text-sm',
-  lg: 'px-7 py-3.5 text-base',
+  sm: 'h-9 gap-1.5 rounded-lg px-3.5 text-xs',
+  md: 'h-11 px-5 text-sm',
+  lg: 'h-12 px-7 text-base',
 };
 
 export function Button({
@@ -70,6 +77,7 @@ export function Button({
   return (
     <button
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={cn(
         'btn',
         buttonVariants[variant],
@@ -79,9 +87,9 @@ export function Button({
       {...props}
     >
       {loading ? (
-        <RefreshCw className="h-4 w-4 animate-spin" />
+        <RefreshCw className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
       ) : (
-        Icon && <Icon className="h-4 w-4" />
+        Icon && <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
       )}
       {children}
     </button>
@@ -102,7 +110,13 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <div className={cn(hover ? 'card-hover' : 'card', 'p-5', className)}>
+    <div
+      className={cn(
+        hover ? 'card-hover' : 'card',
+        'relative p-5',
+        className
+      )}
+    >
       {children}
     </div>
   );
@@ -130,17 +144,17 @@ export function SectionHeading({
         align === 'center' && 'text-center sm:flex-col sm:items-center'
       )}
     >
-      <div>
-        <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-ink-50 sm:text-2xl">
+      <div className="min-w-0">
+        <h2 className="text-balance text-xl font-bold tracking-tight text-slate-900 dark:text-ink-50 sm:text-2xl">
           {title}
         </h2>
         {subtitle && (
-          <p className="mt-1 text-sm text-slate-500 dark:text-ink-400">
+          <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-ink-400">
             {subtitle}
           </p>
         )}
       </div>
-      {action}
+      {action && <div className="shrink-0">{action}</div>}
     </div>
   );
 }
@@ -175,7 +189,7 @@ export function Badge({
 }) {
   return (
     <span className={cn('badge', badgeTones[tone], className)}>
-      {Icon && <Icon className="h-3 w-3" />}
+      {Icon && <Icon className="h-3 w-3 shrink-0" aria-hidden="true" />}
       {children}
     </span>
   );
@@ -233,6 +247,12 @@ export function Avatar({
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
   const sizes = {
     xs: 'h-6 w-6 text-[10px]',
     sm: 'h-8 w-8 text-xs',
@@ -241,23 +261,32 @@ export function Avatar({
     xl: 'h-20 w-20 text-2xl',
   };
 
+  const label = name ? `${name} avatar` : 'Avatar';
+
   return (
     <div
+      role="img"
+      aria-label={label}
+      title={name || undefined}
       className={cn(
-        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-300',
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-brand-700 ring-1 ring-black/5 dark:bg-brand-950 dark:text-brand-300 dark:ring-white/10',
         sizes[size],
         className
       )}
     >
-      {src ? (
+      {src && !failed ? (
         <img
           src={src}
-          alt={name || 'Avatar'}
+          alt=""
+          aria-hidden="true"
           className="h-full w-full object-cover"
           loading="lazy"
+          onError={() => setFailed(true)}
         />
       ) : (
-        <span className="font-semibold">{(name || 'U')[0]?.toUpperCase()}</span>
+        <span className="font-semibold" aria-hidden="true">
+          {(name || 'U')[0]?.toUpperCase()}
+        </span>
       )}
     </div>
   );
@@ -268,12 +297,12 @@ export function Avatar({
 ========================================================= */
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('skeleton', className)} />;
+  return <div aria-hidden="true" className={cn('skeleton', className)} />;
 }
 
 export function SkeletonCard() {
   return (
-    <div className="card animate-pulse p-5">
+    <div className="card overflow-hidden p-5" aria-busy="true">
       <div className="flex items-center gap-3">
         <Skeleton className="h-10 w-10 rounded-full" />
         <div className="flex-1 space-y-2">
@@ -290,7 +319,7 @@ export function SkeletonCard() {
 
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" aria-busy="true">
       {Array.from({ length: rows }).map((_, i) => (
         <Skeleton key={i} className="h-12 w-full rounded-xl" />
       ))}
@@ -307,47 +336,75 @@ export function EmptyState({
   title,
   description,
   action,
+  className,
 }: {
   icon?: LucideIcon;
   title: string;
   description?: string;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 dark:border-ink-700 bg-white/60 dark:bg-ink-900/40 px-6 py-14 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
-        <Icon className="h-6 w-6" />
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-6 py-12 text-center shadow-xs dark:border-ink-700 dark:bg-ink-900/40 sm:px-10 sm:py-16',
+        className
+      )}
+    >
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-lavender text-brand-600 ring-1 ring-brand-100 dark:bg-brand-950 dark:text-brand-300 dark:ring-brand-900/60">
+        <Icon className="h-6 w-6" aria-hidden="true" />
       </div>
-      <h3 className="mt-4 text-sm font-semibold text-slate-900 dark:text-ink-50">
+      <h3 className="mt-5 text-base font-semibold text-slate-900 dark:text-ink-50">
         {title}
       </h3>
       {description && (
-        <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-ink-400">
+        <p className="mt-1.5 max-w-md text-sm leading-relaxed text-slate-500 dark:text-ink-400">
           {description}
         </p>
       )}
-      {action && <div className="mt-4">{action}</div>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
 
 export function ErrorState({
   message = 'Something went wrong.',
+  title,
   onRetry,
+  className,
 }: {
   message?: string;
+  title?: string;
   onRetry?: () => void;
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-danger-100 dark:border-danger-500/20 bg-danger-50/60 dark:bg-danger-500/5 px-6 py-12 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-danger-100 text-danger-600 dark:bg-danger-500/15 dark:text-danger-200">
-        <AlertCircle className="h-6 w-6" />
+    <div
+      role="alert"
+      className={cn(
+        'flex flex-col items-center justify-center rounded-2xl border border-danger-100 bg-danger-50/60 px-6 py-12 text-center shadow-xs dark:border-danger-500/20 dark:bg-danger-500/5 sm:px-10 sm:py-14',
+        className
+      )}
+    >
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-100 text-danger-600 ring-1 ring-danger-200/70 dark:bg-danger-500/15 dark:text-danger-200 dark:ring-danger-500/20">
+        <AlertCircle className="h-6 w-6" aria-hidden="true" />
       </div>
-      <p className="mt-4 max-w-sm text-sm font-medium text-danger-700 dark:text-danger-200">
+      {title && (
+        <h3 className="mt-4 text-base font-semibold text-danger-700 dark:text-danger-200">
+          {title}
+        </h3>
+      )}
+      <p className="mt-3 max-w-md text-sm font-medium leading-relaxed text-danger-700 dark:text-danger-200">
         {message}
       </p>
       {onRetry && (
-        <Button variant="outline" size="sm" className="mt-4" onClick={onRetry}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-5"
+          onClick={onRetry}
+          icon={RefreshCw}
+        >
           Try again
         </Button>
       )}
@@ -372,60 +429,128 @@ export function ResponsiveModal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
 
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+
+      if (e.key !== 'Tab') return;
+
+      const panel = panelRef.current;
+      if (!panel) return;
+
+      const focusable = Array.from(
+        panel.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => el.offsetParent !== null || el === panel);
+
+      if (focusable.length === 0) {
+        e.preventDefault();
+        panel.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
 
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
+
+    const prevOverflow = document.body.style.overflow;
+    const prevPaddingRight = document.body.style.paddingRight;
+    const scrollbarWidth =
+      window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = 'hidden';
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+
+    // Move focus into the dialog once it has mounted.
+    const focusTimer = window.setTimeout(() => panelRef.current?.focus(), 0);
 
     return () => {
+      window.clearTimeout(focusTimer);
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      document.body.style.paddingRight = prevPaddingRight;
+      previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
+        <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center sm:p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm dark:bg-ink-950/60"
+            aria-hidden="true"
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm dark:bg-ink-950/70"
           />
           <motion.div
+            ref={panelRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby={title ? titleId : undefined}
+            aria-label={title ? undefined : 'Dialog'}
+            tabIndex={-1}
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-            className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-xl dark:bg-ink-900 sm:rounded-2xl"
+            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+            className="safe-bottom relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-elevated outline-none dark:bg-ink-900 sm:max-h-[85vh] sm:rounded-2xl sm:pb-0"
           >
-            {title && (
-              <div className="flex items-center justify-between border-b border-slate-100 dark:border-ink-800 px-5 py-4">
-                <h3 className="text-base font-semibold text-slate-900 dark:text-ink-50">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 dark:border-ink-800">
+              {title ? (
+                <h3
+                  id={titleId}
+                  className="text-base font-semibold text-slate-900 dark:text-ink-50"
+                >
                   {title}
                 </h3>
-                <button
-                  onClick={onClose}
-                  aria-label="Close dialog"
-                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-ink-800 dark:hover:text-ink-300"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-            )}
-            <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
+              ) : (
+                <span className="sr-only">Dialog</span>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close dialog"
+                className="-mr-1.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-brand-600/60 dark:hover:bg-ink-800 dark:hover:text-ink-200"
+              >
+                <X className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
+              {children}
+            </div>
             {footer && (
-              <div className="border-t border-slate-100 dark:border-ink-800 px-5 py-4">
+              <div className="border-t border-slate-100 px-5 py-4 dark:border-ink-800">
                 {footer}
               </div>
             )}
@@ -457,20 +582,26 @@ export function SearchBar({
 }) {
   return (
     <form
+      role="search"
       onSubmit={(e) => {
         e.preventDefault();
         onSubmit?.();
       }}
       className={cn('relative', className)}
     >
-      <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <Icon
+        className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-ink-500"
+        aria-hidden="true"
+      />
       <input
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-50 dark:placeholder:text-ink-500"
+        enterKeyHint="search"
+        autoComplete="off"
+        className="search-input h-11 pr-4"
       />
     </form>
   );
@@ -565,9 +696,12 @@ export function MarketplaceProviderCard({
     <motion.div
       whileHover={{ y: -3 }}
       transition={{ duration: 0.2 }}
-      className={cn('card-hover group overflow-hidden', className)}
+      className={cn(
+        'card-hover group overflow-hidden focus-within:ring-2 focus-within:ring-brand-600/30',
+        className
+      )}
     >
-      <div className="relative h-36 overflow-hidden bg-lavender">
+      <div className="relative h-36 overflow-hidden bg-lavender dark:bg-ink-800">
         {cover ? (
           <img
             src={cover}
@@ -586,9 +720,9 @@ export function MarketplaceProviderCard({
             aria-label={saved ? 'Unsave provider' : 'Save provider'}
             aria-pressed={saved}
             className={cn(
-              'absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full backdrop-blur transition',
+              'absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full backdrop-blur transition focus-visible:ring-2 focus-visible:ring-white/80',
               saved
-                ? 'bg-white text-danger-500'
+                ? 'bg-white text-danger-500 shadow-sm'
                 : 'bg-slate-900/30 text-white hover:bg-white hover:text-danger-500'
             )}
           >
@@ -598,20 +732,35 @@ export function MarketplaceProviderCard({
               stroke="currentColor"
               strokeWidth="2"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
             </svg>
           </button>
         )}
 
-        <div className="absolute bottom-3 left-3 flex items-center gap-2.5">
-          <Avatar src={providerAvatar(provider)} name={providerName(provider)} size="sm" className="border-2 border-white" />
+        <div className="absolute inset-x-3 bottom-3 flex items-center gap-2.5">
+          <Avatar
+            src={providerAvatar(provider)}
+            name={providerName(provider)}
+            size="sm"
+            className="ring-2 ring-white"
+          />
           <div className="min-w-0 text-white">
             <div className="flex items-center gap-1.5">
               <p className="truncate text-sm font-semibold">{providerName(provider)}</p>
               {provider.verified && (
-                <span className="shrink-0 rounded-full bg-white/20 p-0.5 backdrop-blur">
-                  <svg className="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <span
+                  className="shrink-0 rounded-full bg-white/20 p-0.5 backdrop-blur"
+                  role="img"
+                  aria-label="Verified provider"
+                >
+                  <svg
+                    className="h-3 w-3 text-white"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
                     <path d="M12 2l2.4 2.4 3.4-.6.6 3.4L20.8 9.6 18.4 12l2.4 2.4-3.4.6-.6 3.4L12 16l-2.4 2.4-3.4-.6-.6-3.4L3.2 11.6 5.6 9.2 3.2 6.8l3.4-.6.6-3.4L12 2z" />
                   </svg>
                 </span>
@@ -638,7 +787,7 @@ export function MarketplaceProviderCard({
             )}
           </div>
           {provider.location && (
-            <span className="truncate pl-2 text-xs text-slate-400">
+            <span className="min-w-0 max-w-[45%] truncate pl-2 text-xs text-slate-400">
               {provider.location}
             </span>
           )}
@@ -668,12 +817,16 @@ export function MarketplaceProviderCard({
         <div className="mt-4 flex gap-2">
           <Link
             to={`/providers/${id}`}
-            className="btn-outline btn-sm flex-1"
+            className="btn-outline btn-sm flex flex-1 items-center justify-center whitespace-nowrap"
           >
             View Profile
           </Link>
           {onBook && (
-            <Button size="sm" className="flex-1" onClick={() => onBook(id)}>
+            <Button
+              size="sm"
+              className="flex-1 whitespace-nowrap"
+              onClick={() => onBook(id)}
+            >
               Book Now
             </Button>
           )}
@@ -703,9 +856,12 @@ export function ServiceCard({
     <motion.div
       whileHover={{ y: -3 }}
       transition={{ duration: 0.2 }}
-      className={cn('card-hover group overflow-hidden', className)}
+      className={cn(
+        'card-hover group overflow-hidden focus-within:ring-2 focus-within:ring-brand-600/30',
+        className
+      )}
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-lavender">
+      <div className="relative aspect-[16/10] overflow-hidden bg-lavender dark:bg-ink-800">
         {service.image ? (
           <img
             src={service.image}
@@ -717,7 +873,7 @@ export function ServiceCard({
           <div className="h-full w-full bg-gradient-to-br from-brand-100 to-brand-200 dark:from-brand-950 dark:to-brand-900" />
         )}
         {service.category && (
-          <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-brand-700 backdrop-blur dark:bg-ink-900/90 dark:text-brand-300">
+          <span className="absolute left-3 top-3 max-w-[calc(100%_-_1.5rem)] truncate rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-brand-700 shadow-xs backdrop-blur dark:bg-ink-900/90 dark:text-brand-300">
             {service.category}
           </span>
         )}
@@ -729,15 +885,15 @@ export function ServiceCard({
         </h3>
 
         {provider && (
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-ink-400">
+          <div className="mt-1.5 flex min-w-0 items-center gap-1.5 text-xs text-slate-500 dark:text-ink-400">
             <Avatar
               src={providerAvatar(provider)}
               name={providerName(provider)}
               size="xs"
             />
-            {providerName(provider)}
+            <span className="truncate">{providerName(provider)}</span>
             {provider.verified && <VerifiedBadge />}
-          </p>
+          </div>
         )}
 
         {service.description && (
@@ -759,7 +915,7 @@ export function ServiceCard({
               <span className="text-xs font-medium text-slate-400">Price on request</span>
             )}
           </span>
-          {action}
+          {action && <div className="ml-3 shrink-0">{action}</div>}
         </div>
       </div>
     </motion.div>
@@ -797,28 +953,33 @@ export function ReviewCard({
   }
 
   return (
-    <div className="card p-5">
+    <div className="card h-full p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Avatar src={avatar} name={reviewerName || 'Guest'} size="md" />
-          <div>
-            <p className="text-sm font-semibold text-slate-900 dark:text-ink-50">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
               {reviewerName || 'Guest'}
             </p>
             {formattedDate && (
-              <p className="text-xs text-slate-400">{formattedDate}</p>
+              <p className="text-xs tabular-nums text-slate-400">
+                {formattedDate}
+              </p>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 rounded-full bg-warning-50 px-2 py-0.5 dark:bg-warning-600/15">
-          <Star className="h-3 w-3 fill-warning-500 text-warning-500" />
-          <span className="text-xs font-semibold text-warning-700 dark:text-warning-200">
+        <div className="flex shrink-0 items-center gap-1 rounded-full bg-warning-50 px-2 py-0.5 dark:bg-warning-600/15">
+          <Star
+            className="h-3 w-3 fill-warning-500 text-warning-500"
+            aria-hidden="true"
+          />
+          <span className="text-xs font-semibold tabular-nums text-warning-700 dark:text-warning-200">
             {Number(rating || 0).toFixed(1)}
           </span>
         </div>
       </div>
       {comment && (
-        <p className="mt-3 text-sm leading-relaxed text-slate-600 dark:text-ink-300">
+        <p className="mt-3 whitespace-pre-line break-words text-sm leading-relaxed text-slate-600 dark:text-ink-300">
           {comment}
         </p>
       )}
@@ -848,7 +1009,10 @@ export class RenderErrorBoundary extends Component<
     if (this.state.error) {
       return (
         this.props.fallback || (
-          <div className="rounded-xl border border-danger-100 bg-danger-50 p-4 text-xs text-danger-700 dark:border-danger-500/20 dark:bg-danger-500/5 dark:text-danger-200">
+          <div
+            role="alert"
+            className="rounded-xl border border-danger-100 bg-danger-50 p-4 text-xs text-danger-700 dark:border-danger-500/20 dark:bg-danger-500/5 dark:text-danger-200"
+          >
             This section failed to render. Please refresh the page.
           </div>
         )

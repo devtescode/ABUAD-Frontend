@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { useMemo, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -45,24 +39,20 @@ import {
 import { useAuth } from "@/context/AppContext";
 import { formatNaira } from "@/data/mockData";
 import { providerNavItems } from "@/data/providerNavItems";
-
-
-
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000";
+import {
+  useMyServices,
+  useProviderBookings,
+  useProviderDetails,
+} from "@/hooks/queries";
+import { getApiErrorMessage, hasUserToken } from "@/lib/api";
 
 /*
- * Backend endpoints used by this dashboard:
+ * Backend endpoints used by this dashboard (all via React Query hooks):
  *
  *   GET /provider/eachprofiledetails/:userId  → provider profile
  *   GET /provider/services                    → provider's services
  *   GET /bookings/provider-bookings           → provider's bookings
  */
-const PROFILE_ENDPOINT = "/provider/eachprofiledetails";
-const SERVICES_ENDPOINT = "/provider/services";
-const BOOKINGS_ENDPOINT = "/bookings/provider-bookings";
 const REFRESH_INTERVAL = 30_000;
 
 /* How many items each section shows before "+X more" */
@@ -124,6 +114,10 @@ interface Provider {
   email?: string;
   avatar?: string;
   profileImage?: string;
+  about?: string;
+  bio?: string;
+  location?: string;
+  phoneNumber?: string;
   verified?: boolean;
   status?: string;
   rating?: number;
@@ -303,201 +297,158 @@ export function ProvidersDashboard() {
     authUser?._id || authUser?.id || ""
   );
 
+  const hasSession = hasUserToken();
 
+  /*
+   * Three independent queries keep failing sections isolated: a slow
+   * or broken profile endpoint no longer blanks out bookings/services.
+   * Polling + focus refetch replace the old manual interval effect.
+   */
+  const profileQuery = useProviderDetails(userId, {
+    enabled: hasSession && Boolean(userId),
+    refetchInterval: REFRESH_INTERVAL,
+    refetchOnWindowFocus: true,
+  });
 
-  const [provider, setProvider] = useState<Provider | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const servicesQuery = useMyServices({
+    refetchInterval: REFRESH_INTERVAL,
+    refetchOnWindowFocus: true,
+  });
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const bookingsQuery = useProviderBookings({
+    refetchInterval: REFRESH_INTERVAL,
+    refetchOnWindowFocus: true,
+  });
 
-  const loadDashboard = useCallback(
-    async (manualRefresh = false) => {
-      const token = sessionStorage.getItem("servicely_token");
+  /* Flatten the loose backend envelopes into the shapes used below. */
+  const provider = useMemo<Provider | null>(() => {
+    const payload =
+      profileQuery.data as unknown as AnyObject | undefined;
 
-      if (!token) {
-        setError("Please log in again to view your dashboard.");
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    if (!payload || payload.success === false) return null;
 
-      if (!userId) {
-        setError(
-          "Your account ID is missing. Please log in again."
-        );
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+    const value =
+      payload.provider ??
+      payload.data?.provider ??
+      payload.data ??
+      payload;
 
-      if (manualRefresh) setRefreshing(true);
+    if (!value || payload.provider === null) return null;
 
-      try {
-        const headers = {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        };
+    return value as Provider;
+  }, [profileQuery.data]);
 
-        const [
-          profileResponse,
-          servicesResponse,
-          bookingsResponse,
-        ] = await Promise.all([
-          fetch(
-            `${API_URL}${PROFILE_ENDPOINT}/${encodeURIComponent(
-              userId
-            )}`,
-            { headers }
-          ),
-          fetch(`${API_URL}${SERVICES_ENDPOINT}`, {
-            headers,
-          }),
-          fetch(`${API_URL}${BOOKINGS_ENDPOINT}`, {
-            headers,
-          }),
-        ]);
+  const services = useMemo<Service[]>(() => {
+    const payload = servicesQuery.data as unknown;
 
-        const [
-          profileResult,
-          servicesResult,
-          bookingsResult,
-        ] = await Promise.all([
-          profileResponse.json(),
-          servicesResponse.json(),
-          bookingsResponse.json(),
-        ]);
+    if (Array.isArray(payload)) return payload as Service[];
 
-        /* PROFILE */
-        if (!profileResponse.ok) {
-          throw new Error(
-            profileResult?.message ||
-            "Unable to load your provider profile."
-          );
-        }
+    const record = payload as AnyObject | undefined;
 
-        const profile: Provider | null =
-          profileResult?.provider ??
-          profileResult?.data?.provider ??
-          profileResult?.data ??
-          profileResult;
+    if (Array.isArray(record?.services)) {
+      return record.services as Service[];
+    }
 
-        if (
-          !profile ||
-          profileResult?.success === false ||
-          profileResult?.provider === null
-        ) {
-          throw new Error(
-            profileResult?.message ||
-            "Your provider profile was not found."
-          );
-        }
+    if (Array.isArray(record?.data?.services)) {
+      return record.data.services as Service[];
+    }
 
-        /* SERVICES */
-        if (!servicesResponse.ok) {
-          throw new Error(
-            servicesResult?.message ||
-            "Unable to load your services."
-          );
-        }
+    if (Array.isArray(record?.data)) {
+      return record.data as Service[];
+    }
 
-        const serviceList: Service[] = Array.isArray(
-          servicesResult?.services
-        )
-          ? servicesResult.services
-          : Array.isArray(servicesResult?.data?.services)
-            ? servicesResult.data.services
-            : Array.isArray(servicesResult?.data)
-              ? servicesResult.data
-              : Array.isArray(servicesResult)
-                ? servicesResult
-                : [];
+    return [];
+  }, [servicesQuery.data]);
 
-        if (servicesResult?.success === false) {
-          throw new Error(
-            servicesResult?.message ||
-            "Unable to load your services."
-          );
-        }
+  const bookings = useMemo<Booking[]>(() => {
+    const payload = bookingsQuery.data as unknown;
 
-        /* BOOKINGS */
-        if (!bookingsResponse.ok) {
-          throw new Error(
-            bookingsResult?.message ||
-            "Unable to load your bookings."
-          );
-        }
+    if (Array.isArray(payload)) return payload as Booking[];
 
-        const bookingList: Booking[] =
-          Array.isArray(bookingsResult?.bookings)
-            ? bookingsResult.bookings
-            : Array.isArray(bookingsResult?.data?.bookings)
-              ? bookingsResult.data.bookings
-              : Array.isArray(bookingsResult?.data)
-                ? bookingsResult.data
-                : Array.isArray(bookingsResult)
-                  ? bookingsResult
-                  : [];
+    const record = payload as AnyObject | undefined;
 
-        if (bookingsResult?.success === false) {
-          throw new Error(
-            bookingsResult?.message ||
-            "Unable to load bookings."
-          );
-        }
+    if (Array.isArray(record?.bookings)) {
+      return record.bookings as Booking[];
+    }
 
-        setProvider(profile);
-        setServices(serviceList);
-        setBookings(bookingList);
-        setLastUpdated(new Date());
-        setError("");
-      } catch (err) {
-        console.error("Provider dashboard:", err);
+    if (Array.isArray(record?.data?.bookings)) {
+      return record.data.bookings as Booking[];
+    }
 
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Something went wrong while loading your dashboard."
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [userId]
-  );
+    if (Array.isArray(record?.data)) {
+      return record.data as Booking[];
+    }
 
-  useEffect(() => {
-    void loadDashboard();
+    return [];
+  }, [bookingsQuery.data]);
 
-    const interval = window.setInterval(() => {
-      if (document.visibilityState === "visible") {
-        void loadDashboard();
-      }
-    }, REFRESH_INTERVAL);
+  /* ---------- combined query state (drives header + banner) ---------- */
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void loadDashboard();
-      }
-    };
+  const sessionError = !hasSession
+    ? "Please log in again to view your dashboard."
+    : !userId
+      ? "Your account ID is missing. Please log in again."
+      : "";
 
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange
+  const profileError = profileQuery.isError
+    ? getApiErrorMessage(profileQuery.error)
+    : !profileQuery.isLoading &&
+      !provider &&
+      !sessionError
+      ? "Your provider profile was not found."
+      : "";
+
+  const servicesError = servicesQuery.isError
+    ? getApiErrorMessage(servicesQuery.error)
+    : "";
+
+  const bookingsError = bookingsQuery.isError
+    ? getApiErrorMessage(bookingsQuery.error)
+    : "";
+
+  const error =
+    sessionError ||
+    profileError ||
+    servicesError ||
+    bookingsError;
+
+  const isError = Boolean(error);
+
+  /* Only block the page on a genuinely empty first load. */
+  const isLoading =
+    Boolean(userId) &&
+    (profileQuery.isLoading ||
+      servicesQuery.isLoading ||
+      bookingsQuery.isLoading);
+
+  const isFetching =
+    profileQuery.isFetching ||
+    servicesQuery.isFetching ||
+    bookingsQuery.isFetching;
+
+  const isRefreshing = isFetching && !isLoading;
+
+  const lastUpdated = useMemo(() => {
+    const newest = Math.max(
+      profileQuery.dataUpdatedAt || 0,
+      servicesQuery.dataUpdatedAt || 0,
+      bookingsQuery.dataUpdatedAt || 0
     );
 
-    return () => {
-      window.clearInterval(interval);
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange
-      );
-    };
-  }, [loadDashboard]);
+    return newest > 0 ? new Date(newest) : null;
+  }, [
+    profileQuery.dataUpdatedAt,
+    servicesQuery.dataUpdatedAt,
+    bookingsQuery.dataUpdatedAt,
+  ]);
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      profileQuery.refetch(),
+      servicesQuery.refetch(),
+      bookingsQuery.refetch(),
+    ]);
+  };
 
   /* =========================================================
      DERIVED DATA — everything below is computed from the
@@ -641,6 +592,28 @@ export function ProvidersDashboard() {
     provider?.verified === true ||
     provider?.status === "verified";
 
+  /* Profile completeness — every signal comes from live data. */
+  const profileCompletion = useMemo(() => {
+    const checks = [
+      Boolean(provider?.name || provider?.fullName || authUser?.name),
+      Boolean(profileImage),
+      Boolean(provider?.about || provider?.bio),
+      Boolean(provider?.location),
+      verified,
+      activeServices.length > 0,
+    ];
+
+    const completed = checks.filter(Boolean).length;
+
+    return Math.round((completed / checks.length) * 100);
+  }, [
+    provider,
+    authUser?.name,
+    profileImage,
+    verified,
+    activeServices.length,
+  ]);
+
   const hour = new Date().getHours();
   const greeting =
     hour < 12
@@ -650,7 +623,7 @@ export function ProvidersDashboard() {
         : "Good evening";
 
   /* Loading screen */
-  if (loading) {
+  if (isLoading) {
     return (
       <DashboardLayout role="provider" navItems={providerNavItems}>
         <div
@@ -658,9 +631,9 @@ export function ProvidersDashboard() {
           aria-busy="true"
           aria-label="Loading your dashboard"
         >
-          <Skeleton className="h-48 w-full rounded-3xl sm:h-52" />
+          <Skeleton className="h-52 w-full rounded-3xl sm:h-56" />
 
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {[1, 2, 3, 4].map((item) => (
               <Skeleton
                 key={item}
@@ -669,11 +642,20 @@ export function ProvidersDashboard() {
             ))}
           </div>
 
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            {[1, 2, 3, 4].map((item) => (
+              <Skeleton
+                key={`action-${item}`}
+                className="h-[4.5rem] rounded-2xl"
+              />
+            ))}
+          </div>
+
           <Skeleton className="h-72 rounded-2xl" />
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
             <Skeleton className="h-80 rounded-2xl xl:col-span-2" />
-            <Skeleton className="h-80 rounded-2xl" />
+            <Skeleton className="h-96 rounded-2xl xl:h-80" />
           </div>
         </div>
       </DashboardLayout>
@@ -708,14 +690,14 @@ export function ProvidersDashboard() {
           <div className="absolute -left-8 top-10 hidden h-28 w-28 rounded-full border border-white/10 md:block" />
         </div>
 
-        <div className="relative flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex min-w-0 items-start gap-4">
+        <div className="relative flex flex-col gap-6 p-5 sm:p-7 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-1 items-start gap-4">
             <Link
               to="/provider/profile"
               aria-label="Open your provider profile"
-              className="relative shrink-0"
+              className="group relative shrink-0 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-700"
             >
-              <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/15 ring-2 ring-white/30 sm:h-16 sm:w-16">
+              <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white/15 ring-2 ring-white/30 transition group-hover:ring-white/50 sm:h-16 sm:w-16">
                 {profileImage ? (
                   <img
                     src={profileImage}
@@ -737,7 +719,7 @@ export function ProvidersDashboard() {
               )}
             </Link>
 
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-white/90 backdrop-blur">
                   Provider Dashboard
@@ -765,7 +747,7 @@ export function ProvidersDashboard() {
                 open, and watch the work come to you.
               </p>
 
-              <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-white/70">
                 <span className="inline-flex items-center gap-1.5">
                   <span className="relative flex h-2 w-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
@@ -774,30 +756,63 @@ export function ProvidersDashboard() {
                   Live
                 </span>
 
-                {lastUpdated && (
-                  <span>
-                    Updated{" "}
-                    {lastUpdated.toLocaleTimeString("en-NG", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                {isFetching ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    Syncing…
                   </span>
+                ) : (
+                  lastUpdated && (
+                    <span>
+                      Updated{" "}
+                      {lastUpdated.toLocaleTimeString("en-NG", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  )
                 )}
 
+                <span>
+                  {activeServices.length} service
+                  {activeServices.length === 1 ? "" : "s"} published
+                </span>
+
                 <span className="hidden sm:inline">
-                  · {activeServices.length} service
-                  {activeServices.length === 1 ? "" : "s"}{" "}
-                  published · {bookings.length} booking
+                  · {bookings.length} booking
                   {bookings.length === 1 ? "" : "s"}
                 </span>
-              </p>
+              </div>
+
+              {/* Profile completion — derived from live profile data */}
+              <div className="mt-3 max-w-xs">
+                <div className="flex items-center justify-between text-[11px] font-medium text-white/70">
+                  <span>Profile completion</span>
+                  <span className="tabular-nums text-white/90">
+                    {profileCompletion}%
+                  </span>
+                </div>
+                <div
+                  className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/20"
+                  role="progressbar"
+                  aria-valuenow={profileCompletion}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Profile completion"
+                >
+                  <div
+                    className="h-full rounded-full bg-white transition-[width] duration-500"
+                    style={{ width: `${profileCompletion}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap gap-2.5">
+          <div className="grid w-full shrink-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:gap-2.5 lg:justify-end">
             <Link
               to="/provider/profile"
-              className="btn bg-white px-4 py-2.5 text-sm text-brand-700 shadow-sm hover:bg-brand-50"
+              className="btn min-h-11 justify-center bg-white px-4 py-2.5 text-sm text-brand-700 shadow-sm hover:bg-brand-50"
             >
               View Public Profile
               <ArrowRight className="h-4 w-4" />
@@ -805,7 +820,7 @@ export function ProvidersDashboard() {
 
             <Link
               to="/provider/add-service"
-              className="btn border border-white/30 bg-white/10 px-4 py-2.5 text-sm text-white backdrop-blur hover:bg-white/20"
+              className="btn min-h-11 justify-center border border-white/30 bg-white/10 px-4 py-2.5 text-sm text-white backdrop-blur hover:bg-white/20"
             >
               <Plus className="h-4 w-4" />
               Add Service
@@ -813,15 +828,16 @@ export function ProvidersDashboard() {
 
             <button
               type="button"
-              onClick={() => void loadDashboard(true)}
-              disabled={refreshing}
+              onClick={() => void handleRefresh()}
+              disabled={isFetching}
               aria-label="Refresh dashboard data"
-              className="btn border border-white/20 px-3.5 py-2.5 text-sm text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              aria-busy={isRefreshing}
+              className="btn col-span-2 min-h-11 justify-center border border-white/20 px-3.5 py-2.5 text-sm text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
             >
               <RefreshCw
                 className={cn(
                   "h-4 w-4",
-                  refreshing && "animate-spin"
+                  isRefreshing && "animate-spin"
                 )}
               />
               Refresh
@@ -831,22 +847,22 @@ export function ProvidersDashboard() {
       </motion.section>
 
       {/* ============================ ERROR BANNER ============================ */}
-      {error && (
+      {isError && (
         <div
           role="alert"
           className="mt-6 flex flex-col gap-3 rounded-2xl border border-danger-200 bg-danger-50 p-4 text-sm text-danger-700 sm:flex-row sm:items-center sm:justify-between dark:border-danger-500/25 dark:bg-danger-500/10 dark:text-danger-200"
         >
-          <p>{error}</p>
+          <p className="min-w-0">{error}</p>
           <button
             type="button"
-            onClick={() => void loadDashboard(true)}
-            disabled={refreshing}
-            className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-danger-200 bg-white px-3 py-1.5 text-xs font-semibold text-danger-700 transition hover:bg-danger-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-danger-500/30 dark:bg-transparent dark:text-danger-200 dark:hover:bg-danger-500/15"
+            onClick={() => void handleRefresh()}
+            disabled={isFetching}
+            className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-danger-200 bg-white px-3 py-1.5 text-xs font-semibold text-danger-700 transition hover:bg-danger-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-danger-500/30 dark:bg-transparent dark:text-danger-200 dark:hover:bg-danger-500/15"
           >
             <RefreshCw
               className={cn(
                 "h-3.5 w-3.5",
-                refreshing && "animate-spin"
+                isRefreshing && "animate-spin"
               )}
             />
             Try again
@@ -855,7 +871,11 @@ export function ProvidersDashboard() {
       )}
 
       {/* ============================ STATS ============================ */}
-      <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div
+        className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
+        role="group"
+        aria-label="Key performance indicators"
+      >
         <StatCard
           label="Total Bookings"
           value={bookings.length.toLocaleString("en-NG")}
@@ -895,6 +915,61 @@ export function ProvidersDashboard() {
         />
       </div>
 
+      {/* ============================ QUICK ACTIONS ============================ */}
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.03 }}
+        aria-labelledby="quick-actions-heading"
+        className="mt-6"
+      >
+        <div className="mb-3 flex items-end justify-between gap-3">
+          <h2
+            id="quick-actions-heading"
+            className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-ink-400"
+          >
+            Quick actions
+          </h2>
+          <span className="hidden text-xs text-slate-400 sm:inline dark:text-ink-500">
+            {profileCompletion}% profile complete
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <QuickAction
+            to="/provider/requests"
+            icon={Inbox}
+            label="Requests"
+            hint={`${pendingBookings.length} pending`}
+            tone="warning"
+          />
+
+          <QuickAction
+            to="/provider/bookings"
+            icon={Calendar}
+            label="Bookings"
+            hint={`${bookings.length} total`}
+            tone="brand"
+          />
+
+          <QuickAction
+            to="/provider/services"
+            icon={Store}
+            label="Services"
+            hint={`${activeServices.length} active`}
+            tone="success"
+          />
+
+          <QuickAction
+            to="/provider/add-service"
+            icon={Plus}
+            label="Add service"
+            hint="Grow your catalog"
+            tone="rose"
+          />
+        </div>
+      </motion.section>
+
       {/* ============================ EARNINGS OVERVIEW ============================ */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}
@@ -933,10 +1008,10 @@ export function ProvidersDashboard() {
         </div>
 
         <div className="p-5 sm:p-6">
-          {error ? (
+          {bookingsError && earningsEntries.length === 0 ? (
             <ErrorState
-              message={error}
-              onRetry={() => void loadDashboard(true)}
+              message={bookingsError}
+              onRetry={() => void handleRefresh()}
             />
           ) : earningsEntries.length === 0 ? (
             <EmptyState
@@ -985,10 +1060,10 @@ export function ProvidersDashboard() {
             Recent booking requests
           </div>
 
-          {error && bookings.length === 0 ? (
+          {bookingsError && previewBookings.length === 0 ? (
             <ErrorState
-              message={error}
-              onRetry={() => void loadDashboard(true)}
+              message={bookingsError}
+              onRetry={() => void handleRefresh()}
             />
           ) : previewBookings.length === 0 ? (
             <EmptyState
@@ -1065,10 +1140,10 @@ export function ProvidersDashboard() {
             Your services
           </div>
 
-          {error && services.length === 0 ? (
+          {servicesError && services.length === 0 ? (
             <ErrorState
-              message={error}
-              onRetry={() => void loadDashboard(true)}
+              message={servicesError}
+              onRetry={() => void handleRefresh()}
             />
           ) : previewServices.length === 0 ? (
             <EmptyState
@@ -1145,7 +1220,7 @@ function PanelHeading({
   tone?: "brand" | "success";
 }) {
   return (
-    <div className="mb-4 flex items-end justify-between gap-3">
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 items-start gap-2.5">
         <span
           className={cn(
@@ -1172,6 +1247,62 @@ function PanelHeading({
 
       {action}
     </div>
+  );
+}
+
+
+/* =========================================================
+   QUICK ACTION CARD — routes only, no extra business logic.
+======================================================== */
+
+const quickActionTones = {
+  brand:
+    "bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300",
+  success:
+    "bg-success-50 text-success-600 dark:bg-success-600/15 dark:text-success-200",
+  warning:
+    "bg-warning-50 text-warning-600 dark:bg-warning-600/15 dark:text-warning-200",
+  rose: "bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300",
+};
+
+function QuickAction({
+  to,
+  icon: Icon,
+  label,
+  hint,
+  tone,
+}: {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  hint: string;
+  tone: keyof typeof quickActionTones;
+}) {
+  return (
+    <Link
+      to={to}
+      className="card-hover group flex min-h-[4.5rem] items-center gap-3 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent sm:p-5 dark:focus-visible:ring-brand-400"
+    >
+      <span
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105",
+          quickActionTones[tone]
+        )}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
+          {label}
+        </span>
+        <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-ink-400">
+          {hint}
+        </span>
+      </span>
+
+      <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-brand-500 dark:text-ink-600 dark:group-hover:text-brand-300" />
+    </Link>
   );
 }
 

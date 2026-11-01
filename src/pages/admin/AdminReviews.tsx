@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   Ban,
+  CheckCircle2,
   Eye,
   EyeOff,
   Loader2,
@@ -10,17 +12,32 @@ import {
   Search,
   Star,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { DashboardLayout, DashboardHeader } from "@/components/DashboardLayout";
 import { adminNavItems } from "@/data/adminNavItems";
 import { StarRating } from "@/components/shared";
+import {
+  Avatar,
+  Badge,
+  Button,
+  EmptyState,
+  ErrorState,
+  ResponsiveModal,
+  Skeleton,
+  cn,
+} from "@/components/ui";
+import { getApiErrorMessage } from "@/lib/api";
+import {
+  useAdminReviewVisibility,
+  useAdminReviews,
+} from "@/hooks/queries";
 
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000";
+/* =========================================================
+   TYPES
+========================================================= */
 
 interface Customer {
   _id?: string;
@@ -67,18 +84,18 @@ interface Review {
   updatedAt?: string;
 }
 
-interface ReviewsResponse {
-  success: boolean;
-  count?: number;
-  reviews?: Review[];
-  message?: string;
+type VisibilityFilter = "all" | "visible" | "hidden";
+type RatingFilter = "all" | "5" | "4" | "3" | "low";
+type SortOption = "newest" | "oldest" | "highest" | "lowest";
+
+interface Toast {
+  type: "success" | "error";
+  message: string;
 }
 
-interface ToggleHideResponse {
-  success: boolean;
-  message?: string;
-  review?: Review;
-}
+/* =========================================================
+   HELPERS
+========================================================= */
 
 const formatDate = (date?: string) => {
   if (!date) return "Unknown date";
@@ -118,36 +135,18 @@ const getProviderName = (provider?: Provider) => {
  * Extract a phone number from a customer or provider.
  * Handles multiple possible backend field names.
  */
-const getPersonPhone = (
-  person?: Customer | Provider
-) => {
-  return (
-    person?.phone ||
-    person?.phoneNumber ||
-    ""
-  );
+const getPersonPhone = (person?: Customer | Provider) => {
+  return person?.phone || person?.phoneNumber || "";
 };
 
-const getInitial = (name?: string) => {
-  if (!name) return "?";
-
-  return name.trim().charAt(0).toUpperCase();
-};
-
-const getImage = (
-  person?: Customer | Provider
-) => {
-  return (
-    person?.avatar ||
-    person?.profileImage ||
-    ""
-  );
+const getImage = (person?: Customer | Provider) => {
+  return person?.avatar || person?.profileImage || "";
 };
 
 /*
  * Helper: determine whether a review is currently hidden.
  * Handles multiple possible backend field names so this
- * works regardless of how your backend names it.
+ * works regardless of how the backend names it.
  */
 const isReviewHidden = (review: Review) => {
   if (typeof review.isHidden === "boolean") {
@@ -165,118 +164,75 @@ const isReviewHidden = (review: Review) => {
   return false;
 };
 
+const getReviewTime = (review: Review) => {
+  if (!review.createdAt) return 0;
+
+  const time = new Date(review.createdAt).getTime();
+
+  return Number.isNaN(time) ? 0 : time;
+};
+
+/* =========================================================
+   PAGE
+========================================================= */
+
 export function AdminReviews() {
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
-  const [selectedReview, setSelectedReview] =
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useAdminReviews();
+
+  const {
+    mutateAsync: toggleVisibility,
+    isPending: isVisibilityPending,
+    variables: visibilityVariables,
+  } = useAdminReviewVisibility();
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [visibilityFilter, setVisibilityFilter] =
+    useState<VisibilityFilter>("all");
+  const [ratingFilter, setRatingFilter] =
+    useState<RatingFilter>("all");
+  const [sortOption, setSortOption] =
+    useState<SortOption>("newest");
+
+  const [selectedReviewId, setSelectedReviewId] = useState<
+    string | null
+  >(null);
+  const [confirmTarget, setConfirmTarget] =
     useState<Review | null>(null);
-
-  const [searchQuery, setSearchQuery] =
-    useState("");
+  const [toast, setToast] = useState<Toast | null>(null);
 
   /*
-   * Tracks which review ids are currently being toggled.
-   * Used to disable the button and show a spinner only on
-   * the specific review being updated.
+   * Reviews come straight from React Query. Hidden-review
+   * normalisation is handled by `isReviewHidden` so the UI keeps
+   * supporting every backend field name.
    */
-  const [togglingIds, setTogglingIds] = useState<
-    Set<string>
-  >(new Set());
-
-  /*
-   * Toast-style feedback for hide/unhide results.
-   */
-  const [toast, setToast] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  const fetchReviews = useCallback(
-    async (isRefresh = false) => {
-      try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-
-        setError("");
-
-        const token = sessionStorage.getItem(
-          "servicely_admin_token"
-        );
-
-        if (!token) {
-          throw new Error(
-            "Admin session expired. Please log in again."
-          );
-        }
-
-        const response = await fetch(
-          `${API_URL}/adminreviews/allreviews`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        const data: ReviewsResponse =
-          await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "Unable to load reviews."
-          );
-        }
-
-        if (!data.success) {
-          throw new Error(
-            data.message ||
-              "Unable to load reviews."
-          );
-        }
-
-        setReviews(
-          Array.isArray(data.reviews)
-            ? data.reviews
-            : []
-        );
-      } catch (err) {
-        console.error(
-          "FETCH ADMIN REVIEWS ERROR:",
-          err
-        );
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load reviews."
-        );
-
-        if (!isRefresh) {
-          setReviews([]);
-        }
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    []
+  const reviews = useMemo<Review[]>(
+    () =>
+      Array.isArray(data)
+        ? (data as unknown as Review[])
+        : [],
+    [data]
   );
 
-  useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
-
   /*
-   * Auto-dismiss toast after 3 seconds.
+   * The details dialog derives its review from the query data so it
+   * stays in sync after a hide/unhide mutation invalidates the list.
    */
+  const selectedReview = useMemo(
+    () =>
+      reviews.find(
+        (review) => review._id === selectedReviewId
+      ) || null,
+    [reviews, selectedReviewId]
+  );
+
+  /* Auto-dismiss toast after 3 seconds. */
   useEffect(() => {
     if (!toast) return;
 
@@ -287,204 +243,71 @@ export function AdminReviews() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  const handleRefresh = () => {
-    fetchReviews(true);
-  };
+  /* =======================================================
+     SEARCH / FILTER / SORT
+  ======================================================= */
 
-  /* =========================================================
-     TOGGLE HIDE / UNHIDE
-     
-     Sends a PATCH request to the backend to hide or unhide
-     the given review.
-
-     Backend endpoint used:
-       PATCH /adminreviews/:id/hide
-       PATCH /adminreviews/:id/unhide
-
-     If your backend uses a single endpoint like
-     /adminreviews/:id/visibility with a body { hidden: true },
-     swap the two fetch calls below for one.
-  ========================================================= */
-  const handleToggleHide = async (review: Review) => {
-    if (!review?._id) return;
-
-    const currentlyHidden = isReviewHidden(review);
-    const reviewId = review._id;
-
-    // Guard: skip if already toggling this review
-    if (togglingIds.has(reviewId)) return;
-
-    // Mark as toggling
-    setTogglingIds((prev) => {
-      const next = new Set(prev);
-      next.add(reviewId);
-      return next;
-    });
-
-    try {
-      const token = sessionStorage.getItem(
-        "servicely_admin_token"
-      );
-
-      if (!token) {
-        throw new Error(
-          "Admin session expired. Please log in again."
-        );
-      }
-
-      const endpoint = currentlyHidden
-        ? `${API_URL}/adminreviews/${encodeURIComponent(
-            reviewId
-          )}/unhide`
-        : `${API_URL}/adminreviews/${encodeURIComponent(
-            reviewId
-          )}/hide`;
-
-      const response = await fetch(endpoint, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      let data: ToggleHideResponse;
-
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error(
-          "The server returned an invalid response."
-        );
-      }
-
-      if (!response.ok || data.success === false) {
-        throw new Error(
-          data.message ||
-            (currentlyHidden
-              ? "Unable to unhide review."
-              : "Unable to hide review.")
-        );
-      }
-
-      /*
-       * Update local state so the UI reflects the new state
-       * without needing a full refetch.
-       *
-       * We prefer the review object returned by the backend
-       * (data.review) if present, otherwise we patch locally.
-       */
-      const updatedReview: Review = data.review
-        ? data.review
-        : {
-            ...review,
-            isHidden: !currentlyHidden,
-            hidden: !currentlyHidden,
-          };
-
-      setReviews((prev) =>
-        prev.map((item) =>
-          item._id === reviewId
-            ? { ...item, ...updatedReview }
-            : item
-        )
-      );
-
-      // Keep the modal in sync if it's open on this review
-      setSelectedReview((prev) =>
-        prev && prev._id === reviewId
-          ? { ...prev, ...updatedReview }
-          : prev
-      );
-
-      setToast({
-        type: "success",
-        message: currentlyHidden
-          ? "Review is now visible to customers."
-          : "Review has been hidden from customers.",
-      });
-    } catch (err) {
-      console.error(
-        "TOGGLE REVIEW VISIBILITY ERROR:",
-        err
-      );
-
-      setToast({
-        type: "error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Unable to update review visibility.",
-      });
-    } finally {
-      setTogglingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(reviewId);
-        return next;
-      });
-    }
-  };
-
-  /*
-   * SEARCH
-   * Searches through:
-   * - Customer name
-   * - Customer email
-   * - Customer phone
-   * - Provider name
-   * - Provider email
-   * - Provider phone
-   * - Service title
-   * - Service category
-   * - Review comment
-   */
   const filteredReviews = useMemo(() => {
-    const query =
-      searchQuery.trim().toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
 
-    if (!query) {
-      return reviews;
-    }
+    const list = reviews.filter((review) => {
+      if (
+        visibilityFilter !== "all" &&
+        isReviewHidden(review) !==
+          (visibilityFilter === "hidden")
+      ) {
+        return false;
+      }
 
-    return reviews.filter((review) => {
-      const customerName =
-        getCustomerName(
-          review.customer
-        ).toLowerCase();
+      const rating = Number(review.rating || 0);
+
+      if (ratingFilter === "5" && rating !== 5) {
+        return false;
+      }
+
+      if (ratingFilter === "4" && rating !== 4) {
+        return false;
+      }
+
+      if (ratingFilter === "3" && rating !== 3) {
+        return false;
+      }
+
+      if (ratingFilter === "low" && rating > 2) {
+        return false;
+      }
+
+      if (!query) return true;
+
+      const customerName = getCustomerName(
+        review.customer
+      ).toLowerCase();
 
       const customerEmail =
-        review.customer?.email?.toLowerCase() ||
-        "";
+        review.customer?.email?.toLowerCase() || "";
 
-      const customerPhone =
-        getPersonPhone(
-          review.customer
-        ).toLowerCase();
+      const customerPhone = getPersonPhone(
+        review.customer
+      ).toLowerCase();
 
-      const providerName =
-        getProviderName(
-          review.provider
-        ).toLowerCase();
+      const providerName = getProviderName(
+        review.provider
+      ).toLowerCase();
 
       const providerEmail =
-        review.provider?.email?.toLowerCase() ||
-        "";
+        review.provider?.email?.toLowerCase() || "";
 
-      const providerPhone =
-        getPersonPhone(
-          review.provider
-        ).toLowerCase();
+      const providerPhone = getPersonPhone(
+        review.provider
+      ).toLowerCase();
 
       const serviceName =
-        review.service?.title?.toLowerCase() ||
-        "";
+        review.service?.title?.toLowerCase() || "";
 
       const serviceCategory =
-        review.service?.category?.toLowerCase() ||
-        "";
+        review.service?.category?.toLowerCase() || "";
 
-      const comment =
-        review.comment?.toLowerCase() || "";
+      const comment = review.comment?.toLowerCase() || "";
 
       return (
         customerName.includes(query) ||
@@ -498,1139 +321,1107 @@ export function AdminReviews() {
         comment.includes(query)
       );
     });
-  }, [reviews, searchQuery]);
 
-  /*
-   * STATISTICS
-   * These remain based on ALL reviews,
-   * not just the search results.
-   */
+    const sorted = [...list];
+
+    switch (sortOption) {
+      case "oldest":
+        sorted.sort(
+          (a, b) => getReviewTime(a) - getReviewTime(b)
+        );
+        break;
+      case "highest":
+        sorted.sort(
+          (a, b) =>
+            Number(b.rating || 0) - Number(a.rating || 0)
+        );
+        break;
+      case "lowest":
+        sorted.sort(
+          (a, b) =>
+            Number(a.rating || 0) - Number(b.rating || 0)
+        );
+        break;
+      default:
+        sorted.sort(
+          (a, b) => getReviewTime(b) - getReviewTime(a)
+        );
+    }
+
+    return sorted;
+  }, [
+    reviews,
+    searchQuery,
+    visibilityFilter,
+    ratingFilter,
+    sortOption,
+  ]);
+
+  /* =======================================================
+     STATISTICS (based on ALL reviews, not filtered results)
+  ======================================================= */
+
   const averageRating = useMemo(() => {
     if (!reviews.length) return 0;
 
     const total = reviews.reduce(
-      (sum, review) =>
-        sum + Number(review.rating || 0),
+      (sum, review) => sum + Number(review.rating || 0),
       0
     );
 
     return total / reviews.length;
   }, [reviews]);
 
-  const fiveStarReviews = useMemo(() => {
-    return reviews.filter(
-      (review) =>
-        Number(review.rating) === 5
-    ).length;
-  }, [reviews]);
+  const fiveStarReviews = useMemo(
+    () =>
+      reviews.filter(
+        (review) => Number(review.rating) === 5
+      ).length,
+    [reviews]
+  );
 
-  const lowRatedReviews = useMemo(() => {
-    return reviews.filter(
-      (review) =>
-        Number(review.rating) <= 2
-    ).length;
-  }, [reviews]);
+  const lowRatedReviews = useMemo(
+    () =>
+      reviews.filter(
+        (review) => Number(review.rating) <= 2
+      ).length,
+    [reviews]
+  );
 
-  const hiddenReviews = useMemo(() => {
-    return reviews.filter((review) =>
-      isReviewHidden(review)
-    ).length;
-  }, [reviews]);
+  const hiddenReviews = useMemo(
+    () =>
+      reviews.filter((review) =>
+        isReviewHidden(review)
+      ).length,
+    [reviews]
+  );
+
+  const fiveStarPercent = reviews.length
+    ? Math.round((fiveStarReviews / reviews.length) * 100)
+    : 0;
+
+  /* =======================================================
+     QUERY STATE
+  ======================================================= */
+
+  const errorMessage = isError
+    ? getApiErrorMessage(error)
+    : "";
+
+  /*
+   * Refetch when the current data is stale after a failed
+   * background refresh, keeping any previously loaded rows.
+   */
+  const showStaleError =
+    isError && reviews.length > 0;
+
+  const hasActiveFilters =
+    searchQuery.trim() !== "" ||
+    visibilityFilter !== "all" ||
+    ratingFilter !== "all";
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setVisibilityFilter("all");
+    setRatingFilter("all");
+    setSortOption("newest");
+  };
+
+  /* =======================================================
+     ACTIONS
+  ======================================================= */
+
+  const requestToggle = (review: Review) => {
+    if (!review?._id || isVisibilityPending) return;
+
+    setSelectedReviewId(null);
+    setToast(null);
+    setConfirmTarget(review);
+  };
+
+  const handleConfirmToggle = async () => {
+    const target = confirmTarget;
+
+    if (!target?._id) return;
+
+    const hide = !isReviewHidden(target);
+
+    setToast(null);
+
+    try {
+      await toggleVisibility({
+        id: target._id,
+        hide,
+      });
+
+      setToast({
+        type: "success",
+        message: hide
+          ? "Review has been hidden from customers."
+          : "Review is now visible to customers.",
+      });
+
+      setConfirmTarget(null);
+    } catch (err) {
+      console.error(
+        "TOGGLE REVIEW VISIBILITY ERROR:",
+        err
+      );
+
+      setToast({
+        type: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Unable to update review visibility.",
+      });
+    }
+  };
+
+  const confirmHidden = confirmTarget
+    ? !isReviewHidden(confirmTarget)
+    : true;
+
+  const isConfirming =
+    Boolean(confirmTarget) &&
+    isVisibilityPending &&
+    visibilityVariables?.id === confirmTarget?._id;
+
+  /* =======================================================
+     RENDER
+  ======================================================= */
 
   return (
-    <DashboardLayout
-      role="admin"
-      navItems={adminNavItems}
-    >
+    <DashboardLayout role="admin" navItems={adminNavItems}>
       <DashboardHeader
         title="Review Management"
         subtitle="View and moderate customer reviews"
+        action={
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm dark:border-ink-700 dark:bg-ink-900 dark:text-ink-300">
+            <EyeOff className="h-3.5 w-3.5 text-danger-500 dark:text-danger-200" />
+            {isLoading
+              ? "Loading reviews…"
+              : `${hiddenReviews} hidden`}
+          </span>
+        }
       />
 
-      <div className="space-y-6">
-        {/* =========================================
-            PAGE HEADER + SEARCH
-        ========================================== */}
-        <div className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900 sm:p-6">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
-                  <MessageSquare className="h-5 w-5" />
-                </div>
+      {/* ====================================================
+          SUMMARY CARDS
+      ==================================================== */}
 
-                <div>
-                  <h2 className="text-lg font-bold text-ink-900 dark:text-white">
-                    Customer Reviews
-                  </h2>
-
-                  <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                    See what customers are saying
-                    about providers and their
-                    services.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
-              {/* SEARCH */}
-              <div className="relative w-full sm:min-w-[300px] xl:w-[360px]">
-                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
-
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) =>
-                    setSearchQuery(
-                      event.target.value
-                    )
-                  }
-                  placeholder="Search reviews..."
-                  className="h-11 search-input"
-                />
-
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSearchQuery("")
-                    }
-                    aria-label="Clear search"
-                    className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-ink-400 transition hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800 dark:hover:text-white"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* REFRESH */}
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={
-                  loading || refreshing
-                }
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-4 text-sm font-semibold text-ink-700 transition hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800 sm:w-auto"
-              >
-                {refreshing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-
-                Refresh
-              </button>
-            </div>
-          </div>
-
-          {/* SEARCH RESULT COUNT */}
-          {!loading && (
-            <div className="mt-5 flex flex-col gap-2 border-t border-ink-100 pt-4 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-ink-500 dark:text-ink-400">
-                {searchQuery ? (
-                  <>
-                    Showing{" "}
-                    <span className="font-semibold text-ink-700 dark:text-ink-200">
-                      {filteredReviews.length}
-                    </span>{" "}
-                    of{" "}
-                    <span className="font-semibold text-ink-700 dark:text-ink-200">
-                      {reviews.length}
-                    </span>{" "}
-                    reviews
-                  </>
-                ) : (
-                  <>
-                    {reviews.length}{" "}
-                    {reviews.length === 1
-                      ? "review"
-                      : "reviews"}{" "}
-                    available
-                  </>
-                )}
-              </p>
-
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSearchQuery("")
-                  }
-                  className="inline-flex w-fit items-center gap-1.5 text-xs font-semibold text-primary-600 transition hover:text-primary-700 dark:text-primary-400"
-                >
-                  <X className="h-3.5 w-3.5" />
-                  Clear search
-                </button>
+      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+        {isLoading ? (
+          Array.from({ length: 5 }).map((_, index) => (
+            <div
+              key={index}
+              className={cn(
+                "card p-4 sm:p-5",
+                index === 0 && "col-span-2 sm:col-span-1"
               )}
-            </div>
-          )}
-        </div>
-
-        {/* =========================================
-            STATISTICS
-        ========================================== */}
-        {!loading && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {/* TOTAL */}
-            <div className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-ink-500 dark:text-ink-400">
-                    Total Reviews
-                  </p>
-
-                  <p className="mt-2 text-2xl font-bold text-ink-900 dark:text-white">
-                    {reviews.length}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
-                  <MessageSquare className="h-5 w-5" />
-                </div>
+            >
+              <div className="flex items-start justify-between gap-3">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-9 w-9 rounded-xl" />
               </div>
+              <Skeleton className="mt-4 h-7 w-14" />
+              <Skeleton className="mt-2 h-3 w-24" />
             </div>
+          ))
+        ) : (
+          <>
+            <MetricCard
+              label="Total Reviews"
+              value={reviews.length}
+              icon={MessageSquare}
+              tone="bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300"
+              hint={
+                <>
+                  {hiddenReviews}{" "}
+                  {hiddenReviews === 1
+                    ? "review is"
+                    : "reviews are"}{" "}
+                  hidden
+                </>
+              }
+              className="col-span-2 sm:col-span-1"
+            />
 
-            {/* AVERAGE */}
-            <div className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-ink-500 dark:text-ink-400">
-                    Average Rating
-                  </p>
-
-                  <div className="mt-2 flex items-center gap-2">
-                    <p className="text-2xl font-bold text-ink-900 dark:text-white">
-                      {averageRating.toFixed(
-                        1
-                      )}
-                    </p>
-
-                    <Star className="h-5 w-5 fill-current text-amber-400" />
-                  </div>
+            <MetricCard
+              label="Average Rating"
+              value={averageRating.toFixed(1)}
+              icon={Star}
+              tone="bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-300"
+              hint={
+                <div className="flex items-center gap-1.5">
+                  <StarRating
+                    rating={averageRating}
+                    size={12}
+                  />
+                  <span>out of 5</span>
                 </div>
+              }
+            />
 
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-500 dark:bg-amber-500/10">
-                  <Star className="h-5 w-5 fill-current" />
-                </div>
-              </div>
-            </div>
+            <MetricCard
+              label="5-Star Reviews"
+              value={fiveStarReviews}
+              icon={Star}
+              tone="bg-success-50 text-success-600 dark:bg-success-600/15 dark:text-success-200"
+              hint={`${fiveStarPercent}% of all reviews`}
+            />
 
-            {/* FIVE STAR */}
-            <div className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-ink-500 dark:text-ink-400">
-                    5-Star Reviews
-                  </p>
+            <MetricCard
+              label="Low Rated"
+              value={lowRatedReviews}
+              icon={AlertCircle}
+              tone="bg-warning-50 text-warning-600 dark:bg-warning-600/15 dark:text-warning-200"
+              hint="Ratings of 2 or below"
+            />
 
-                  <p className="mt-2 text-2xl font-bold text-ink-900 dark:text-white">
-                    {fiveStarReviews}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-                  <Star className="h-5 w-5 fill-current" />
-                </div>
-              </div>
-            </div>
-
-            {/* LOW RATED / HIDDEN */}
-            <div className="rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-ink-500 dark:text-ink-400">
-                    {hiddenReviews > 0
-                      ? "Hidden Reviews"
-                      : "Low Rated"}
-                  </p>
-
-                  <p className="mt-2 text-2xl font-bold text-ink-900 dark:text-white">
-                    {hiddenReviews > 0
-                      ? hiddenReviews
-                      : lowRatedReviews}
-                  </p>
-                </div>
-
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400">
-                  {hiddenReviews > 0 ? (
-                    <EyeOff className="h-5 w-5" />
-                  ) : (
-                    <Ban className="h-5 w-5" />
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+            <MetricCard
+              label="Hidden Reviews"
+              value={hiddenReviews}
+              icon={EyeOff}
+              tone="bg-danger-50 text-danger-600 dark:bg-danger-500/15 dark:text-danger-200"
+              hint="Excluded from customer view"
+            />
+          </>
         )}
+      </div>
 
-        {/* =========================================
-            ERROR
-        ========================================== */}
-        {error && (
-          <div className="rounded-2xl border border-red-200 bg-red-50 p-4 dark:border-red-500/20 dark:bg-red-500/10">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-red-700 dark:text-red-400">
-                  Unable to load reviews
-                </p>
+      {/* ====================================================
+          TOOLBAR
+      ==================================================== */}
 
-                <p className="mt-1 text-sm text-red-600 dark:text-red-300">
-                  {error}
-                </p>
-              </div>
+      <div className="card mb-5 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="relative w-full xl:flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 dark:text-ink-500" />
 
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) =>
+                setSearchQuery(event.target.value)
+              }
+              placeholder="Search by customer, provider, service or comment…"
+              aria-label="Search reviews"
+              autoComplete="off"
+              className="search-input h-11 pl-10 pr-11"
+            />
+
+            {searchQuery && (
               <button
                 type="button"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-500/20 dark:bg-ink-900 dark:text-red-400 dark:hover:bg-red-500/10 sm:w-auto"
-              >
-                {refreshing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                Try Again
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* =========================================
-            LOADING
-        ========================================== */}
-        {loading ? (
-          <div className="space-y-4">
-            {Array.from({ length: 4 }).map(
-              (_, index) => (
-                <div
-                  key={index}
-                  className="animate-pulse rounded-2xl border border-ink-100 bg-white p-5 dark:border-ink-800 dark:bg-ink-900 sm:p-6"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 shrink-0 rounded-full bg-ink-100 dark:bg-ink-800" />
-
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 w-36 rounded bg-ink-100 dark:bg-ink-800" />
-
-                      <div className="h-3 w-48 rounded bg-ink-100 dark:bg-ink-800" />
-                    </div>
-
-                    <div className="h-5 w-20 rounded bg-ink-100 dark:bg-ink-800" />
-                  </div>
-
-                  <div className="mt-5 h-16 rounded-xl bg-ink-100 dark:bg-ink-800" />
-
-                  <div className="mt-4 h-8 w-28 rounded bg-ink-100 dark:bg-ink-800" />
-                </div>
-              )
-            )}
-          </div>
-        ) : reviews.length === 0 ? (
-          /* =========================================
-             NO REVIEWS
-          ========================================== */
-          <div className="flex min-h-[350px] items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-white px-6 py-12 dark:border-ink-700 dark:bg-ink-900">
-            <div className="flex max-w-md flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ink-50 text-ink-400 dark:bg-ink-800 dark:text-ink-500">
-                <MessageSquare className="h-7 w-7" />
-              </div>
-
-              <h3 className="mt-5 text-lg font-bold text-ink-900 dark:text-white">
-                No reviews yet
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-                Customer reviews will appear
-                here after customers complete
-                bookings and submit their
-                feedback.
-              </p>
-            </div>
-          </div>
-        ) : filteredReviews.length === 0 ? (
-          /* =========================================
-             NO SEARCH RESULTS
-          ========================================== */
-          <div className="flex min-h-[300px] items-center justify-center rounded-2xl border border-dashed border-ink-200 bg-white px-6 py-12 dark:border-ink-700 dark:bg-ink-900">
-            <div className="flex max-w-md flex-col items-center text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-50 text-ink-400 dark:bg-ink-800 dark:text-ink-500">
-                <Search className="h-6 w-6" />
-              </div>
-
-              <h3 className="mt-4 text-base font-bold text-ink-900 dark:text-white">
-                No matching reviews
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-                We couldn't find any reviews
-                matching{" "}
-                <span className="font-semibold text-ink-700 dark:text-ink-200">
-                  "{searchQuery}"
-                </span>
-                .
-              </p>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setSearchQuery("")
-                }
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700"
+                onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
+                className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-ink-800 dark:hover:text-ink-100"
               >
                 <X className="h-4 w-4" />
-                Clear Search
               </button>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:flex xl:items-center">
+            <select
+              value={visibilityFilter}
+              onChange={(event) =>
+                setVisibilityFilter(
+                  event.target.value as VisibilityFilter
+                )
+              }
+              aria-label="Filter by visibility"
+              className="input h-11 w-full min-w-0 cursor-pointer pr-9 text-sm xl:w-[168px]"
+            >
+              <option value="all">All reviews</option>
+              <option value="visible">Visible only</option>
+              <option value="hidden">Hidden only</option>
+            </select>
+
+            <select
+              value={ratingFilter}
+              onChange={(event) =>
+                setRatingFilter(
+                  event.target.value as RatingFilter
+                )
+              }
+              aria-label="Filter by rating"
+              className="input h-11 w-full min-w-0 cursor-pointer pr-9 text-sm xl:w-[160px]"
+            >
+              <option value="all">All ratings</option>
+              <option value="5">5 stars</option>
+              <option value="4">4 stars</option>
+              <option value="3">3 stars</option>
+              <option value="low">Low rated (≤2)</option>
+            </select>
+
+            <select
+              value={sortOption}
+              onChange={(event) =>
+                setSortOption(
+                  event.target.value as SortOption
+                )
+              }
+              aria-label="Sort reviews"
+              className="input h-11 w-full min-w-0 cursor-pointer pr-9 text-sm xl:w-[160px]"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+              <option value="highest">Highest rated</option>
+              <option value="lowest">Lowest rated</option>
+            </select>
+
+            <Button
+              variant="outline"
+              icon={RefreshCw}
+              loading={isFetching}
+              onClick={() => {
+                void refetch();
+              }}
+              className="h-11 w-full sm:col-span-2 xl:w-auto"
+            >
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-ink-800">
+          <p
+            className="text-sm text-slate-500 dark:text-ink-400"
+            aria-live="polite"
+          >
+            {isLoading ? (
+              "Loading reviews…"
+            ) : (
+              <>
+                Showing{" "}
+                <span className="font-semibold text-slate-800 dark:text-ink-100">
+                  {filteredReviews.length}
+                </span>{" "}
+                of{" "}
+                <span className="font-semibold text-slate-800 dark:text-ink-100">
+                  {reviews.length}
+                </span>{" "}
+                {reviews.length === 1
+                  ? "review"
+                  : "reviews"}
+              </>
+            )}
+          </p>
+
+          {hasActiveFilters && !isLoading && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-brand-600 transition-colors hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/50"
+            >
+              <X className="h-3.5 w-3.5" />
+              Reset filters
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ====================================================
+          STALE / BACKGROUND ERROR
+      ==================================================== */}
+
+      {showStaleError && (
+        <div className="mb-4 flex flex-col gap-2 rounded-2xl border border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-700 dark:border-warning-600/30 dark:bg-warning-600/10 dark:text-warning-200 sm:flex-row sm:items-center sm:justify-between">
+          <span className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Showing the last loaded reviews.{" "}
+              {errorMessage}
+            </span>
+          </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              void refetch();
+            }}
+            className="shrink-0 self-start font-semibold underline underline-offset-2 hover:no-underline sm:self-auto"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {/* ====================================================
+          CONTENT
+      ==================================================== */}
+
+      {isLoading ? (
+        <ReviewsSkeleton />
+      ) : isError && reviews.length === 0 ? (
+        <ErrorState
+          title="Unable to load reviews"
+          message={errorMessage}
+          onRetry={() => {
+            void refetch();
+          }}
+        />
+      ) : reviews.length === 0 ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="No reviews yet"
+          description="Customer reviews will appear here after customers complete bookings and submit their feedback."
+        />
+      ) : filteredReviews.length === 0 ? (
+        <EmptyState
+          icon={Search}
+          title="No matching reviews"
+          description={
+            searchQuery.trim()
+              ? `We couldn't find any reviews matching "${searchQuery.trim()}".`
+              : "No reviews match the selected filters. Try a different combination."
+          }
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetFilters}
+            >
+              Clear filters
+            </Button>
+          }
+        />
+      ) : (
+        <>
+          {/* ==============================================
+              DESKTOP TABLE
+          ============================================== */}
+
+          <div className="card hidden overflow-hidden md:block">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[960px] text-left text-sm">
+                <caption className="sr-only">
+                  Customer reviews available for moderation
+                </caption>
+
+                <thead className="border-b border-slate-200/70 bg-slate-50/95 text-[11px] uppercase tracking-wider text-slate-500 dark:border-ink-800 dark:bg-ink-900/95 dark:text-ink-400">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-4 py-3.5 font-semibold"
+                    >
+                      Customer
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-3.5 font-semibold"
+                    >
+                      Provider &amp; Service
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-3.5 font-semibold"
+                    >
+                      Rating
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-3.5 font-semibold"
+                    >
+                      Status
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-3.5 font-semibold"
+                    >
+                      Date
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-4 py-3.5 text-right font-semibold"
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100 dark:divide-ink-800">
+                  {filteredReviews.map((review) => {
+                    const view = getReviewView(review);
+
+                    const rowIsPending =
+                      isVisibilityPending &&
+                      visibilityVariables?.id === review._id;
+
+                    return (
+                      <tr
+                        key={review._id}
+                        className={cn(
+                          "group transition-colors hover:bg-slate-50/80 dark:hover:bg-ink-800/40",
+                          view.hidden &&
+                            "bg-danger-50/40 dark:bg-danger-500/5"
+                        )}
+                      >
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              src={view.customerImage}
+                              name={view.customerName}
+                              size="md"
+                            />
+
+                            <div className="min-w-0">
+                              <p className="max-w-[190px] truncate font-semibold text-slate-900 dark:text-ink-50">
+                                {view.customerName}
+                              </p>
+
+                              {review.customer?.email && (
+                                <p className="max-w-[190px] truncate text-xs text-slate-500 dark:text-ink-400">
+                                  {review.customer.email}
+                                </p>
+                              )}
+
+                              {view.customerPhone && (
+                                <p className="mt-0.5 flex max-w-[190px] items-center gap-1 truncate text-[11px] text-slate-400 dark:text-ink-500">
+                                  <Phone className="h-3 w-3 shrink-0" />
+                                  {view.customerPhone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div className="min-w-0">
+                            <p className="max-w-[220px] truncate font-semibold text-slate-900 dark:text-ink-50">
+                              {view.providerName}
+                            </p>
+
+                            {review.service?.title && (
+                              <p className="max-w-[220px] truncate text-xs text-slate-500 dark:text-ink-400">
+                                {review.service.title}
+                              </p>
+                            )}
+
+                            {review.service?.category && (
+                              <p className="max-w-[220px] truncate text-[11px] text-slate-400 dark:text-ink-500">
+                                {review.service.category}
+                              </p>
+                            )}
+
+                            {view.providerPhone && (
+                              <p className="mt-0.5 flex max-w-[220px] items-center gap-1 truncate text-[11px] text-slate-400 dark:text-ink-500">
+                                <Phone className="h-3 w-3 shrink-0" />
+                                {view.providerPhone}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <div className="flex items-center gap-2">
+                            <StarRating
+                              rating={Number(
+                                review.rating || 0
+                              )}
+                              size={14}
+                            />
+                            <span className="text-xs font-semibold text-slate-500 dark:text-ink-400">
+                              {review.rating}/5
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <VisibilityBadge hidden={view.hidden} />
+                        </td>
+
+                        <td className="whitespace-nowrap px-4 py-4 text-xs text-slate-500 dark:text-ink-400">
+                          {formatDate(review.createdAt)}
+                        </td>
+
+                        <td className="px-4 py-4">
+                          <ReviewActions
+                            hidden={view.hidden}
+                            pending={rowIsPending}
+                            busy={isVisibilityPending}
+                            onView={() =>
+                              setSelectedReviewId(review._id)
+                            }
+                            onToggle={() =>
+                              requestToggle(review)
+                            }
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-        ) : (
-          /* =========================================
-             REVIEWS LIST
-          ========================================== */
-          <div className="space-y-4">
+
+          {/* ==============================================
+              MOBILE CARDS
+          ============================================== */}
+
+          <div className="space-y-3 md:hidden">
             {filteredReviews.map((review) => {
-              const customerName =
-                getCustomerName(
-                  review.customer
-                );
+              const view = getReviewView(review);
 
-              const providerName =
-                getProviderName(
-                  review.provider
-                );
-
-              const customerImage =
-                getImage(review.customer);
-
-              const customerPhone =
-                getPersonPhone(review.customer);
-
-              const providerPhone =
-                getPersonPhone(review.provider);
-
-              const hidden = isReviewHidden(review);
-              const isToggling = togglingIds.has(
-                review._id
-              );
+              const rowIsPending =
+                isVisibilityPending &&
+                visibilityVariables?.id === review._id;
 
               return (
                 <motion.div
                   key={review._id}
-                  initial={{
-                    opacity: 0,
-                    y: 8,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    duration: 0.2,
-                  }}
-                  className={`rounded-2xl border p-5 shadow-sm transition hover:shadow-md dark:bg-ink-900 sm:p-6 ${
-                    hidden
-                      ? "border-red-200 bg-red-50/40 dark:border-red-500/30 dark:bg-red-500/5"
-                      : "border-ink-100 bg-white dark:border-ink-800"
-                  }`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className={cn(
+                    "card p-4 transition-shadow hover:shadow-card-hover",
+                    view.hidden &&
+                      "border-danger-200 bg-danger-50/40 dark:border-danger-500/30 dark:bg-danger-500/5"
+                  )}
                 >
-                  {/* TOP */}
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      {customerImage ? (
-                        <img
-                          src={customerImage}
-                          alt={customerName}
-                          className="h-11 w-11 shrink-0 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-bold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400">
-                          {getInitial(
-                            customerName
-                          )}
-                        </div>
-                      )}
+                      <Avatar
+                        src={view.customerImage}
+                        name={view.customerName}
+                        size="md"
+                      />
 
                       <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-semibold text-ink-900 dark:text-white">
-                            {customerName}
-                          </p>
+                        <p className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
+                          {view.customerName}
+                        </p>
 
-                          {hidden && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700 dark:bg-red-500/20 dark:text-red-300">
-                              <EyeOff className="h-3 w-3" />
-                              Hidden
-                            </span>
-                          )}
-                        </div>
-
-                        {review.customer
-                          ?.email && (
-                          <p className="mt-0.5 truncate text-xs text-ink-400 dark:text-ink-500">
+                        {review.customer?.email && (
+                          <p className="truncate text-xs text-slate-500 dark:text-ink-400">
                             {review.customer.email}
                           </p>
                         )}
 
-                        {customerPhone && (
-                          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-400 dark:text-ink-500">
+                        {view.customerPhone && (
+                          <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-slate-400 dark:text-ink-500">
                             <Phone className="h-3 w-3 shrink-0" />
-                            {customerPhone}
+                            {view.customerPhone}
                           </p>
                         )}
-
-                        <p className="mt-0.5 text-xs text-ink-400 dark:text-ink-500">
-                          {formatDate(
-                            review.createdAt
-                          )}
-                        </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 flex-col items-end gap-0.5">
                       <StarRating
-                        rating={Number(
-                          review.rating || 0
-                        )}
+                        rating={Number(review.rating || 0)}
+                        size={13}
                       />
-
-                      <span className="text-xs font-semibold text-ink-500 dark:text-ink-400">
+                      <span className="text-xs font-semibold text-slate-500 dark:text-ink-400">
                         {review.rating}/5
                       </span>
                     </div>
                   </div>
 
-                  {/* PROVIDER + SERVICE */}
-                  <div className="mt-4 rounded-xl bg-ink-50 p-3.5 dark:bg-ink-800/60">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <span className="text-ink-400">
-                        Customer reviewed:
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <VisibilityBadge hidden={view.hidden} />
+                    <span className="text-xs text-slate-400 dark:text-ink-500">
+                      {formatDate(review.createdAt)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-ink-800/50">
+                    <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+                      <span className="text-xs text-slate-400 dark:text-ink-500">
+                        Reviewed:
                       </span>
-
-                      <span className="font-semibold text-ink-800 dark:text-ink-100">
-                        {providerName}
+                      <span className="font-semibold text-slate-800 dark:text-ink-100">
+                        {view.providerName}
                       </span>
-
-                      {review.service
-                        ?.title && (
-                        <>
-                          <span className="text-ink-300 dark:text-ink-600">
-                            •
-                          </span>
-
-                          <span className="text-ink-600 dark:text-ink-300">
-                            {review.service.title}
-                          </span>
-                        </>
+                      {review.service?.title && (
+                        <span className="text-xs text-slate-500 dark:text-ink-400">
+                          • {review.service.title}
+                        </span>
                       )}
-                    </div>
+                    </p>
 
-                    {review.service
-                      ?.category && (
-                      <p className="mt-1 text-xs text-ink-400 dark:text-ink-500">
+                    {review.service?.category && (
+                      <p className="mt-1 text-[11px] text-slate-400 dark:text-ink-500">
                         {review.service.category}
                       </p>
                     )}
 
-                    {providerPhone && (
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-500 dark:text-ink-400">
+                    {view.providerPhone && (
+                      <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-ink-400">
                         <Phone className="h-3 w-3 shrink-0" />
-                        Provider phone:{" "}
-                        <span className="font-semibold text-ink-700 dark:text-ink-200">
-                          {providerPhone}
-                        </span>
+                        Provider phone: {view.providerPhone}
                       </p>
                     )}
                   </div>
 
-                  {/* COMMENT */}
-                  <div className="mt-4">
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                      Customer Review
+                  {review.comment ? (
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-ink-300">
+                      &ldquo;{review.comment}&rdquo;
                     </p>
+                  ) : (
+                    <p className="mt-3 text-sm italic text-slate-400 dark:text-ink-500">
+                      No written comment was provided.
+                    </p>
+                  )}
 
-                    {review.comment ? (
-                      <p className="text-sm leading-6 text-ink-600 dark:text-ink-300">
-                        "{review.comment}"
-                      </p>
-                    ) : (
-                      <p className="text-sm italic text-ink-400 dark:text-ink-500">
-                        No written comment was
-                        provided.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* ACTIONS */}
-                  <div className="mt-5 flex flex-wrap gap-2 border-t border-ink-100 pt-4 dark:border-ink-800">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedReview(
-                          review
-                        )
+                  <div className="mt-4 border-t border-slate-100 pt-3 dark:border-ink-800">
+                    <ReviewActions
+                      hidden={view.hidden}
+                      pending={rowIsPending}
+                      busy={isVisibilityPending}
+                      layout="grid"
+                      onView={() =>
+                        setSelectedReviewId(review._id)
                       }
-                      className="inline-flex items-center gap-2 rounded-xl border border-ink-200 bg-white px-3.5 py-2 text-xs font-semibold text-ink-700 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      View
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleToggleHide(review)
-                      }
-                      disabled={isToggling}
-                      className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        hidden
-                          ? "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500/20 dark:bg-ink-900 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
-                          : "border-red-200 bg-white text-red-600 hover:bg-red-50 dark:border-red-500/20 dark:bg-ink-900 dark:text-red-400 dark:hover:bg-red-500/10"
-                      }`}
-                    >
-                      {isToggling ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : hidden ? (
-                        <Eye className="h-3.5 w-3.5" />
-                      ) : (
-                        <Ban className="h-3.5 w-3.5" />
-                      )}
-
-                      {isToggling
-                        ? hidden
-                          ? "Unhiding..."
-                          : "Hiding..."
-                        : hidden
-                        ? "Unhide"
-                        : "Hide"}
-                    </button>
+                      onToggle={() => requestToggle(review)}
+                    />
                   </div>
                 </motion.div>
               );
             })}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-      {/* =========================================
-          REVIEW DETAILS MODAL
-      ========================================== */}
-      <AnimatePresence>
+      {/* ====================================================
+          REVIEW DETAILS
+      ==================================================== */}
+
+      <ResponsiveModal
+        open={Boolean(selectedReview)}
+        onClose={() => setSelectedReviewId(null)}
+        title="Review details"
+        footer={
+          selectedReview ? (
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedReviewId(null)}
+                className="min-h-10"
+              >
+                Close
+              </Button>
+
+              <Button
+                variant={
+                  isReviewHidden(selectedReview)
+                    ? "primary"
+                    : "danger"
+                }
+                size="sm"
+                icon={
+                  isReviewHidden(selectedReview)
+                    ? Eye
+                    : Ban
+                }
+                disabled={isVisibilityPending}
+                onClick={() =>
+                  requestToggle(selectedReview)
+                }
+                className="min-h-10"
+              >
+                {isReviewHidden(selectedReview)
+                  ? "Unhide review"
+                  : "Hide review"}
+              </Button>
+            </div>
+          ) : null
+        }
+      >
         {selectedReview && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-3 backdrop-blur-sm sm:p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={() =>
-              setSelectedReview(null)
-            }
-          >
-            <motion.div
-              className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white shadow-2xl dark:bg-ink-900"
-              initial={{
-                opacity: 0,
-                y: 30,
-                scale: 0.96,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-                scale: 1,
-              }}
-              exit={{
-                opacity: 0,
-                y: 20,
-                scale: 0.96,
-              }}
-              transition={{
-                duration: 0.3,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-              onClick={(event) =>
-                event.stopPropagation()
-              }
-            >
-              {/* MODAL HEADER */}
-              <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-ink-100 bg-white px-5 py-5 dark:border-ink-800 dark:bg-ink-900 sm:px-6">
-                <div className="min-w-0">
-                  <h3 className="text-lg font-bold text-ink-900 dark:text-white">
-                    Review Details
-                  </h3>
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <VisibilityBadge
+                hidden={isReviewHidden(selectedReview)}
+              />
 
-                  <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                    Customer feedback and service
-                    information
-                  </p>
-                </div>
+              <span className="text-xs font-medium text-slate-500 dark:text-ink-400">
+                {formatDate(selectedReview.createdAt)}
+              </span>
+            </div>
 
-                <motion.button
-                  type="button"
-                  onClick={() =>
-                    setSelectedReview(null)
-                  }
-                  whileHover={{
-                    scale: 1.08,
-                  }}
-                  whileTap={{
-                    scale: 0.92,
-                  }}
-                  aria-label="Close review"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-ink-400 transition hover:bg-ink-100 hover:text-ink-700 dark:hover:bg-ink-800 dark:hover:text-white"
-                >
-                  <X className="h-5 w-5" />
-                </motion.button>
-              </div>
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+                Customer
+              </p>
 
-              <div className="space-y-6 p-5 sm:p-6">
-                {/* CUSTOMER */}
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.08,
-                    duration: 0.25,
-                  }}
-                >
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                    Customer
+              <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-ink-800 dark:bg-ink-800/40">
+                <Avatar
+                  src={getImage(selectedReview.customer)}
+                  name={getCustomerName(
+                    selectedReview.customer
+                  )}
+                  size="lg"
+                />
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900 dark:text-ink-50">
+                    {getCustomerName(selectedReview.customer)}
                   </p>
 
-                  <div className="flex items-center gap-3 rounded-2xl border border-ink-100 bg-ink-50 p-4 dark:border-ink-800 dark:bg-ink-800/50">
-                    {getImage(
-                      selectedReview.customer
-                    ) ? (
-                      <img
-                        src={getImage(
-                          selectedReview.customer
-                        )}
-                        alt={getCustomerName(
-                          selectedReview.customer
-                        )}
-                        className="h-12 w-12 shrink-0 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-100 font-bold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400">
-                        {getInitial(
-                          getCustomerName(
-                            selectedReview.customer
-                          )
-                        )}
-                      </div>
-                    )}
+                  {selectedReview.customer?.email && (
+                    <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-ink-400">
+                      {selectedReview.customer.email}
+                    </p>
+                  )}
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-ink-900 dark:text-white">
-                        {getCustomerName(
-                          selectedReview.customer
-                        )}
-                      </p>
-
-                      {selectedReview
-                        .customer?.email && (
-                        <p className="mt-0.5 truncate text-sm text-ink-500 dark:text-ink-400">
-                          {
-                            selectedReview
-                              .customer.email
-                          }
-                        </p>
-                      )}
-
+                  {getPersonPhone(selectedReview.customer) && (
+                    <p className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-ink-400">
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
                       {getPersonPhone(
                         selectedReview.customer
-                      ) && (
-                        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500 dark:text-ink-400">
-                          <Phone className="h-3.5 w-3.5 shrink-0" />
-                          {getPersonPhone(
-                            selectedReview.customer
-                          )}
-                        </p>
                       )}
-                    </div>
-                  </div>
-                </motion.div>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
 
-                {/* PROVIDER */}
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.14,
-                    duration: 0.25,
-                  }}
-                >
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                    Provider
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+                Provider
+              </p>
+
+              <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white p-3.5 shadow-xs dark:border-ink-800 dark:bg-ink-900">
+                <Avatar
+                  src={getImage(selectedReview.provider)}
+                  name={getProviderName(
+                    selectedReview.provider
+                  )}
+                  size="lg"
+                />
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-slate-900 dark:text-ink-50">
+                    {getProviderName(selectedReview.provider)}
                   </p>
 
-                  <div className="flex items-center gap-3 rounded-2xl border border-ink-100 bg-white p-4 shadow-sm dark:border-ink-800 dark:bg-ink-900">
-                    {getImage(
-                      selectedReview.provider
-                    ) ? (
-                      <img
-                        src={getImage(
-                          selectedReview.provider
-                        )}
-                        alt={getProviderName(
-                          selectedReview.provider
-                        )}
-                        className="h-14 w-14 shrink-0 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-100 text-lg font-bold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400">
-                        {getInitial(
-                          getProviderName(
-                            selectedReview.provider
-                          )
-                        )}
-                      </div>
-                    )}
+                  {selectedReview.provider?.email && (
+                    <p className="mt-0.5 truncate text-sm text-slate-500 dark:text-ink-400">
+                      {selectedReview.provider.email}
+                    </p>
+                  )}
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-ink-900 dark:text-white">
-                        {getProviderName(
-                          selectedReview.provider
-                        )}
-                      </p>
-
-                      {selectedReview
-                        .provider?.email && (
-                        <p className="mt-0.5 truncate text-sm text-ink-500 dark:text-ink-400">
-                          {
-                            selectedReview
-                              .provider.email
-                          }
-                        </p>
-                      )}
-
+                  {getPersonPhone(selectedReview.provider) && (
+                    <p className="mt-0.5 flex items-center gap-1.5 text-sm text-slate-500 dark:text-ink-400">
+                      <Phone className="h-3.5 w-3.5 shrink-0" />
                       {getPersonPhone(
                         selectedReview.provider
-                      ) && (
-                        <p className="mt-0.5 flex items-center gap-1.5 text-sm text-ink-500 dark:text-ink-400">
-                          <Phone className="h-3.5 w-3.5 shrink-0" />
-                          {getPersonPhone(
-                            selectedReview.provider
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* SERVICE */}
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.2,
-                    duration: 0.25,
-                  }}
-                >
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                    Service Reviewed
-                  </p>
-
-                  <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-sm dark:border-ink-800 dark:bg-ink-900">
-                    {selectedReview.service
-                      ?.image ? (
-                      <div className="relative h-48 w-full overflow-hidden bg-ink-100 dark:bg-ink-800 sm:h-60">
-                        <motion.img
-                          src={
-                            selectedReview
-                              .service.image
-                          }
-                          alt={
-                            selectedReview.service
-                              .title ||
-                            "Service"
-                          }
-                          initial={{
-                            scale: 1.05,
-                          }}
-                          animate={{
-                            scale: 1,
-                          }}
-                          transition={{
-                            duration: 0.5,
-                            ease: "easeOut",
-                          }}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-40 items-center justify-center bg-ink-100 text-sm text-ink-400 dark:bg-ink-800">
-                        No service image
-                        available
-                      </div>
-                    )}
-
-                    <div className="p-4 sm:p-5">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <h4 className="text-base font-bold text-ink-900 dark:text-white">
-                            {selectedReview
-                              .service
-                              ?.title ||
-                              "Service"}
-                          </h4>
-
-                          {selectedReview
-                            .service
-                            ?.category && (
-                            <span className="mt-2 inline-flex rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-500/10 dark:text-primary-400">
-                              {
-                                selectedReview
-                                  .service
-                                  .category
-                              }
-                            </span>
-                          )}
-                        </div>
-
-                        {typeof selectedReview
-                          .service
-                          ?.price ===
-                          "number" && (
-                          <p className="shrink-0 text-base font-bold text-primary-600 dark:text-primary-400">
-                            ₦
-                            {selectedReview.service.price.toLocaleString(
-                              "en-NG"
-                            )}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* RATING */}
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.26,
-                    duration: 0.25,
-                  }}
-                >
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                    Rating
-                  </p>
-
-                  <div className="flex items-center gap-3 rounded-2xl border border-ink-100 bg-ink-50 p-4 dark:border-ink-800 dark:bg-ink-800/50">
-                    <StarRating
-                      rating={Number(
-                        selectedReview.rating ||
-                          0
-                      )}
-                    />
-
-                    <span className="font-semibold text-ink-700 dark:text-ink-200">
-                      {selectedReview.rating}/5
-                    </span>
-                  </div>
-                </motion.div>
-
-                {/* COMMENT */}
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.32,
-                    duration: 0.25,
-                  }}
-                >
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                    Customer Review
-                  </p>
-
-                  <div className="rounded-2xl border border-ink-100 bg-ink-50 p-4 dark:border-ink-800 dark:bg-ink-800/50 sm:p-5">
-                    <p className="text-sm leading-7 text-ink-700 dark:text-ink-200">
-                      {selectedReview.comment ||
-                        "No written comment was provided."}
-                    </p>
-                  </div>
-                </motion.div>
-
-                {/* DATE */}
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.38,
-                    duration: 0.25,
-                  }}
-                  className="border-t border-ink-100 pt-5 dark:border-ink-800"
-                >
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-ink-400 dark:text-ink-500">
-                      Review Date
-                    </p>
-
-                    <p className="text-sm font-medium text-ink-700 dark:text-ink-200">
-                      {formatDate(
-                        selectedReview.createdAt
                       )}
                     </p>
-                  </div>
-                </motion.div>
-
-                {/* MODAL ACTIONS */}
-                <motion.div
-                  initial={{
-                    opacity: 0,
-                    y: 12,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay: 0.44,
-                    duration: 0.25,
-                  }}
-                  className="border-t border-ink-100 pt-5 dark:border-ink-800"
-                >
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleToggleHide(
-                        selectedReview
-                      )
-                    }
-                    disabled={togglingIds.has(
-                      selectedReview._id
-                    )}
-                    className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto ${
-                      isReviewHidden(
-                        selectedReview
-                      )
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
-                        : "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20"
-                    }`}
-                  >
-                    {togglingIds.has(
-                      selectedReview._id
-                    ) ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : isReviewHidden(
-                        selectedReview
-                      ) ? (
-                      <Eye className="h-4 w-4" />
-                    ) : (
-                      <Ban className="h-4 w-4" />
-                    )}
-
-                    {togglingIds.has(
-                      selectedReview._id
-                    )
-                      ? isReviewHidden(
-                          selectedReview
-                        )
-                        ? "Unhiding..."
-                        : "Hiding..."
-                      : isReviewHidden(
-                          selectedReview
-                        )
-                      ? "Unhide this review"
-                      : "Hide this review"}
-                  </button>
-                </motion.div>
+                  )}
+                </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </div>
 
-      {/* =========================================
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+                Service Reviewed
+              </p>
+
+              <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xs dark:border-ink-800 dark:bg-ink-900">
+                {selectedReview.service?.image ? (
+                  <img
+                    src={selectedReview.service.image}
+                    alt={
+                      selectedReview.service.title ||
+                      "Service"
+                    }
+                    loading="lazy"
+                    className="h-40 w-full object-cover sm:h-44"
+                  />
+                ) : (
+                  <div className="flex h-28 items-center justify-center bg-slate-100 text-sm text-slate-400 dark:bg-ink-800 dark:text-ink-500">
+                    No service image available
+                  </div>
+                )}
+
+                <div className="p-3.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 dark:text-ink-50">
+                        {selectedReview.service?.title ||
+                          "Service"}
+                      </p>
+
+                      {selectedReview.service?.category && (
+                        <span className="badge mt-1.5 bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+                          {selectedReview.service.category}
+                        </span>
+                      )}
+                    </div>
+
+                    {typeof selectedReview.service?.price ===
+                      "number" && (
+                      <p className="shrink-0 text-sm font-bold text-brand-600 dark:text-brand-300">
+                        ₦
+                        {selectedReview.service.price.toLocaleString(
+                          "en-NG"
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+                Rating
+              </p>
+
+              <div className="flex items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-ink-800 dark:bg-ink-800/40">
+                <StarRating
+                  rating={Number(selectedReview.rating || 0)}
+                  size={18}
+                />
+                <span className="text-sm font-semibold text-slate-700 dark:text-ink-200">
+                  {selectedReview.rating}/5
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
+                Customer Review
+              </p>
+
+              <div className="rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-ink-800 dark:bg-ink-800/40">
+                <p className="text-sm leading-6 text-slate-700 dark:text-ink-200">
+                  {selectedReview.comment ||
+                    "No written comment was provided."}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </ResponsiveModal>
+
+      {/* ====================================================
+          CONFIRMATION
+      ==================================================== */}
+
+      <ResponsiveModal
+        open={Boolean(confirmTarget)}
+        onClose={() => {
+          if (!isConfirming) setConfirmTarget(null);
+        }}
+        title={
+          confirmHidden
+            ? "Hide this review?"
+            : "Unhide this review?"
+        }
+        footer={
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmTarget(null)}
+              disabled={isConfirming}
+              className="min-h-10"
+            >
+              Cancel
+            </Button>
+
+            <Button
+              variant={confirmHidden ? "danger" : "primary"}
+              size="sm"
+              loading={isConfirming}
+              onClick={() => {
+                void handleConfirmToggle();
+              }}
+              className="min-h-10"
+            >
+              {confirmHidden ? "Hide review" : "Unhide review"}
+            </Button>
+          </div>
+        }
+      >
+        {confirmTarget && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 dark:border-ink-800 dark:bg-ink-800/40">
+              <Avatar
+                src={getImage(confirmTarget.customer)}
+                name={getCustomerName(confirmTarget.customer)}
+                size="md"
+              />
+
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50">
+                  {getCustomerName(confirmTarget.customer)}
+                </p>
+
+                <div className="mt-1 flex items-center gap-2">
+                  <StarRating
+                    rating={Number(confirmTarget.rating || 0)}
+                    size={12}
+                  />
+                  <span className="text-xs text-slate-500 dark:text-ink-400">
+                    {confirmTarget.rating}/5
+                  </span>
+                </div>
+
+                {confirmTarget.comment && (
+                  <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-500 dark:text-ink-400">
+                    &ldquo;{confirmTarget.comment}&rdquo;
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p className="text-sm leading-relaxed text-slate-600 dark:text-ink-300">
+              {confirmHidden
+                ? "This review will be hidden from customers and provider profiles. You can unhide it at any time."
+                : "This review will become visible to customers and provider profiles again."}
+            </p>
+          </div>
+        )}
+      </ResponsiveModal>
+
+      {/* ====================================================
           TOAST
-      ========================================== */}
+      ==================================================== */}
+
       <AnimatePresence>
         {toast && (
           <motion.div
-            initial={{
-              opacity: 0,
-              y: 40,
-              scale: 0.95,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              scale: 1,
-            }}
-            exit={{
-              opacity: 0,
-              y: 20,
-              scale: 0.95,
-            }}
+            role="status"
+            aria-live="polite"
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
             transition={{
-              duration: 0.25,
+              duration: 0.22,
               ease: [0.22, 1, 0.36, 1],
             }}
-            className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2"
+            className="pointer-events-none fixed inset-x-0 bottom-6 z-[80] flex justify-center px-4 safe-bottom"
           >
             <div
-              className={`flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-lg backdrop-blur-md ${
+              className={cn(
+                "pointer-events-auto flex max-w-md items-center gap-3 rounded-2xl border px-4 py-3 shadow-elevated backdrop-blur-md",
                 toast.type === "success"
-                  ? "border-emerald-200 bg-emerald-50/95 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
-                  : "border-red-200 bg-red-50/95 text-red-800 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-200"
-              }`}
-            >
-              {toast.type === "success" ? (
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                  <svg
-                    className="h-3.5 w-3.5"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M16.704 5.29a1 1 0 010 1.415l-7.5 7.5a1 1 0 01-1.415 0l-3.5-3.5a1 1 0 111.415-1.415l2.792 2.793 6.793-6.793a1 1 0 011.415 0z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-              ) : (
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-500 text-white">
-                  <X className="h-3.5 w-3.5" />
-                </div>
+                  ? "border-success-200 bg-success-50/95 text-success-700 dark:border-success-600/30 dark:bg-success-600/15 dark:text-success-200"
+                  : "border-danger-200 bg-danger-50/95 text-danger-700 dark:border-danger-500/30 dark:bg-danger-500/15 dark:text-danger-200"
               )}
+            >
+              <span
+                className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white",
+                  toast.type === "success"
+                    ? "bg-success-600"
+                    : "bg-danger-600"
+                )}
+              >
+                {toast.type === "success" ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <X className="h-3.5 w-3.5" />
+                )}
+              </span>
 
               <p className="text-sm font-semibold">
                 {toast.message}
@@ -1640,5 +1431,181 @@ export function AdminReviews() {
         )}
       </AnimatePresence>
     </DashboardLayout>
+  );
+}
+
+/* =========================================================
+   SHARED BITS
+========================================================= */
+
+function getReviewView(review: Review) {
+  return {
+    customerName: getCustomerName(review.customer),
+    customerImage: getImage(review.customer),
+    customerPhone: getPersonPhone(review.customer),
+    providerName: getProviderName(review.provider),
+    providerPhone: getPersonPhone(review.provider),
+    hidden: isReviewHidden(review),
+  };
+}
+
+function VisibilityBadge({ hidden }: { hidden: boolean }) {
+  return hidden ? (
+    <Badge tone="danger" icon={EyeOff}>
+      Hidden
+    </Badge>
+  ) : (
+    <Badge tone="success" icon={Eye}>
+      Visible
+    </Badge>
+  );
+}
+
+function ReviewActions({
+  hidden,
+  pending,
+  busy,
+  layout = "row",
+  onView,
+  onToggle,
+}: {
+  hidden: boolean;
+  pending: boolean;
+  busy: boolean;
+  layout?: "row" | "grid";
+  onView: () => void;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "items-center gap-2",
+        layout === "row"
+          ? "flex justify-end"
+          : "grid grid-cols-2"
+      )}
+    >
+      <button
+        type="button"
+        onClick={onView}
+        className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 transition-colors hover:border-brand-200 hover:bg-lavender hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-600/60 dark:border-ink-700 dark:bg-transparent dark:text-ink-300 dark:hover:border-ink-600 dark:hover:bg-ink-800 dark:hover:text-ink-50"
+      >
+        <Eye className="h-3.5 w-3.5" />
+        View
+      </button>
+
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={busy}
+        aria-busy={pending || undefined}
+        className={cn(
+          "inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60",
+          hidden
+            ? "border-success-200 bg-white text-success-700 hover:bg-success-50 focus-visible:ring-success-600/60 dark:border-success-600/30 dark:bg-transparent dark:text-success-200 dark:hover:bg-success-600/10"
+            : "border-danger-200 bg-white text-danger-600 hover:bg-danger-50 focus-visible:ring-danger-500/60 dark:border-danger-500/30 dark:bg-transparent dark:text-danger-200 dark:hover:bg-danger-500/10"
+        )}
+      >
+        {pending ? (
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        ) : hidden ? (
+          <Eye className="h-3.5 w-3.5" />
+        ) : (
+          <Ban className="h-3.5 w-3.5" />
+        )}
+
+        {pending
+          ? hidden
+            ? "Unhiding…"
+            : "Hiding…"
+          : hidden
+            ? "Unhide"
+            : "Hide"}
+      </button>
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  hint,
+  icon: Icon,
+  tone,
+  className,
+}: {
+  label: string;
+  value: string | number;
+  hint?: React.ReactNode;
+  icon: LucideIcon;
+  tone: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "card flex flex-col justify-between gap-3 p-4 transition-shadow hover:shadow-card-hover sm:p-5",
+        className
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-ink-400">
+          {label}
+        </p>
+
+        <span
+          className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-black/5 dark:ring-white/10",
+            tone
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+      </div>
+
+      <div>
+        <p className="text-2xl font-bold tracking-tight tabular-nums text-slate-900 dark:text-ink-50">
+          {value}
+        </p>
+
+        {hint && (
+          <div className="mt-1 text-xs text-slate-500 dark:text-ink-400">
+            {hint}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ReviewsSkeleton() {
+  return (
+    <div className="card overflow-hidden" aria-busy="true">
+      <div className="hidden items-center gap-4 border-b border-slate-100 bg-slate-50/80 px-4 py-3 dark:border-ink-800 dark:bg-ink-900/60 md:flex">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-28" />
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="ml-auto h-3 w-16" />
+      </div>
+
+      <div className="divide-y divide-slate-100 dark:divide-ink-800">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div
+            key={index}
+            className="flex items-center gap-3 px-4 py-4 sm:px-5"
+          >
+            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-40 max-w-full" />
+              <Skeleton className="h-3 w-56 max-w-full" />
+            </div>
+
+            <Skeleton className="hidden h-3 w-20 sm:block" />
+            <Skeleton className="h-8 w-20 shrink-0 rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

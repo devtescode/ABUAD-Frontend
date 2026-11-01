@@ -403,9 +403,9 @@ export function CustomerBrowse() {
         <div className="flex flex-col gap-4 bg-gradient-to-br from-brand-600 via-brand-500 to-brand-700 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:from-brand-700 dark:via-brand-600 dark:to-brand-800">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/20">
+              {/* <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/20">
                 <Sparkles className="h-4 w-4 text-white" />
-              </span>
+              </span> */}
 
               <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
                 Servicely Marketplace

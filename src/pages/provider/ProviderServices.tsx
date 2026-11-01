@@ -1,5 +1,5 @@
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     AlertCircle,
     AlertTriangle,
@@ -34,16 +34,16 @@ import {
     ErrorState,
     ResponsiveModal,
     SearchBar,
-    SkeletonCard,
+    Skeleton,
     cn,
+    type ServiceLike,
 } from '@/components/ui';
-
-// Keep this page on the same API instance as the admin status controls.
-// A hard-coded localhost URL can return stale service statuses from a
-// different backend than the one the admin just updated.
-const API_URL =
-    import.meta.env.VITE_API_URL ||
-    'http://localhost:5000';
+import {
+    useDeleteService,
+    useMyServices,
+    useUpdateService,
+} from '@/hooks/queries';
+import { hasUserToken } from '@/lib/api';
 
 interface Service {
     _id: string;
@@ -108,6 +108,9 @@ const getStatusMeta = (status?: string): {
         case 'suspended':
             return { label: 'Suspended', tone: 'danger', icon: AlertTriangle };
 
+        case 'inactive':
+            return { label: 'Inactive', tone: 'neutral', icon: Info };
+
         default:
             return { label: status || 'Active', tone: 'neutral', icon: Info };
     }
@@ -121,6 +124,68 @@ const isActiveStatus = (status?: string) => {
 const isPendingStatus = (status?: string) =>
     (status || '').toLowerCase() === 'pending';
 
+const releasePreviewUrl = (url?: string) => {
+    if (url?.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+    }
+};
+
+const normalizeService = (raw: ServiceLike): Service => ({
+    _id: String(raw._id || raw.id || ''),
+    provider:
+        typeof raw.provider === 'string'
+            ? raw.provider
+            : String(raw.provider?._id || raw.provider?.id || ''),
+    title: String(raw.title || 'Untitled service'),
+    category: String(raw.category || 'Uncategorised'),
+    price: Number(raw.price || 0),
+    duration: String(raw.duration || 'Flexible'),
+    description: String(raw.description || ''),
+    image: typeof raw.image === 'string' ? raw.image : '',
+    status: String(
+        raw.status || (raw.isActive === false ? 'inactive' : 'active')
+    ),
+    createdAt:
+        typeof raw.createdAt === 'string' ? raw.createdAt : undefined,
+    updatedAt:
+        typeof raw.updatedAt === 'string' ? raw.updatedAt : undefined,
+});
+
+/* =========================================================
+   LOADING CARD
+========================================================= */
+
+function ServiceCardSkeleton() {
+    return (
+        <div className="card overflow-hidden">
+            <Skeleton className="aspect-[16/10] w-full rounded-none" />
+
+            <div className="space-y-3 p-4 sm:p-5">
+                <Skeleton className="h-4 w-3/4" />
+
+                <div className="flex gap-2">
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+
+                <div className="flex items-center justify-between pt-2">
+                    <Skeleton className="h-6 w-24" />
+                    <Skeleton className="h-7 w-20 rounded-lg" />
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                    <Skeleton className="h-9 flex-1 rounded-lg" />
+                    <Skeleton className="h-9 w-9 rounded-lg" />
+                    <Skeleton className="h-9 w-9 rounded-lg" />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 /* =========================================================
    PAGE
 ========================================================= */
@@ -128,13 +193,22 @@ const isPendingStatus = (status?: string) =>
 type StatusFilter = 'all' | 'active' | 'pending';
 
 export function ProviderServices() {
-    const [services, setServices] = useState<Service[]>([]);
-    const [loading, setLoading] = useState(true);
+    const {
+        data: rawServices,
+        isLoading,
+        isError,
+        error: listError,
+        refetch,
+    } = useMyServices();
 
-    // Fetch failures (list could not be loaded) vs. action errors
-    // (edit/delete/validation) so each one renders in the right place.
-    const [listError, setListError] = useState('');
+    const updateService = useUpdateService();
+    const deleteService = useDeleteService();
+
+    const hasSession = hasUserToken();
+
+    // Action failures (edit/delete/validation) and success feedback.
     const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
 
     // Toolbar
     const [search, setSearch] = useState('');
@@ -158,91 +232,26 @@ export function ProviderServices() {
 
     const [editImage, setEditImage] = useState<File | null>(null);
     const [editImagePreview, setEditImagePreview] = useState('');
-    const [editLoading, setEditLoading] = useState(false);
 
     // Delete
     const [deletingService, setDeletingService] = useState<Service | null>(null);
     const [deleteOpen, setDeleteOpen] = useState(false);
-    const [deleteLoading, setDeleteLoading] = useState(false);
 
-    const getToken = () => {
-        return sessionStorage.getItem('servicely_token');
-    };
+    const services = useMemo(
+        () => (rawServices ?? []).map(normalizeService),
+        [rawServices]
+    );
 
-    // ==========================================
-    // FETCH SERVICES
-    // ==========================================
+    const listErrorMessage = isError
+        ? listError instanceof Error
+            ? listError.message
+            : 'Failed to load your services.'
+        : !hasSession
+          ? 'Your session has expired. Please log in again.'
+          : '';
 
-
-    const fetchServices = async () => {
-        try {
-            setLoading(true);
-            setListError('');
-
-            const token = getToken();
-
-            if (!token) {
-                setListError('Your session has expired. Please log in again.');
-                return;
-            }
-
-            const response = await fetch(
-                `${API_URL}/provider/services`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        Accept: 'application/json',
-                        'Cache-Control': 'no-cache',
-                    },
-                    cache: 'no-store',
-                }
-            );
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    result.message ||
-                    'Failed to load your services.'
-                );
-            }
-
-            const fetchedServices = Array.isArray(result.services)
-                ? result.services
-                : [];
-
-            console.log(
-                'Provider services fetched:',
-                fetchedServices.map((service: Service) => ({
-                    id: service._id,
-                    title: service.title,
-                    status: service.status,
-                }))
-            );
-
-            setServices(fetchedServices);
-        } catch (error) {
-            console.error(
-                'Fetch services error:',
-                error
-            );
-
-            setListError(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to load your services.'
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-
-
-    useEffect(() => {
-        fetchServices();
-    }, []);
+    const isUpdating = updateService.isPending;
+    const isDeleting = deleteService.isPending;
 
     // ==========================================
     // FILTERS (client side)
@@ -295,6 +304,7 @@ export function ProviderServices() {
         setViewingService(service);
         setViewOpen(true);
         setError('');
+        setSuccessMessage('');
     };
 
     // ==========================================
@@ -305,6 +315,7 @@ export function ProviderServices() {
         setDeletingService(service);
         setDeleteOpen(true);
         setError('');
+        setSuccessMessage('');
     };
 
     // ==========================================
@@ -323,9 +334,25 @@ export function ProviderServices() {
             description: service.description,
         });
 
+        releasePreviewUrl(editImagePreview);
         setEditImage(null);
         setEditImagePreview(service.image);
         setError('');
+        setSuccessMessage('');
+    };
+
+    const closeEditModal = () => {
+        if (isUpdating) return;
+
+        releasePreviewUrl(editImagePreview);
+        setEditOpen(false);
+        setEditImage(null);
+        setEditImagePreview('');
+    };
+
+    const closeDeleteModal = () => {
+        if (isDeleting) return;
+        setDeleteOpen(false);
     };
 
     // ==========================================
@@ -350,6 +377,7 @@ export function ProviderServices() {
         }
 
         setError('');
+        releasePreviewUrl(editImagePreview);
         setEditImage(file);
 
         const previewUrl = URL.createObjectURL(file);
@@ -361,11 +389,9 @@ export function ProviderServices() {
     // ==========================================
 
     const removeEditImage = () => {
+        releasePreviewUrl(editImagePreview);
         setEditImage(null);
-
-        if (editingService) {
-            setEditImagePreview(editingService.image);
-        }
+        setEditImagePreview(editingService?.image || '');
     };
 
     // ==========================================
@@ -376,6 +402,7 @@ export function ProviderServices() {
         if (!editingService) return;
 
         setError('');
+        setSuccessMessage('');
 
         if (!editForm.title.trim()) {
             setError('Please enter a service title.');
@@ -398,15 +425,6 @@ export function ProviderServices() {
         }
 
         try {
-            setEditLoading(true);
-
-            const token = getToken();
-
-            if (!token) {
-                setError('Your session has expired. Please log in again.');
-                return;
-            }
-
             const data = new FormData();
 
             data.append('title', editForm.title.trim());
@@ -420,49 +438,22 @@ export function ProviderServices() {
                 data.append('image', editImage);
             }
 
-            const response = await fetch(
-                `${API_URL}/provider/services/${editingService._id}`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: data,
-                }
-            );
+            await updateService.mutateAsync({
+                id: editingService._id,
+                formData: data,
+            });
 
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    result.message || 'Failed to update service.'
-                );
-            }
-
-            // Update service in UI immediately
-            setServices((prev) =>
-                prev.map((service) =>
-                    service._id === editingService._id
-                        ? result.service
-                        : service
-                )
-            );
-
-            // Close modal
+            releasePreviewUrl(editImagePreview);
             setEditOpen(false);
             setEditImage(null);
             setEditImagePreview('');
-
-        } catch (error) {
-            console.error('Update service error:', error);
-
+            setSuccessMessage('Service updated successfully.');
+        } catch (mutationError) {
             setError(
-                error instanceof Error
-                    ? error.message
+                mutationError instanceof Error
+                    ? mutationError.message
                     : 'Failed to update service.'
             );
-        } finally {
-            setEditLoading(false);
         }
     };
 
@@ -473,53 +464,19 @@ export function ProviderServices() {
     const handleDelete = async () => {
         if (!deleteOpen || !deletingService) return;
 
+        setError('');
+        setSuccessMessage('');
+
         try {
-            setDeleteLoading(true);
-            setError('');
-
-            const token = getToken();
-
-            if (!token) {
-                setError('Your session has expired. Please log in again.');
-                return;
-            }
-
-            const response = await fetch(
-                `${API_URL}/provider/services/${deletingService._id}`,
-                {
-                    method: 'DELETE',
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    result.message || 'Failed to delete service.'
-                );
-            }
-
-            setServices((prev) =>
-                prev.filter(
-                    (service) => service._id !== deletingService._id
-                )
-            );
-
+            await deleteService.mutateAsync(deletingService._id);
             setDeleteOpen(false);
-
-        } catch (error) {
-            console.error('Delete service error:', error);
-
+            setSuccessMessage('Service deleted successfully.');
+        } catch (mutationError) {
             setError(
-                error instanceof Error
-                    ? error.message
+                mutationError instanceof Error
+                    ? mutationError.message
                     : 'Failed to delete service.'
             );
-        } finally {
-            setDeleteLoading(false);
         }
     };
 
@@ -557,13 +514,41 @@ export function ProviderServices() {
                 action={
                     <Link
                         to="/provider/add-service"
-                        className="btn-primary"
+                        className="btn-primary w-full justify-center sm:w-auto"
                     >
                         <Plus className="h-4 w-4" />
                         Add Service
                     </Link>
                 }
             />
+
+            {/* =====================================================
+          SUCCESS BANNER
+      ===================================================== */}
+
+            <AnimatePresence>
+                {successMessage && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        role="status"
+                        className="mb-6 flex items-center gap-3 rounded-xl border border-success-100 bg-success-50 px-4 py-3 text-sm text-success-700 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-200"
+                    >
+                        <CheckCircle2 className="h-5 w-5 shrink-0" />
+                        <span>{successMessage}</span>
+
+                        <button
+                            type="button"
+                            onClick={() => setSuccessMessage('')}
+                            aria-label="Dismiss success message"
+                            className="ml-auto rounded-lg p-1 transition hover:bg-success-100 dark:hover:bg-success-500/20"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* =====================================================
           TOOLBAR — search + status filter chips
@@ -624,19 +609,19 @@ export function ProviderServices() {
           LIST ERROR BANNER (refresh failed but list still visible)
       ===================================================== */}
 
-            {listError && services.length > 0 && (
+            {listErrorMessage && services.length > 0 && (
                 <div
                     role="alert"
                     className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-danger-100 bg-danger-50 px-4 py-3 text-sm text-danger-700 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-200"
                 >
                     <AlertCircle className="h-5 w-5 shrink-0" />
-                    <span>{listError}</span>
+                    <span>{listErrorMessage}</span>
 
                     <Button
                         variant="outline"
                         size="sm"
                         className="ml-auto"
-                        onClick={fetchServices}
+                        onClick={() => refetch()}
                     >
                         Retry
                     </Button>
@@ -672,25 +657,25 @@ export function ProviderServices() {
           CONTENT
       ===================================================== */}
 
-            {loading ? (
+            {isLoading ? (
 
                 /* LOADING */
                 <div
-                    className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3"
+                    className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3"
                     aria-busy="true"
                     aria-label="Loading your services"
                 >
                     {[1, 2, 3, 4, 5, 6].map((item) => (
-                        <SkeletonCard key={item} />
+                        <ServiceCardSkeleton key={item} />
                     ))}
                 </div>
 
-            ) : listError && services.length === 0 ? (
+            ) : listErrorMessage && services.length === 0 ? (
 
                 /* FETCH ERROR */
                 <ErrorState
-                    message={listError}
-                    onRetry={fetchServices}
+                    message={listErrorMessage}
+                    onRetry={hasSession ? () => refetch() : undefined}
                 />
 
             ) : services.length === 0 ? (
@@ -701,7 +686,10 @@ export function ProviderServices() {
                     title="You haven't added any services yet"
                     description="Create your first service to start offering your work to ABUAD students."
                     action={
-                        <Link to="/provider/add-service" className="btn-primary">
+                        <Link
+                            to="/provider/add-service"
+                            className="btn-primary w-full justify-center sm:w-auto"
+                        >
                             <Plus className="h-4 w-4" />
                             Add Service
                         </Link>
@@ -741,7 +729,7 @@ export function ProviderServices() {
                         {services.length === 1 ? 'service' : 'services'}
                     </p>
 
-                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                         <AnimatePresence mode="popLayout">
                             {filteredServices.map((service, index) => {
                                 const meta = getStatusMeta(service.status);
@@ -767,7 +755,7 @@ export function ProviderServices() {
                                             delay: Math.min(index, 7) * 0.04,
                                         }}
                                         whileHover={{ y: -4 }}
-                                        className="card-hover group flex flex-col overflow-hidden"
+                                        className="card-hover group flex flex-col overflow-hidden focus-within:ring-2 focus-within:ring-brand-500/25"
                                     >
                                         {/* ================= IMAGE ================= */}
                                         <div className="relative aspect-[16/10] overflow-hidden bg-lavender">
@@ -783,6 +771,22 @@ export function ProviderServices() {
                                                     <ImageIcon className="h-10 w-10 text-brand-400 dark:text-brand-500" />
                                                 </div>
                                             )}
+
+                                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/30 via-transparent to-transparent" />
+
+                                            <span className="absolute left-3 top-3 max-w-[60%] truncate rounded-full bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-brand-700 shadow-sm backdrop-blur dark:bg-ink-900/90 dark:text-brand-300">
+                                                {service.category}
+                                            </span>
+
+                                            <div className="absolute right-3 top-3">
+                                                <Badge
+                                                    tone={meta.tone}
+                                                    icon={meta.icon}
+                                                    className="shadow-sm backdrop-blur"
+                                                >
+                                                    {meta.label}
+                                                </Badge>
+                                            </div>
                                         </div>
 
                                         {/* ================= CONTENT ================= */}
@@ -791,17 +795,6 @@ export function ProviderServices() {
                                             <h3 className="line-clamp-1 text-base font-semibold text-slate-900 dark:text-ink-50">
                                                 {service.title}
                                             </h3>
-
-                                            {/* Category + approval status */}
-                                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                                <Badge tone="brand" icon={Tag}>
-                                                    {service.category}
-                                                </Badge>
-
-                                                <Badge tone={meta.tone} icon={meta.icon}>
-                                                    {meta.label}
-                                                </Badge>
-                                            </div>
 
                                             {/* Description */}
                                             <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-slate-500 dark:text-ink-400">
@@ -833,7 +826,7 @@ export function ProviderServices() {
                                                         variant="outline"
                                                         size="sm"
                                                         icon={Pencil}
-                                                        className="flex-1"
+                                                        className="min-w-0 flex-1"
                                                         onClick={() => openEditModal(service)}
                                                     >
                                                         Edit
@@ -844,7 +837,7 @@ export function ProviderServices() {
                                                         onClick={() => openViewModal(service)}
                                                         aria-label={`View details of ${service.title}`}
                                                         title="View details"
-                                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-brand-300 hover:bg-lavender hover:text-brand-700 dark:border-ink-700 dark:text-ink-400 dark:hover:border-ink-600 dark:hover:bg-ink-800 dark:hover:text-brand-300"
+                                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-brand-300 hover:bg-lavender hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500/40 dark:border-ink-700 dark:text-ink-400 dark:hover:border-ink-600 dark:hover:bg-ink-800 dark:hover:text-brand-300"
                                                     >
                                                         <Eye className="h-4 w-4" />
                                                     </button>
@@ -854,7 +847,7 @@ export function ProviderServices() {
                                                         onClick={() => openDeleteModal(service)}
                                                         aria-label={`Delete ${service.title}`}
                                                         title="Delete service"
-                                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-danger-100 bg-danger-50 text-danger-600 transition hover:bg-danger-100 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400 dark:hover:bg-danger-500/20"
+                                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-danger-100 bg-danger-50 text-danger-600 transition hover:bg-danger-100 focus-visible:ring-2 focus-visible:ring-danger-500/40 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400 dark:hover:bg-danger-500/20"
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </button>
@@ -985,11 +978,7 @@ export function ProviderServices() {
 
             <ResponsiveModal
                 open={editOpen}
-                onClose={() => {
-                    if (!editLoading) {
-                        setEditOpen(false);
-                    }
-                }}
+                onClose={closeEditModal}
                 title="Edit service"
                 footer={
                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1001,15 +990,15 @@ export function ProviderServices() {
                         <div className="flex gap-3">
                             <Button
                                 variant="outline"
-                                onClick={() => setEditOpen(false)}
-                                disabled={editLoading}
+                                onClick={closeEditModal}
+                                disabled={isUpdating}
                             >
                                 Cancel
                             </Button>
 
                             <Button
                                 icon={Save}
-                                loading={editLoading}
+                                loading={isUpdating}
                                 onClick={handleUpdateService}
                             >
                                 Save changes
@@ -1019,6 +1008,17 @@ export function ProviderServices() {
                 }
             >
                 {inlineError}
+
+                {editingService && (
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 dark:border-ink-800 dark:bg-ink-800/50">
+                        <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-ink-400">
+                            <Tag className="h-3.5 w-3.5" />
+                            {editingService.category}
+                        </span>
+
+                        {statusBadge(editingService)}
+                    </div>
+                )}
 
                 {/* ================= IMAGE SECTION ================= */}
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-ink-800 dark:bg-ink-800/50">
@@ -1047,7 +1047,12 @@ export function ProviderServices() {
                             </p>
 
                             <div className="mt-3 flex flex-wrap items-center gap-2">
-                                <label className="btn-outline btn-sm cursor-pointer">
+                                <label
+                                    className={cn(
+                                        'btn-outline btn-sm cursor-pointer',
+                                        isUpdating && 'pointer-events-none opacity-50'
+                                    )}
+                                >
                                     <Camera className="h-3.5 w-3.5" />
                                     Change image
 
@@ -1057,6 +1062,7 @@ export function ProviderServices() {
                                         className="sr-only"
                                         aria-label="Upload a new service image"
                                         onChange={handleEditImageChange}
+                                        disabled={isUpdating}
                                     />
                                 </label>
 
@@ -1064,6 +1070,7 @@ export function ProviderServices() {
                                     <button
                                         type="button"
                                         onClick={removeEditImage}
+                                        disabled={isUpdating}
                                         className="btn btn-sm border border-danger-100 bg-danger-50 text-danger-600 hover:bg-danger-100 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-400"
                                     >
                                         <X className="h-3.5 w-3.5" />
@@ -1100,6 +1107,7 @@ export function ProviderServices() {
                             }
                             placeholder="e.g. Professional Event Photography"
                             className="input"
+                            disabled={isUpdating}
                         />
                     </div>
 
@@ -1120,6 +1128,7 @@ export function ProviderServices() {
                                     })
                                 }
                                 className="input appearance-none pr-10"
+                                disabled={isUpdating}
                             >
                                 {categories.map((category) => (
                                     <option key={category} value={category}>
@@ -1157,6 +1166,7 @@ export function ProviderServices() {
                                     }
                                     placeholder="0"
                                     className="input pl-9"
+                                    disabled={isUpdating}
                                 />
                             </div>
                         </div>
@@ -1181,6 +1191,7 @@ export function ProviderServices() {
                                     }
                                     placeholder="e.g. 2 hours"
                                     className="input pl-10"
+                                    disabled={isUpdating}
                                 />
                             </div>
                         </div>
@@ -1213,6 +1224,7 @@ export function ProviderServices() {
                             }
                             placeholder="Describe what customers will receive..."
                             className="form-textarea mt-1.5"
+                            disabled={isUpdating}
                         />
                     </div>
                 </div>
@@ -1225,18 +1237,14 @@ export function ProviderServices() {
 
             <ResponsiveModal
                 open={deleteOpen}
-                onClose={() => {
-                    if (!deleteLoading) {
-                        setDeleteOpen(false);
-                    }
-                }}
+                onClose={closeDeleteModal}
                 title="Delete service?"
                 footer={
                     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                         <Button
                             variant="outline"
-                            onClick={() => setDeleteOpen(false)}
-                            disabled={deleteLoading}
+                            onClick={closeDeleteModal}
+                            disabled={isDeleting}
                         >
                             Cancel
                         </Button>
@@ -1244,7 +1252,7 @@ export function ProviderServices() {
                         <Button
                             variant="danger"
                             icon={Trash2}
-                            loading={deleteLoading}
+                            loading={isDeleting}
                             onClick={handleDelete}
                         >
                             Delete service

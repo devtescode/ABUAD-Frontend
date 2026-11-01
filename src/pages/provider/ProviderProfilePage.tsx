@@ -33,6 +33,7 @@ import {
   MapPin,
   Maximize2,
   MessageCircle,
+  RefreshCw,
   Share2,
   ShieldCheck,
   Star,
@@ -45,11 +46,13 @@ import {
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { customerNavItems } from "@/data/customerNavItems";
 import { useBookings } from "@/context/AppContext";
-
-
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000";
+import { ErrorState } from "@/components/ui";
+import {
+  useProviderDetails,
+  useProviderPortfolio,
+  useProviderReviews,
+} from "@/hooks/queries";
+import { getApiErrorMessage, hasUserToken } from "@/lib/api";
 
 /* =========================================================
    TYPES
@@ -201,32 +204,6 @@ interface Review {
   updatedAt?: string;
 }
 
-interface ProviderProfileResponse {
-  success: boolean;
-  message?: string;
-
-  provider?: Provider;
-  services?: Service[];
-}
-
-interface ProviderReviewsResponse {
-  success: boolean;
-  message?: string;
-
-  count?: number;
-  averageRating?: number;
-  reviews?: Review[];
-}
-
-interface PortfolioResponse {
-  success?: boolean;
-  message?: string;
-
-  count?: number;
-
-  portfolio?: PortfolioItem[];
-}
-
 interface ProviderProfileLocationState {
   providerServices?: Service[];
 }
@@ -359,10 +336,12 @@ function EmptyState({
   icon,
   title,
   description,
+  action,
 }: {
   icon: ReactNode;
   title: string;
   description: string;
+  action?: ReactNode;
 }) {
   return (
     <div className="flex min-h-[300px] flex-col items-center justify-center rounded-3xl border border-dashed border-ink-200 bg-white px-6 text-center shadow-sm dark:border-ink-800 dark:bg-ink-900">
@@ -377,6 +356,8 @@ function EmptyState({
       <p className="mt-2 max-w-md text-sm leading-6 text-ink-500 dark:text-ink-400">
         {description}
       </p>
+
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
@@ -412,38 +393,152 @@ export default function ProviderProfilePage() {
   );
 
   /* =========================================================
-     STATE
+     DATA (React Query)
   ========================================================= */
 
-  const [provider, setProvider] =
-    useState<Provider | null>(null);
+  const {
+    data: profileData,
+    isLoading: profileLoading,
+    isError: profileIsError,
+    error: profileQueryError,
+    refetch: refetchProfile,
+  } = useProviderDetails(id);
 
-  const [services, setServices] =
-    useState<Service[]>([]);
+  const {
+    data: reviewsData,
+    isLoading: reviewsLoading,
+    isError: reviewsIsError,
+    error: reviewsQueryError,
+    refetch: refetchReviews,
+  } = useProviderReviews(id);
 
-  const [reviews, setReviews] =
-    useState<Review[]>([]);
+  const {
+    data: portfolioData,
+    isLoading: portfolioLoading,
+    isError: portfolioIsError,
+    error: portfolioQueryError,
+    refetch: refetchPortfolio,
+  } = useProviderPortfolio(id);
 
-  const [reviewsLoading, setReviewsLoading] =
-    useState(false);
+  /*
+   * Keep customers on the dedicated login screen when their session
+   * is missing. The query hooks themselves are auth-aware (optional),
+   * so profile data can still render for public link previews.
+   */
+  useEffect(() => {
+    if (id && !hasUserToken()) {
+      navigate("/login/customer", { replace: true });
+    }
+  }, [id, navigate]);
 
-  const [portfolioItems, setPortfolioItems] =
-    useState<PortfolioItem[]>([]);
+  const provider = useMemo<Provider | null>(() => {
+    const rawProvider =
+      profileData?.provider as unknown as Provider | undefined;
+
+    if (!rawProvider) return null;
+
+    const completedBookings = Number(
+      rawProvider.completedBookings
+    );
+
+    return {
+      ...rawProvider,
+      completedBookings: Number.isFinite(completedBookings)
+        ? completedBookings
+        : undefined,
+    };
+  }, [profileData]);
+
+  const services = useMemo<Service[]>(() => {
+    const rawProvider =
+      profileData?.provider as unknown as Provider | undefined;
+
+    const profileServices = Array.isArray(
+      profileData?.services
+    )
+      ? (profileData.services as unknown as Service[])
+      : Array.isArray(rawProvider?.services)
+        ? rawProvider.services
+        : [];
+
+    return profileServices.length > 0
+      ? profileServices
+      : routeServices;
+  }, [profileData, routeServices]);
+
+  /*
+   * Hidden reviews are filtered BEFORE they reach the component so
+   * admin moderation is respected by the count, average rating and
+   * the visible list.
+   */
+  const reviews = useMemo<Review[]>(() => {
+    const allReviews = Array.isArray(reviewsData?.reviews)
+      ? (reviewsData.reviews as unknown as Review[])
+      : [];
+
+    return allReviews.filter(
+      (review) => !isReviewHidden(review)
+    );
+  }, [reviewsData]);
+
+  const portfolioItems = useMemo<PortfolioItem[]>(() => {
+    const portfolio = Array.isArray(portfolioData)
+      ? ([...portfolioData] as unknown as PortfolioItem[])
+      : [];
+
+    portfolio.sort((a, b) => {
+      if (!a.createdAt || !b.createdAt) {
+        return 0;
+      }
+
+      return (
+        new Date(b.createdAt).getTime() -
+        new Date(a.createdAt).getTime()
+      );
+    });
+
+    return portfolio;
+  }, [portfolioData]);
+
+  /* A small, decorative preview of the provider's latest work. */
+  const heroGallery = useMemo(
+    () =>
+      portfolioItems
+        .map((item) => getPortfolioImage(item))
+        .filter((image) => Boolean(image))
+        .slice(0, 3),
+    [portfolioItems]
+  );
+
+  const profileError = !id
+    ? "Provider profile could not be found."
+    : profileIsError
+      ? getApiErrorMessage(profileQueryError)
+      : profileData &&
+        profileData.success === false
+        ? (profileData.message ||
+          "Failed to load provider profile.")
+        : profileData && !profileData.provider
+          ? "Provider profile was not returned by the server."
+          : "";
+
+  const reviewsError = reviewsIsError
+    ? getApiErrorMessage(reviewsQueryError)
+    : reviewsData && reviewsData.success === false
+      ? (reviewsData.message ||
+        "Unable to load provider reviews.")
+      : "";
+
+  const portfolioError = portfolioIsError
+    ? getApiErrorMessage(portfolioQueryError)
+    : "";
+
+  /* =========================================================
+     UI STATE
+  ========================================================= */
 
   const [activeTab, setActiveTab] =
     useState<TabType>("services");
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [portfolioLoading, setPortfolioLoading] =
-    useState(false);
-
-  const [portfolioError, setPortfolioError] =
-    useState("");
 
   const [savingProvider, setSavingProvider] =
     useState(false);
@@ -495,404 +590,6 @@ export default function ProviderProfilePage() {
   ];
 
   /* =========================================================
-     FETCH PROVIDER PROFILE
-     
-     IMPORTANT:
-     
-     This effect ONLY fetches the provider profile and their
-     services. It does NOT touch reviews.
-     
-     Reviews are owned exclusively by the dedicated reviews
-     effect below, which also filters out hidden reviews.
-  ========================================================= */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchProviderProfile = async () => {
-      if (!id) {
-        setError(
-          "Provider profile could not be found."
-        );
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setError("");
-
-        const token =
-          sessionStorage.getItem(
-            "servicely_token"
-          );
-
-        if (!token) {
-          navigate("/login/customer", {
-            replace: true,
-          });
-          return;
-        }
-
-        const response = await fetch(
-          `${API_URL}/provider/eachprofiledetails/${encodeURIComponent(
-            id
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          }
-        );
-
-        let result: ProviderProfileResponse;
-
-        try {
-          result = await response.json();
-        } catch {
-          throw new Error(
-            "The server returned an invalid response."
-          );
-        }
-
-        if (
-          !response.ok ||
-          !result.success
-        ) {
-          throw new Error(
-            result.message ||
-            `Failed to load provider profile. (${response.status})`
-          );
-        }
-
-        if (!result.provider) {
-          throw new Error(
-            "Provider profile was not returned by the server."
-          );
-        }
-
-        if (cancelled) return;
-
-        const completedBookings = Number(
-          result.provider.completedBookings
-        );
-        setProvider({
-          ...result.provider,
-          completedBookings: Number.isFinite(completedBookings)
-            ? completedBookings
-            : undefined,
-        });
-
-        const profileServices =
-          Array.isArray(result.services)
-            ? result.services
-            : Array.isArray(
-              result.provider.services
-            )
-              ? result.provider.services
-              : [];
-
-        setServices(
-          profileServices.length > 0
-            ? profileServices
-            : routeServices
-        );
-      } catch (err) {
-        if (cancelled) return;
-
-        console.error(
-          "Fetch provider profile error:",
-          err
-        );
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load provider profile."
-        );
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchProviderProfile();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id, navigate, routeServices]);
-
-
-  /* =========================================================
-     FETCH PROVIDER REVIEWS
-     
-     IMPORTANT:
-     
-     Reviews are fetched separately from the provider profile
-     because reviews have their own public endpoint:
-     
-       /reviews/provider/:providerId
-     
-     This allows every customer to see reviews left by
-     previous customers.
-     
-     HIDDEN REVIEWS:
-     
-     Any review marked as hidden by an admin is filtered out
-     BEFORE being stored in state. This guarantees hidden
-     reviews never appear anywhere in the customer view —
-     not in the count, not in the average rating, not in
-     the list.
-  ========================================================= */
-
-  useEffect(() => {
-    if (!id) {
-      setReviewsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    const fetchProviderReviews = async () => {
-      try {
-        setReviewsLoading(true);
-
-        const token =
-          sessionStorage.getItem(
-            "servicely_token"
-          );
-
-        const response = await fetch(
-          `${API_URL}/reviews/provider/${encodeURIComponent(
-            id
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              Accept: "application/json",
-              ...(token
-                ? {
-                  Authorization: `Bearer ${token}`,
-                }
-                : {}),
-            },
-            cache: "no-store",
-          }
-        );
-
-        const result: ProviderReviewsResponse =
-          await response.json();
-
-        // console.log("Review API result:", result);
-        // console.log(
-        //   "Review API reviews:",
-        //   result.reviews
-        // );
-
-        if (
-          !response.ok ||
-          result.success === false
-        ) {
-          throw new Error(
-            result.message ||
-            "Unable to load provider reviews."
-          );
-        }
-
-        if (!cancelled) {
-          const allReviews = Array.isArray(
-            result.reviews
-          )
-            ? result.reviews
-            : [];
-
-          /*
-           * Filter out any reviews that were hidden by an
-           * admin. This keeps the customer view in sync with
-           * the admin panel's Hide/Unhide action.
-           */
-          const visibleReviews = allReviews.filter(
-            (review) => !isReviewHidden(review)
-          );
-
-          console.log(
-            "Visible reviews after filtering:",
-            visibleReviews
-          );
-
-          setReviews(visibleReviews);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error(
-            "Fetch provider reviews error:",
-            error
-          );
-          setReviews([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setReviewsLoading(false);
-        }
-      }
-    };
-
-    fetchProviderReviews();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  /* =========================================================
-     FETCH THIS PROVIDER'S PORTFOLIO
-     
-     IMPORTANT:
-     
-     We are NOT using:
-     
-       /portfolio/allportfolio
-     
-     We are using:
-     
-       /portfolio/provider/:providerId
-     
-     This matches the new backend controller.
-  ========================================================= */
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchProviderPortfolio = async () => {
-      if (!id) return;
-
-      try {
-        setPortfolioLoading(true);
-        setPortfolioError("");
-
-        const token =
-          sessionStorage.getItem(
-            "servicely_token"
-          );
-
-        if (!token) {
-          return;
-        }
-
-        const portfolioUrl =
-          `${API_URL}/portfolio/provider/${encodeURIComponent(
-            id
-          )}`;
-
-        console.log(
-          "Fetching provider portfolio from:",
-          portfolioUrl
-        );
-
-        const response = await fetch(
-          portfolioUrl,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          }
-        );
-
-        let result: PortfolioResponse;
-
-        try {
-          result = await response.json();
-        } catch {
-          throw new Error(
-            "The portfolio server returned an invalid response."
-          );
-        }
-
-        // console.log(
-        //   "Provider portfolio response:",
-        //   result
-        // );
-
-        if (
-          !response.ok ||
-          result.success === false
-        ) {
-          throw new Error(
-            result.message ||
-            `Failed to load portfolio. (${response.status})`
-          );
-        }
-
-        if (cancelled) return;
-
-        const portfolio = Array.isArray(
-          result.portfolio
-        )
-          ? result.portfolio
-          : [];
-
-        /*
-         * Backend already filters by provider.
-         *
-         * We therefore DO NOT need to filter
-         * every portfolio on the frontend.
-         */
-
-        portfolio.sort((a, b) => {
-          if (
-            !a.createdAt ||
-            !b.createdAt
-          ) {
-            return 0;
-          }
-
-          return (
-            new Date(
-              b.createdAt
-            ).getTime() -
-            new Date(
-              a.createdAt
-            ).getTime()
-          );
-        });
-
-        setPortfolioItems(portfolio);
-      } catch (err) {
-        if (cancelled) return;
-
-        console.error(
-          "Fetch provider portfolio error:",
-          err
-        );
-
-        setPortfolioError(
-          err instanceof Error
-            ? err.message
-            : "Failed to load provider portfolio."
-        );
-
-        setPortfolioItems([]);
-      } finally {
-        if (!cancelled) {
-          setPortfolioLoading(false);
-        }
-      }
-    };
-
-    fetchProviderPortfolio();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  /* =========================================================
      ACTIVE SERVICES
   ========================================================= */
 
@@ -900,6 +597,14 @@ export default function ProviderProfilePage() {
     (service) =>
       service.status !== "rejected"
   );
+
+  const startingPrice = activeServices.length
+    ? Math.min(
+      ...activeServices.map((service) =>
+        Number(service.price || 0)
+      )
+    )
+    : 0;
 
   /* =========================================================
      PROVIDER DATA
@@ -1298,40 +1003,73 @@ export default function ProviderProfilePage() {
      LOADING STATE
   ========================================================= */
 
-  if (loading) {
+  if (profileLoading) {
     return (
       <DashboardLayout
         role="customer"
         navItems={customerNavItems}
       >
-        <div className="min-h-screen bg-ink-50 px-4 py-8 dark:bg-ink-950 sm:px-6 lg:px-8">
+        <div
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+          className="min-h-screen bg-[#f7f8f7] px-4 py-6 dark:bg-ink-950 sm:px-6 lg:px-8"
+        >
+          <span className="sr-only">
+            Loading provider profile…
+          </span>
+
           <div className="mx-auto max-w-7xl">
-            <div className="mb-6 h-6 w-32 animate-pulse rounded bg-ink-200 dark:bg-ink-800" />
+            <div className="mb-5 h-10 w-24 animate-pulse rounded-full bg-ink-200 dark:bg-ink-800" />
 
-            <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900">
-              <div className="h-56 animate-pulse bg-ink-100 dark:bg-ink-800" />
+            <div className="overflow-hidden rounded-3xl border border-ink-100 bg-ink-950 dark:border-ink-800">
+              <div className="h-64 animate-pulse bg-gradient-to-br from-ink-800 via-ink-900 to-ink-800 sm:h-72" />
 
-              <div className="p-6 sm:p-8">
-                <div className="-mt-20 flex flex-col gap-5 sm:flex-row sm:items-end">
-                  <div className="h-28 w-28 animate-pulse rounded-full border-4 border-white bg-ink-200 dark:border-ink-900 dark:bg-ink-700" />
+              <div className="px-5 pb-8 sm:px-8">
+                <div className="-mt-14 flex flex-col gap-5 sm:-mt-16 sm:flex-row sm:items-end">
+                  <div className="h-28 w-28 animate-pulse rounded-[1.4rem] border-4 border-white bg-ink-700 dark:border-ink-900 sm:h-32 sm:w-32" />
 
-                  <div className="flex-1 space-y-3">
-                    <div className="h-7 w-64 animate-pulse rounded bg-ink-200 dark:bg-ink-700" />
+                  <div className="flex-1 space-y-3 pb-1">
+                    <div className="h-8 w-64 max-w-full animate-pulse rounded-lg bg-white/15" />
+                    <div className="h-4 w-44 animate-pulse rounded bg-white/10" />
 
-                    <div className="h-4 w-40 animate-pulse rounded bg-ink-200 dark:bg-ink-700" />
+                    <div className="flex gap-2">
+                      <div className="h-8 w-24 animate-pulse rounded-full bg-white/10" />
+                      <div className="h-8 w-28 animate-pulse rounded-full bg-white/10" />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-6 lg:grid-cols-3">
-              {Array.from({
-                length: 3,
-              }).map((_, index) => (
+            <div className="relative z-10 -mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ink-100 bg-ink-100 shadow-sm dark:border-ink-800 dark:bg-ink-800 sm:-mt-6 sm:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, index) => (
                 <div
                   key={index}
-                  className="h-80 animate-pulse rounded-2xl bg-white dark:bg-ink-900"
-                />
+                  className="bg-white px-4 py-5 dark:bg-ink-900"
+                >
+                  <div className="mx-auto h-7 w-12 animate-pulse rounded bg-ink-200 dark:bg-ink-700" />
+
+                  <div className="mx-auto mt-2 h-3 w-20 animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="overflow-hidden rounded-3xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900"
+                >
+                  <div className="aspect-[16/10] animate-pulse bg-ink-100 dark:bg-ink-800" />
+
+                  <div className="space-y-3 p-5">
+                    <div className="h-4 w-24 animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+                    <div className="h-6 w-3/4 animate-pulse rounded bg-ink-200 dark:bg-ink-700" />
+                    <div className="h-4 w-full animate-pulse rounded bg-ink-100 dark:bg-ink-800" />
+                    <div className="h-16 w-full animate-pulse rounded-2xl bg-ink-100 dark:bg-ink-800" />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -1344,7 +1082,7 @@ export default function ProviderProfilePage() {
      ERROR STATE
   ========================================================= */
 
-  if (error || !provider) {
+  if (profileError || !provider) {
     return (
       <DashboardLayout
         role="customer"
@@ -1361,19 +1099,29 @@ export default function ProviderProfilePage() {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-              {error ||
+              {profileError ||
                 "We could not find the provider profile you are looking for."}
             </p>
 
-            <button
-              onClick={() =>
-                navigate(-1)
-              }
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Go Back
-            </button>
+            <div className="mt-6 flex flex-col justify-center gap-2.5 sm:flex-row">
+              {id && profileIsError && (
+                <button
+                  onClick={() => void refetchProfile()}
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200 dark:hover:border-primary-800 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Try again
+                </button>
+              )}
+
+              <button
+                onClick={() => navigate(-1)}
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink-800 dark:bg-white dark:text-ink-900 dark:hover:bg-ink-100"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Go Back
+              </button>
+            </div>
           </div>
         </div>
       </DashboardLayout>
@@ -1401,7 +1149,7 @@ export default function ProviderProfilePage() {
               onClick={() =>
                 navigate(-1)
               }
-              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold text-ink-500 transition hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold text-ink-500 transition hover:bg-ink-100 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-primary-500/40 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -1422,11 +1170,11 @@ export default function ProviderProfilePage() {
             <div className="absolute -bottom-24 left-1/4 h-72 w-72 rounded-full bg-accent-400/10 blur-3xl" />
           </div>
 
-          <div className="relative mx-auto max-w-7xl px-4 pb-10 pt-12 sm:px-6 sm:pb-12 sm:pt-16 lg:px-8">
-            <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+          <div className="relative mx-auto max-w-7xl px-4 pb-12 pt-10 sm:px-6 sm:pb-14 sm:pt-14 lg:px-8">
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
 
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-                <div className="relative h-24 w-24 sm:h-32 sm:w-32">
+                <div className="relative h-24 w-24 shrink-0 sm:h-32 sm:w-32">
                   {/* Glow */}
                   <div
                     className="
@@ -1562,62 +1310,114 @@ export default function ProviderProfilePage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {activeServices.length >
-                  0 && (
+              <div className="flex flex-col gap-4 sm:items-start lg:items-end">
+                {heroGallery.length > 0 && (
+                  <div
+                    className="flex flex-wrap items-center gap-2"
+                    aria-label="Portfolio preview"
+                  >
+                    {heroGallery.map((image, index) => (
+                      <button
+                        key={`${image}-${index}`}
+                        type="button"
+                        onClick={() => setActiveTab("portfolio")}
+                        aria-label={`View portfolio image ${index + 1}`}
+                        className="group relative h-16 w-20 overflow-hidden rounded-xl border border-white/15 bg-white/5 shadow-lg transition duration-200 hover:-translate-y-0.5 hover:border-white/40 focus-visible:ring-2 focus-visible:ring-white/70 sm:h-[72px] sm:w-24"
+                      >
+                        <img
+                          src={image}
+                          alt=""
+                          loading="lazy"
+                          onError={handlePortfolioImageError}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        />
+
+                        <span className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                      </button>
+                    ))}
+
+                    {portfolioItems.length > heroGallery.length && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("portfolio")}
+                        className="flex h-16 min-w-[3.5rem] flex-col items-center justify-center rounded-xl border border-white/15 bg-white/10 px-2 text-xs font-bold text-white backdrop-blur transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70 sm:h-[72px]"
+                      >
+                        <span>
+                          +{portfolioItems.length - heroGallery.length}
+                        </span>
+
+                        <span className="text-[10px] font-medium text-white/60">
+                          more
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {activeServices.length > 0 && (
                     <Link
                       to={`/book/${provider._id}`}
-                      className="inline-flex items-center gap-2 rounded-xl bg-primary-400 px-4 py-2.5 text-sm font-extrabold text-primary-950 shadow-lg shadow-primary-950/20 transition hover:bg-primary-300"
+                      className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-primary-400 px-5 py-3 text-sm font-extrabold text-primary-950 shadow-lg shadow-primary-950/20 transition hover:bg-primary-300 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-white/70"
                     >
                       Book now
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                   )}
 
-                {/* =================================================
-                    SAVE PROVIDER
-                ================================================= */}
+                  {/* =================================================
+                      SAVE PROVIDER
+                  ================================================= */}
 
-                <button
-                  type="button"
-                  onClick={handleSaveProvider}
-                  disabled={savingProvider}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${isSaved
-                    ? "bg-white text-ink-900 shadow-lg"
-                    : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20"
-                    } disabled:cursor-not-allowed disabled:opacity-70`}
-                >
-                  {savingProvider ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Heart
-                      className={`h-4 w-4 ${isSaved
-                        ? "fill-current text-red-500"
-                        : ""
-                        }`}
-                    />
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleSaveProvider}
+                    disabled={savingProvider}
+                    aria-pressed={isSaved}
+                    aria-label={
+                      isSaved
+                        ? "Remove provider from saved list"
+                        : "Save provider"
+                    }
+                    className={`inline-flex min-h-[44px] items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition focus-visible:ring-2 focus-visible:ring-white/70 ${isSaved
+                      ? "bg-white text-ink-900 shadow-lg hover:bg-ink-50"
+                      : "bg-white/10 text-white ring-1 ring-white/15 hover:bg-white/20"
+                      } disabled:cursor-not-allowed disabled:opacity-70`}
+                  >
+                    {savingProvider ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Heart
+                        className={`h-4 w-4 ${isSaved
+                          ? "fill-current text-red-500"
+                          : ""
+                          }`}
+                      />
+                    )}
 
-                  {savingProvider
-                    ? "Saving..."
-                    : isSaved
-                      ? "Saved"
-                      : "Save"}
-                </button>
+                    {savingProvider
+                      ? "Saving..."
+                      : isSaved
+                        ? "Saved"
+                        : "Save"}
+                  </button>
 
-                <button
-                  onClick={handleShare}
-                  disabled={sharing}
-                  className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/20 disabled:opacity-60"
-                >
-                  {sharing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Share2 className="h-4 w-4" />
-                  )}
+                  <button
+                    type="button"
+                    onClick={handleShare}
+                    disabled={sharing}
+                    aria-label="Share provider profile"
+                    className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-semibold text-white ring-1 ring-white/15 transition hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70 disabled:opacity-60"
+                  >
+                    {sharing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Share2 className="h-4 w-4" />
+                    )}
 
-                  Share
-                </button>
+                    Share
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1631,42 +1431,42 @@ export default function ProviderProfilePage() {
           <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl border border-white/70 bg-white/95 shadow-xl shadow-ink-950/10 backdrop-blur dark:border-ink-700 dark:bg-ink-900/95">
             <div className="grid grid-cols-2 divide-x divide-y divide-ink-100 dark:divide-ink-800 sm:grid-cols-4 sm:divide-y-0">
 
-              <div className="px-4 py-5 text-center sm:px-6">
-                <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
+              <div className="group px-4 py-5 text-center transition-colors hover:bg-ink-50 dark:hover:bg-ink-800/40 sm:px-6">
+                <p className="text-2xl font-extrabold tracking-tight text-ink-900 group-hover:text-primary-600 dark:text-white dark:group-hover:text-primary-300 sm:text-3xl">
                   {activeServices.length}
                 </p>
 
-                <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500 dark:text-ink-400">
                   Services
                 </p>
               </div>
 
-              <div className="px-4 py-5 text-center sm:px-6">
-                <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
+              <div className="group px-4 py-5 text-center transition-colors hover:bg-ink-50 dark:hover:bg-ink-800/40 sm:px-6">
+                <p className="text-2xl font-extrabold tracking-tight text-ink-900 group-hover:text-primary-600 dark:text-white dark:group-hover:text-primary-300 sm:text-3xl">
                   {portfolioItems.length}
                 </p>
 
-                <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500 dark:text-ink-400">
                   Portfolio
                 </p>
               </div>
 
-              <div className="px-4 py-5 text-center sm:px-6">
-                <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
+              <div className="group px-4 py-5 text-center transition-colors hover:bg-ink-50 dark:hover:bg-ink-800/40 sm:px-6">
+                <p className="text-2xl font-extrabold tracking-tight text-ink-900 group-hover:text-primary-600 dark:text-white dark:group-hover:text-primary-300 sm:text-3xl">
                   {reviewCount}
                 </p>
 
-                <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500 dark:text-ink-400">
                   Reviews
                 </p>
               </div>
 
-              <div className="px-4 py-5 text-center sm:px-6">
-                <p className="text-2xl font-extrabold tracking-tight text-ink-900 dark:text-white">
+              <div className="group px-4 py-5 text-center transition-colors hover:bg-ink-50 dark:hover:bg-ink-800/40 sm:px-6">
+                <p className="text-2xl font-extrabold tracking-tight text-ink-900 group-hover:text-primary-600 dark:text-white dark:group-hover:text-primary-300 sm:text-3xl">
                   {provider.completedBookings ?? "—"}
                 </p>
 
-                <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-500 dark:text-ink-400">
                   Completed bookings
                 </p>
               </div>
@@ -1694,7 +1494,7 @@ export default function ProviderProfilePage() {
                     </h2>
                   </div>
 
-                  <p className="mt-4 text-[15px] leading-7 text-ink-600 dark:text-ink-300">
+                  <p className="mt-4 whitespace-pre-line text-[15px] leading-7 text-ink-600 dark:text-ink-300">
                     {provider.about ||
                       provider.bio}
                   </p>
@@ -1707,17 +1507,24 @@ export default function ProviderProfilePage() {
             TABS
         ================================================= */}
 
-        <div className="sticky top-0 z-30 mt-8 border-y border-ink-100 bg-white/90 backdrop-blur-xl dark:border-ink-800 dark:bg-ink-900/90">
-          <div className="mx-auto max-w-7xl overflow-x-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex min-w-max gap-2 py-2">
+        <div className="sticky top-16 z-20 mt-8 border-y border-ink-100 bg-white/90 backdrop-blur-xl dark:border-ink-800 dark:bg-ink-900/90 lg:top-0">
+          <div className="no-scrollbar mx-auto max-w-7xl overflow-x-auto px-4 sm:px-6 lg:px-8">
+            <div
+              role="tablist"
+              aria-label="Provider profile sections"
+              className="flex min-w-max gap-2 py-2"
+            >
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
 
                 return (
                   <button
                     key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`relative flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition ${isActive
+                    className={`relative flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition focus-visible:ring-2 focus-visible:ring-primary-500/50 ${isActive
                       ? "bg-ink-900 text-white shadow-md dark:bg-white dark:text-ink-900"
                       : "text-ink-500 hover:bg-ink-100 hover:text-ink-900 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-white"
                       }`}
@@ -1772,8 +1579,10 @@ export default function ProviderProfilePage() {
             MAIN CONTENT
         ================================================= */}
 
-        <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-          <AnimatePresence mode="sync">
+        <main className="mx-auto max-w-7xl px-4 pb-28 pt-8 sm:px-6 sm:pt-10 lg:px-8 xl:pb-12">
+          <div className="grid items-start gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="min-w-0">
+              <AnimatePresence mode="sync">
 
             {/* =================================================
                 SERVICES
@@ -1848,6 +1657,8 @@ export default function ProviderProfilePage() {
                               <img
                                 src={serviceImage}
                                 alt={service.title}
+                                loading="lazy"
+                                decoding="async"
                                 onError={(event) => {
                                   if (
                                     !event.currentTarget.src.endsWith(
@@ -1903,7 +1714,7 @@ export default function ProviderProfilePage() {
                                     title: service.title,
                                   })
                                 }
-                                className="absolute bottom-4 right-4 flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/50"
+                                className="absolute bottom-4 right-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/30 text-white backdrop-blur-md transition-all duration-300 hover:scale-105 hover:bg-black/50"
                               >
                                 <Maximize2 className="h-4 w-4" />
                               </button>
@@ -2122,7 +1933,16 @@ export default function ProviderProfilePage() {
                 }}
               >
                 {portfolioLoading ? (
-                  <div className="space-y-7">
+                  <div
+                    className="space-y-7"
+                    role="status"
+                    aria-live="polite"
+                    aria-busy="true"
+                  >
+                    <span className="sr-only">
+                      Loading provider portfolio…
+                    </span>
+
                     <div className="rounded-3xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900 sm:p-7">
                       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="space-y-3">
@@ -2163,12 +1983,9 @@ export default function ProviderProfilePage() {
                     </div>
                   </div>
                 ) : portfolioError ? (
-                  <EmptyState
-                    icon={
-                      <ImageIcon className="h-6 w-6" />
-                    }
-                    title="Portfolio unavailable"
-                    description={portfolioError}
+                  <ErrorState
+                    message={portfolioError}
+                    onRetry={() => void refetchPortfolio()}
                   />
                 ) : portfolioItems.length === 0 ? (
                   <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white dark:border-ink-800 dark:bg-ink-900">
@@ -2338,6 +2155,8 @@ export default function ProviderProfilePage() {
                                         item.title ||
                                         `${providerName} portfolio`
                                       }
+                                      loading="lazy"
+                                      decoding="async"
                                       onError={
                                         handlePortfolioImageError
                                       }
@@ -2494,7 +2313,16 @@ export default function ProviderProfilePage() {
                   // REVIEWS LOADING
                   if (reviewsLoading) {
                     return (
-                      <div className="space-y-4">
+                      <div
+                        className="space-y-4"
+                        role="status"
+                        aria-live="polite"
+                        aria-busy="true"
+                      >
+                        <span className="sr-only">
+                          Loading customer reviews…
+                        </span>
+
                         <div className="animate-pulse rounded-2xl border border-ink-100 bg-white p-6 dark:border-ink-800 dark:bg-ink-900">
                           <div className="h-6 w-32 rounded bg-ink-100 dark:bg-ink-800" />
                           <div className="mt-4 h-10 w-24 rounded bg-ink-100 dark:bg-ink-800" />
@@ -2518,6 +2346,16 @@ export default function ProviderProfilePage() {
                           </div>
                         ))}
                       </div>
+                    );
+                  }
+
+                  // REVIEWS ERROR
+                  if (reviewsError) {
+                    return (
+                      <ErrorState
+                        message={reviewsError}
+                        onRetry={() => void refetchReviews()}
+                      />
                     );
                   }
 
@@ -3228,7 +3066,147 @@ export default function ProviderProfilePage() {
               </motion.div>
             )}
 
-          </AnimatePresence>
+              </AnimatePresence>
+            </div>
+
+            <aside className="hidden xl:block">
+              <div className="sticky top-24 space-y-4">
+                <div className="overflow-hidden rounded-3xl border border-ink-100 bg-white shadow-sm dark:border-ink-800 dark:bg-ink-900">
+                  <div className="border-b border-ink-100 bg-gradient-to-br from-primary-50 via-white to-accent-50 p-5 dark:border-ink-800 dark:from-primary-950/40 dark:via-ink-900 dark:to-ink-900">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary-700 dark:text-primary-300">
+                      Start booking
+                    </p>
+
+                    <p className="mt-2 text-3xl font-black tracking-tight text-ink-900 dark:text-white">
+                      {startingPrice > 0
+                        ? formatNaira(startingPrice)
+                        : "Price on request"}
+                    </p>
+
+                    <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                      {activeServices.length > 0
+                        ? `${activeServices.length} ${activeServices.length === 1
+                          ? "service"
+                          : "services"
+                        } available`
+                        : "No services published yet"}
+                    </p>
+                  </div>
+
+                  <div className="p-5">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="inline-flex items-center gap-1.5 font-bold text-ink-900 dark:text-white">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        {rating > 0 ? rating.toFixed(1) : "New"}
+                      </span>
+
+                      {reviewCount > 0 && (
+                        <span className="text-xs text-ink-400">
+                          ({reviewCount}{" "}
+                          {reviewCount === 1
+                            ? "review"
+                            : "reviews"})
+                        </span>
+                      )}
+
+                      {providerIsActive && (
+                        <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-primary-50 px-2.5 py-1 text-[10px] font-bold text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
+                          <ShieldCheck className="h-3 w-3" />
+                          Verified
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-5 space-y-2.5">
+                      {activeServices.length > 0 ? (
+                        <Link
+                          to={`/book/${provider._id}`}
+                          className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-ink-900 px-5 py-3 text-sm font-extrabold text-white shadow-lg shadow-ink-950/10 transition hover:bg-primary-600 hover:shadow-primary-600/20 dark:bg-white dark:text-ink-900 dark:hover:bg-primary-400"
+                        >
+                          Book now
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                      ) : (
+                        <div className="rounded-xl bg-ink-50 px-4 py-3 text-center text-xs font-medium text-ink-500 dark:bg-ink-800 dark:text-ink-400">
+                          Booking opens when services are published.
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleSaveProvider}
+                        disabled={savingProvider}
+                        aria-pressed={isSaved}
+                        className={`inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${isSaved
+                          ? "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
+                          : "border-ink-200 bg-white text-ink-700 hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200 dark:hover:border-primary-800 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+                          }`}
+                      >
+                        {savingProvider ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Heart
+                            className={`h-4 w-4 ${isSaved ? "fill-current" : ""
+                              }`}
+                          />
+                        )}
+
+                        {savingProvider
+                          ? "Saving..."
+                          : isSaved
+                            ? "Saved to your list"
+                            : "Save provider"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleShare}
+                        disabled={sharing}
+                        className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl border border-ink-200 bg-white px-5 py-3 text-sm font-semibold text-ink-700 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 disabled:opacity-60 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-200 dark:hover:border-primary-800 dark:hover:bg-primary-950/40 dark:hover:text-primary-300"
+                      >
+                        {sharing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Share2 className="h-4 w-4" />
+                        )}
+                        Share profile
+                      </button>
+                    </div>
+
+                    <ul className="mt-5 space-y-2.5 border-t border-ink-100 pt-4 text-xs leading-5 text-ink-500 dark:border-ink-800 dark:text-ink-400">
+                      <li className="flex items-start gap-2">
+                        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                        Secure booking through Servicely
+                      </li>
+
+                      <li className="flex items-start gap-2">
+                        <Clock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-500" />
+                        {availableDaysCount > 0
+                          ? `${availableDaysCount} ${availableDaysCount === 1
+                            ? "day"
+                            : "days"
+                          } available each week`
+                          : "Flexible scheduling"}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("portfolio")}
+                  className="inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-ink-100 bg-white px-4 py-3 text-left text-sm font-semibold text-ink-700 transition hover:border-primary-200 hover:bg-primary-50/50 hover:text-primary-700 dark:border-ink-800 dark:bg-ink-900 dark:text-ink-200 dark:hover:border-primary-800 dark:hover:bg-primary-950/30 dark:hover:text-primary-300"
+                >
+                  <span className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Browse portfolio
+                  </span>
+
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </aside>
+          </div>
         </main>
 
         {/* =================================================
@@ -3237,7 +3215,7 @@ export default function ProviderProfilePage() {
 
         {activeServices.length >
           0 && (
-            <section className="mx-auto max-w-7xl px-4 pb-10 sm:px-6 lg:px-8">
+            <section className="mx-auto max-w-7xl px-4 pb-28 sm:px-6 lg:px-8 xl:pb-12">
               <div className="relative overflow-hidden rounded-3xl bg-ink-950 px-6 py-10 text-center shadow-2xl shadow-ink-950/20 dark:bg-ink-800 sm:px-10 sm:py-12">
                 <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary-400/25 blur-2xl" />
 
@@ -3285,6 +3263,67 @@ export default function ProviderProfilePage() {
               </div>
             </section>
           )}
+
+        {/* =================================================
+            MOBILE STICKY ACTIONS
+        ================================================= */}
+
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/95 px-4 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-ink-800 dark:bg-ink-900/95 xl:hidden">
+          <div className="mx-auto flex max-w-xl items-center gap-2.5">
+            {activeServices.length > 0 ? (
+              <Link
+                to={`/book/${provider._id}`}
+                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-extrabold text-primary-950 shadow-md transition hover:bg-primary-400 active:scale-[0.99]"
+              >
+                Book now
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <div className="flex-1 rounded-xl bg-ink-50 px-4 py-3 text-center text-xs font-semibold text-ink-500 dark:bg-ink-800 dark:text-ink-400">
+                Booking unavailable
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSaveProvider}
+              disabled={savingProvider}
+              aria-pressed={isSaved}
+              aria-label={
+                isSaved
+                  ? "Remove provider from saved list"
+                  : "Save provider"
+              }
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-70 ${isSaved
+                ? "border-red-200 bg-red-50 text-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
+                : "border-ink-200 bg-white text-ink-600 hover:border-primary-200 hover:text-primary-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-primary-800 dark:hover:text-primary-300"
+                }`}
+            >
+              {savingProvider ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Heart
+                  className={`h-5 w-5 ${isSaved ? "fill-current" : ""
+                    }`}
+                />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleShare}
+              disabled={sharing}
+              aria-label="Share provider profile"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-600 transition hover:border-primary-200 hover:text-primary-600 disabled:opacity-60 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-primary-800 dark:hover:text-primary-300"
+            >
+              {sharing ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Share2 className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* =====================================================

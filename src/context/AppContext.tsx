@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -621,11 +622,29 @@ export function BookingProvider({
     [savedProvidersQuery.data]
   );
 
+  // Drop cached bookings as soon as the signed-in account changes or the
+  // session expires so one user never sees another user's booking data.
+  const currentUserIdRef = useRef<string | null>(user?.id ?? null);
+
+  useEffect(() => {
+    const nextUserId = user?.id ?? null;
+
+    if (currentUserIdRef.current === nextUserId) return;
+
+    currentUserIdRef.current = nextUserId;
+    setBookings([]);
+    sessionStorage.removeItem('servicely_bookings');
+  }, [user?.id]);
+
   // ───────────────────────────────────────────────────────────────────────────
   // RESTORE BOOKINGS
   // ───────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
     const storedBookings =
       sessionStorage.getItem('servicely_bookings');
 
@@ -636,7 +655,7 @@ export function BookingProvider({
     } catch (error) {
       console.error('Failed to restore bookings:', error);
     }
-  }, []);
+  }, [user?.id]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // ADD BOOKING

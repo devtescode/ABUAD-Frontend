@@ -75,7 +75,9 @@ export default {
         warning: {
           50: '#fffaeb',
           100: '#fef0c7',
+          // `20` is kept for backwards compatibility; `200` is the intended shade.
           20: '#fedf89',
+          200: '#fedf89',
           500: '#f79009',
           600: '#dc6803',
           700: '#b54708',
@@ -94,13 +96,25 @@ export default {
         display: ['Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
+        xs: '0 1px 2px rgba(16, 24, 40, 0.04)',
         card: '0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08)',
-        'card-hover': '0 4px 8px -2px rgba(16, 24, 40, 0.1), 0 2px 4px -2px rgba(16, 24, 40, 0.06)',
+        'card-hover': '0 12px 24px -12px rgba(16, 24, 40, 0.18), 0 4px 8px -4px rgba(16, 24, 40, 0.08)',
         soft: '0 8px 24px -6px rgba(81, 69, 229, 0.16)',
+        elevated: '0 20px 40px -24px rgba(16, 24, 40, 0.28), 0 8px 16px -12px rgba(16, 24, 40, 0.12)',
+        popover: '0 16px 32px -12px rgba(16, 24, 40, 0.22), 0 4px 8px -4px rgba(16, 24, 40, 0.1)',
+        glow: '0 0 0 4px rgba(81, 69, 229, 0.12)',
+      },
+      borderRadius: {
+        '4xl': '2rem',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
       },
       animation: {
         'fade-in': 'fadeIn 0.4s ease-out',
         'fade-up': 'fadeUp 0.4s ease-out',
+        'scale-in': 'scaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-up': 'slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
         'shimmer': 'shimmer 1.5s infinite',
       },
       keyframes: {
@@ -110,6 +124,14 @@ export default {
         },
         fadeUp: {
           '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        scaleIn: {
+          '0%': { opacity: '0', transform: 'scale(0.97)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(16px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         shimmer: {

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Link,
   useNavigate,
@@ -8,7 +9,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
-  ArrowRight,
   Calendar,
   Check,
   CheckCircle2,
@@ -26,9 +26,7 @@ import {
   RefreshCcw,
   LockKeyhole,
   Sparkles,
-  CalendarDays,
-  Star
-
+  Star,
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -36,9 +34,15 @@ import { customerNavItems } from "@/data/customerNavItems";
 import { formatNaira } from "@/data/mockData";
 import type { Booking } from "@/data/mockData";
 import { useBookings } from "@/context/AppContext";
-
-const API_URL =
-  import.meta.env.VITE_API_URL || "http://localhost:5000";
+import {
+  queryKeys,
+  useCreateBooking,
+  useCreateReview,
+  useCustomerBookings,
+  useInitializePayment,
+  useProviderPublicProfile,
+  useVerifyPayment,
+} from "@/hooks/queries";
 
 /* =========================================================
    TYPES
@@ -327,13 +331,20 @@ export function BookingFlow() {
 
   const serviceId = searchParams.get("service");
 
-  const [provider, setProvider] =
-    useState<Provider | null>(null);
+  const hasSession = Boolean(
+    sessionStorage.getItem("servicely_token")
+  );
 
-  const [selectedService, setSelectedService] =
-    useState<Service | null>(null);
+  /*
+   * One cached request for the provider and the services they offer.
+   * Other screens that open the same provider reuse this cache entry.
+   */
+  const providerQuery = useProviderPublicProfile(id, {
+    enabled: Boolean(id) && Boolean(serviceId) && hasSession,
+  });
 
-  const [loading, setLoading] = useState(true);
+  const createBooking = useCreateBooking();
+
   const [error, setError] = useState("");
 
   const [step, setStep] = useState(0);
@@ -345,139 +356,129 @@ export function BookingFlow() {
     notes: "",
   });
 
-  const [submitting, setSubmitting] = useState(false);
-
   /* =======================================================
-     FETCH PROVIDER + SELECTED SERVICE
+     AUTH GUARD
   ======================================================= */
 
   useEffect(() => {
-    let mounted = true;
+    if (!hasSession) {
+      navigate("/login/customer", {
+        replace: true,
+      });
+    }
+  }, [hasSession, navigate]);
 
-    const fetchBookingData = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  /* =======================================================
+     PROVIDER + SELECTED SERVICE (NORMALISED)
+  ======================================================= */
 
-        const token =
-          sessionStorage.getItem("servicely_token");
+  const provider = useMemo<Provider | null>(() => {
+    const candidate = providerQuery.data?.provider;
 
-        if (!token) {
-          navigate("/login/customer", {
-            replace: true,
-          });
+    return candidate
+      ? (candidate as unknown as Provider)
+      : null;
+  }, [providerQuery.data]);
 
-          return;
-        }
+  const selectedService =
+    useMemo<Service | null>(() => {
+      if (!serviceId) return null;
 
-        if (!id) {
-          throw new Error("Provider ID is missing.");
-        }
+      const providerServices = Array.isArray(
+        providerQuery.data?.services
+      )
+        ? (providerQuery.data?.services as unknown as Service[])
+        : [];
 
-        if (!serviceId) {
-          throw new Error(
-            "No service was selected. Please go back and click Book this on a service."
-          );
-        }
+      /*
+       * IMPORTANT:
+       *
+       * We are NOT displaying all services here.
+       *
+       * We only find the exact service whose ID was
+       * passed from:
+       *
+       * /book/:providerId?service=:serviceId
+       */
+      return (
+        providerServices.find(
+          (service) =>
+            String(service?._id) ===
+            String(serviceId)
+        ) || null
+      );
+    }, [providerQuery.data, serviceId]);
 
-        const response = await fetch(
-          `${API_URL}/provider/eachprofile/${encodeURIComponent(
-            id
-          )}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          }
+  const bootstrapError = useMemo(() => {
+    if (!hasSession) {
+      return "";
+    }
+
+    if (!id) {
+      return "Provider ID is missing.";
+    }
+
+    if (!serviceId) {
+      return "No service was selected. Please go back and click Book this on a service.";
+    }
+
+    if (providerQuery.isError) {
+      return (
+        (providerQuery.error as Error | null)
+          ?.message ||
+        "Failed to load provider information."
+      );
+    }
+
+    if (
+      providerQuery.isSuccess &&
+      providerQuery.data
+    ) {
+      if (providerQuery.data.success === false) {
+        return (
+          providerQuery.data.message ||
+          "Failed to load provider information."
         );
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            result?.message ||
-            "Failed to load provider information."
-          );
-        }
-
-        if (!result?.success) {
-          throw new Error(
-            result?.message ||
-            "Failed to load provider information."
-          );
-        }
-
-        const fetchedProvider: Provider =
-          result.provider;
-
-        const providerServices: Service[] =
-          Array.isArray(result.services)
-            ? result.services
-            : [];
-
-        /*
-         * IMPORTANT:
-         *
-         * We are NOT displaying all services here.
-         *
-         * We only find the exact service whose ID was
-         * passed from:
-         *
-         * /book/:providerId?service=:serviceId
-         */
-        const exactService =
-          providerServices.find(
-            (service) =>
-              String(service?._id) ===
-              String(serviceId)
-          );
-
-        if (!exactService) {
-          throw new Error(
-            "The selected service could not be found. It may have been removed or is no longer available."
-          );
-        }
-
-        const serviceIsRejected =
-          exactService.status === "rejected";
-
-        if (serviceIsRejected) {
-          throw new Error(
-            "This service is currently unavailable for booking."
-          );
-        }
-
-        if (!mounted) return;
-
-        setProvider(fetchedProvider);
-        setSelectedService(exactService);
-      } catch (err: any) {
-        if (!mounted) return;
-
-        console.error(
-          "Booking flow fetch error:",
-          err
-        );
-
-        setError(
-          err?.message ||
-          "Something went wrong while loading the booking."
-        );
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
       }
-    };
 
-    fetchBookingData();
+      if (!providerQuery.data.provider) {
+        return (
+          providerQuery.data.message ||
+          "Failed to load provider information."
+        );
+      }
 
-    return () => {
-      mounted = false;
-    };
-  }, [id, serviceId, navigate]);
+      if (!selectedService) {
+        return "The selected service could not be found. It may have been removed or is no longer available.";
+      }
+
+      if (selectedService.status === "rejected") {
+        return "This service is currently unavailable for booking.";
+      }
+    }
+
+    return "";
+  }, [
+    hasSession,
+    id,
+    serviceId,
+    providerQuery.isError,
+    providerQuery.isSuccess,
+    providerQuery.data,
+    providerQuery.error,
+    selectedService,
+  ]);
+
+  const loading =
+    hasSession &&
+    Boolean(id) &&
+    Boolean(serviceId) &&
+    providerQuery.isLoading;
+
+  const displayError = error || bootstrapError;
+
+  const serviceUnavailable =
+    selectedService?.status === "rejected";
 
   /* =======================================================
      AVAILABLE DAYS
@@ -718,7 +719,6 @@ export function BookingFlow() {
     }
 
     try {
-      setSubmitting(true);
       setError("");
 
       // ==========================================
@@ -745,65 +745,22 @@ export function BookingFlow() {
       // CREATE REAL MONGODB BOOKING
       // ==========================================
 
-      const response =
-        await fetch(
-          `${API_URL}/bookings/createbookings`,
-          {
-            method: "POST",
+      const result = (await createBooking.mutateAsync({
+        serviceId: selectedService._id,
 
-            headers: {
-              "Content-Type":
-                "application/json",
+        date: data.date,
 
-              Authorization:
-                `Bearer ${token}`,
+        time: data.time,
 
-              Accept:
-                "application/json",
-            },
+        location: data.location.trim(),
 
-            body: JSON.stringify({
-              serviceId:
-                selectedService._id,
-
-              date:
-                data.date,
-
-              time:
-                data.time,
-
-              location:
-                data.location.trim(),
-
-              note:
-                data.notes.trim(),
-            }),
-          }
-        );
-
-      let result: any = {};
-
-      try {
-        result =
-          await response.json();
-      } catch {
-        throw new Error(
-          `Server returned an invalid response (${response.status}).`
-        );
-      }
+        note: data.notes.trim(),
+      })) as any;
 
       console.log(
         "Booking creation response:",
         result
       );
-
-      if (!response.ok) {
-        throw new Error(
-          result?.message ||
-          result?.error ||
-          `Unable to create booking (${response.status}).`
-        );
-      }
 
       if (!result?.success) {
         throw new Error(
@@ -977,8 +934,6 @@ export function BookingFlow() {
         error?.message ||
         "Unable to create your booking. Please try again."
       );
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -1015,7 +970,10 @@ export function BookingFlow() {
      ERROR
   ======================================================= */
 
-  if (error && (!provider || !selectedService)) {
+  if (
+    displayError &&
+    (!provider || !selectedService || serviceUnavailable)
+  ) {
     return (
       <DashboardLayout
         role="customer"
@@ -1032,7 +990,7 @@ export function BookingFlow() {
             </h2>
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-500 dark:text-ink-400">
-              {error}
+              {displayError}
             </p>
 
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -1043,6 +1001,17 @@ export function BookingFlow() {
               >
                 Go Back
               </button>
+
+              {id && serviceId && (
+                <button
+                  type="button"
+                  onClick={() => providerQuery.refetch()}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-ink-200 px-5 py-3 text-sm font-semibold text-ink-700 transition hover:bg-ink-50 dark:border-ink-700 dark:text-ink-200 dark:hover:bg-ink-800"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  Try Again
+                </button>
+              )}
 
               {id && (
                 <Link
@@ -1059,7 +1028,7 @@ export function BookingFlow() {
     );
   }
 
-  if (!provider || !selectedService) {
+  if (!provider || !selectedService || serviceUnavailable) {
     return null;
   }
 
@@ -1138,73 +1107,106 @@ export function BookingFlow() {
             PROGRESS
         ================================================= */}
 
-        <div className="mb-7 overflow-x-auto">
-          <div className="flex min-w-[650px] items-center">
-            {bookingSteps.map(
-              (bookingStep, index) => {
-                const isCompleted =
-                  step > bookingStep.id;
+        <div className="mb-7 rounded-3xl border border-ink-100 bg-white p-4 shadow-sm dark:border-ink-800 dark:bg-ink-900 sm:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
+                Step {step + 1} of {bookingSteps.length}
+              </p>
 
-                const isCurrent =
-                  step === bookingStep.id;
+              <p className="mt-0.5 truncate text-sm font-bold text-ink-900 dark:text-white">
+                {bookingSteps[step]?.title}
+              </p>
+            </div>
 
-                return (
-                  <div
-                    key={bookingStep.id}
-                    className="flex flex-1 items-center"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={[
-                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all",
-                          isCompleted
-                            ? "bg-primary-600 text-white"
-                            : isCurrent
-                              ? "bg-ink-900 text-white dark:bg-white dark:text-ink-900"
-                              : "bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500",
-                        ].join(" ")}
-                      >
-                        {isCompleted ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          bookingStep.id + 1
-                        )}
-                      </div>
+            <span className="shrink-0 rounded-full bg-ink-100 px-3 py-1 text-[11px] font-bold text-ink-500 dark:bg-ink-800 dark:text-ink-400">
+              {Math.round(
+                ((step + 1) / bookingSteps.length) * 100
+              )}
+              %
+            </span>
+          </div>
 
-                      <div className="hidden sm:block">
-                        <p
+          <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-ink-100 dark:bg-ink-800">
+            <div
+              className="h-full rounded-full bg-primary-600 transition-all duration-500"
+              style={{
+                width: `${((step + 1) / bookingSteps.length) * 100}%`,
+              }}
+            />
+          </div>
+
+          <div className="no-scrollbar overflow-x-auto">
+            <div className="flex min-w-[560px] items-center">
+              {bookingSteps.map(
+                (bookingStep, index) => {
+                  const isCompleted =
+                    step > bookingStep.id;
+
+                  const isCurrent =
+                    step === bookingStep.id;
+
+                  return (
+                    <div
+                      key={bookingStep.id}
+                      className="flex flex-1 items-center"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          aria-current={
+                            isCurrent ? "step" : undefined
+                          }
                           className={[
-                            "text-sm font-bold",
-                            isCurrent ||
-                              isCompleted
-                              ? "text-ink-900 dark:text-white"
-                              : "text-ink-400 dark:text-ink-500",
+                            "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold transition-all",
+                            isCompleted
+                              ? "bg-primary-600 text-white"
+                              : isCurrent
+                                ? "bg-ink-900 text-white ring-4 ring-ink-900/10 dark:bg-white dark:text-ink-900 dark:ring-white/10"
+                                : "bg-ink-100 text-ink-400 dark:bg-ink-800 dark:text-ink-500",
                           ].join(" ")}
                         >
-                          {bookingStep.title}
-                        </p>
+                          {isCompleted ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            bookingStep.id + 1
+                          )}
+                        </div>
 
-                        <p className="mt-0.5 text-xs text-ink-400 dark:text-ink-500">
-                          {bookingStep.description}
-                        </p>
+                        <div className="hidden sm:block">
+                          <p
+                            className={[
+                              "text-sm font-bold",
+                              isCurrent ||
+                                isCompleted
+                                ? "text-ink-900 dark:text-white"
+                                : "text-ink-400 dark:text-ink-500",
+                            ].join(" ")}
+                          >
+                            {bookingStep.title}
+                          </p>
+
+                          <p className="mt-0.5 text-xs text-ink-400 dark:text-ink-500">
+                            {bookingStep.description}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    {index <
-                      bookingSteps.length - 1 && (
-                        <div
-                          className={[
-                            "mx-4 h-px flex-1",
-                            step > index
-                              ? "bg-primary-500"
-                              : "bg-ink-200 dark:bg-ink-700",
-                          ].join(" ")}
-                        />
-                      )}
-                  </div>
-                );
-              }
-            )}
+                      {index <
+                        bookingSteps.length - 1 && (
+                          <div
+                            className={[
+                              "mx-4 h-px flex-1",
+                              step > index
+                                ? "bg-primary-500"
+                                : "bg-ink-200 dark:bg-ink-700",
+                            ].join(" ")}
+                          />
+                        )}
+                    </div>
+                  );
+                }
+              )}
+            </div>
           </div>
         </div>
 
@@ -1213,7 +1215,7 @@ export function BookingFlow() {
         ================================================= */}
 
         <AnimatePresence>
-          {error && (
+          {displayError && (
             <motion.div
               initial={{
                 opacity: 0,
@@ -1227,9 +1229,12 @@ export function BookingFlow() {
                 opacity: 0,
                 y: -10,
               }}
-              className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"
+              className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300"
             >
-              {error}
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span className="min-w-0 break-words">
+                {displayError}
+              </span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1767,11 +1772,11 @@ export function BookingFlow() {
                 NAVIGATION BUTTONS
             ================================================= */}
 
-            <div className="mt-6 flex items-center justify-between gap-3">
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
               <button
                 type="button"
                 onClick={handleBack}
-                className="inline-flex items-center gap-2 rounded-2xl border border-ink-200 bg-white px-5 py-3.5 text-sm font-bold text-ink-700 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-ink-200 bg-white px-5 py-3.5 text-sm font-bold text-ink-700 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800 sm:w-auto"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Back
@@ -1781,7 +1786,7 @@ export function BookingFlow() {
                 <button
                   type="button"
                   onClick={handleNext}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-950/10 transition hover:bg-primary-600 hover:shadow-xl hover:shadow-primary-600/20 dark:bg-white dark:text-ink-900 dark:hover:bg-primary-400"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-950/10 transition hover:bg-primary-600 hover:shadow-xl hover:shadow-primary-600/20 dark:bg-white dark:text-ink-900 dark:hover:bg-primary-400 sm:w-auto"
                 >
                   Continue
                   <ChevronRight className="h-4 w-4" />
@@ -1790,10 +1795,10 @@ export function BookingFlow() {
                 <button
                   type="button"
                   onClick={handleConfirmBooking}
-                  disabled={submitting}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-primary-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={createBooking.isPending}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-primary-600/20 transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
-                  {submitting ? (
+                  {createBooking.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Preparing Payment...
@@ -1896,12 +1901,14 @@ export function BookingFlow() {
                   Booking summary
                 </p>
 
-                <div className="space-y-4">
-                  <div className="flex gap-3">
-                    <Calendar className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" />
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 rounded-2xl border border-ink-100 p-3 dark:border-ink-800">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                      <Calendar className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                    </div>
 
-                    <div className="min-w-0">
-                      <p className="text-xs text-ink-400">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-ink-400">
                         Date
                       </p>
 
@@ -1913,13 +1920,23 @@ export function BookingFlow() {
                           : "Not selected"}
                       </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setStep(0)}
+                      className="shrink-0 text-xs font-bold text-primary-600 transition hover:text-primary-700 dark:text-primary-400"
+                    >
+                      Edit
+                    </button>
                   </div>
 
-                  <div className="flex gap-3">
-                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" />
+                  <div className="flex items-start gap-3 rounded-2xl border border-ink-100 p-3 dark:border-ink-800">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                      <Clock className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                    </div>
 
-                    <div className="min-w-0">
-                      <p className="text-xs text-ink-400">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-ink-400">
                         Time
                       </p>
 
@@ -1931,13 +1948,23 @@ export function BookingFlow() {
                           : "Not selected"}
                       </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setStep(0)}
+                      className="shrink-0 text-xs font-bold text-primary-600 transition hover:text-primary-700 dark:text-primary-400"
+                    >
+                      Edit
+                    </button>
                   </div>
 
-                  <div className="flex gap-3">
-                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" />
+                  <div className="flex items-start gap-3 rounded-2xl border border-ink-100 p-3 dark:border-ink-800">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                      <MapPin className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                    </div>
 
-                    <div className="min-w-0">
-                      <p className="text-xs text-ink-400">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-ink-400">
                         Location
                       </p>
 
@@ -1946,11 +1973,19 @@ export function BookingFlow() {
                           "Not provided"}
                       </p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setStep(1)}
+                      className="shrink-0 text-xs font-bold text-primary-600 transition hover:text-primary-700 dark:text-primary-400"
+                    >
+                      Edit
+                    </button>
                   </div>
                 </div>
 
                 <div className="mt-5 border-t border-ink-100 pt-5 dark:border-ink-800">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-semibold text-ink-500 dark:text-ink-400">
                       Total
                     </span>
@@ -1989,10 +2024,39 @@ export function BookingConfirmed() {
 
   const { bookings } = useBookings();
 
-  const booking = bookings.find(
-    (item: any) =>
-      String(item.id) === String(id)
-  );
+  const contextBooking =
+    bookings.find(
+      (item: any) =>
+        String(item.id) === String(id)
+    ) || null;
+
+  /*
+   * Confirmation can also be opened directly (e.g. after a refresh).
+   * The cached customer-bookings query fills the gap without a new
+   * request when AppContext already has the booking.
+   */
+  const bookingsQuery = useCustomerBookings({
+    enabled: Boolean(id) && !contextBooking,
+  });
+
+  const booking = useMemo<Booking | null>(() => {
+    if (contextBooking) {
+      return contextBooking;
+    }
+
+    const records =
+      (bookingsQuery.data as Array<Record<string, unknown>>) ||
+      [];
+
+    const found = records.find(
+      (item) =>
+        String(item?.id) === String(id)
+    );
+
+    return found
+      ? (found as unknown as Booking)
+      : null;
+  }, [contextBooking, bookingsQuery.data, id]);
 
   return (
     <DashboardLayout
@@ -2029,62 +2093,101 @@ export function BookingConfirmed() {
             Your booking request has been created successfully.
           </p>
 
-          {booking && (
-            <div className="mt-7 rounded-2xl bg-ink-50 p-5 text-left dark:bg-ink-950/50">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs text-ink-400">
-                    Service
-                  </p>
+          {booking ? (
+            <div className="mt-7 overflow-hidden rounded-2xl border border-ink-100 text-left dark:border-ink-800">
+              <div className="bg-ink-50 p-5 dark:bg-ink-950/50">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                      Service
+                    </p>
 
-                  <p className="mt-1 font-bold text-ink-900 dark:text-white">
-                    {booking.serviceName}
+                    <p className="mt-1 break-words font-bold text-ink-900 dark:text-white">
+                      {booking.serviceName}
+                    </p>
+
+                    {booking.providerName && (
+                      <p className="mt-1 text-xs text-ink-500 dark:text-ink-400">
+                        with{" "}
+                        <span className="font-semibold text-ink-700 dark:text-ink-200">
+                          {booking.providerName}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+
+                  <p className="shrink-0 text-lg font-black text-primary-600 dark:text-primary-400">
+                    {formatNaira(
+                      Number(booking.price) || 0
+                    )}
                   </p>
                 </div>
-
-                <p className="font-black text-primary-600 dark:text-primary-400">
-                  {formatNaira(
-                    Number(booking.price) || 0
-                  )}
-                </p>
               </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-ink-400">
-                    Date
-                  </p>
+              <div className="grid gap-0 divide-y divide-ink-100 dark:divide-ink-800 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+                <div className="flex items-start gap-3 p-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                    <Calendar className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                  </div>
 
-                  <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {formatDate(
-                      booking.date
-                    )}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                      Date
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
+                      {formatDate(
+                        booking.date
+                      )}
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <p className="text-xs text-ink-400">
-                    Time
-                  </p>
+                <div className="flex items-start gap-3 p-4">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                    <Clock className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                  </div>
 
-                  <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {formatTime(
-                      booking.time
-                    )}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                      Time
+                    </p>
+
+                    <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
+                      {formatTime(
+                        booking.time
+                      )}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <p className="text-xs text-ink-400">
-                    Location
-                  </p>
+                <div className="flex items-start gap-3 p-4 sm:col-span-2">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-950/40">
+                    <MapPin className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                  </div>
 
-                  <p className="mt-1 text-sm font-semibold text-ink-800 dark:text-ink-200">
-                    {booking.location}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                      Location
+                    </p>
+
+                    <p className="mt-1 break-words text-sm font-semibold text-ink-800 dark:text-ink-200">
+                      {booking.location}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
+          ) : bookingsQuery.isFetching && id ? (
+            <div className="mt-7 flex items-center justify-center gap-2 rounded-2xl bg-ink-50 px-4 py-3 text-xs font-semibold text-ink-500 dark:bg-ink-950/50 dark:text-ink-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading booking details...
+            </div>
+          ) : (
+            <p className="mx-auto mt-6 max-w-md rounded-2xl bg-ink-50 px-4 py-3 text-xs leading-5 text-ink-500 dark:bg-ink-950/50 dark:text-ink-400">
+              Booking details are not available on this device. You can
+              still find the booking in My Bookings.
+            </p>
           )}
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -2285,31 +2388,23 @@ export function PaymentPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const { bookings } = useBookings();
-
-  const [resolvedBooking, setResolvedBooking] =
-    useState<Booking | null>(null);
-
-  const [resolvingBooking, setResolvingBooking] =
-    useState(false);
-
-  const [bookingResolutionFailed, setBookingResolutionFailed] =
-    useState(false);
-
-  const [paying, setPaying] =
-    useState(false);
+  const { bookings, updateBookingStatus } = useBookings();
+  const queryClient = useQueryClient();
 
   const [paymentError, setPaymentError] =
     useState("");
-
-  const [verifying, setVerifying] =
-    useState(false);
 
   const [verificationSuccess, setVerificationSuccess] =
     useState(false);
 
   const [verificationMessage, setVerificationMessage] =
     useState("");
+
+  const initializePayment = useInitializePayment();
+
+  const hasSession = Boolean(
+    sessionStorage.getItem("servicely_token")
+  );
 
   // ======================================================
   // DETECT PAYSTACK CALLBACK
@@ -2342,16 +2437,98 @@ export function PaymentPage() {
     ) || null;
 
   // ======================================================
+  // CACHED BOOKING LOOKUP
+  // ======================================================
+  //
+  // This prevents the page from immediately saying
+  // "Booking not found" while AppContext is still loading.
+  // The query is skipped when AppContext already has the
+  // booking or while a Paystack callback is being handled.
+  //
+
+  const bookingsQuery = useCustomerBookings({
+    enabled:
+      !isPaymentCallback &&
+      Boolean(id) &&
+      !contextBooking &&
+      hasSession,
+  });
+
+  const verifyPaymentQuery = useVerifyPayment(
+    isPaymentCallback ? paymentReference : undefined,
+    {
+      enabled:
+        isPaymentCallback &&
+        Boolean(paymentReference) &&
+        hasSession,
+    }
+  );
+
+  // ======================================================
+  // BOOKING FROM BACKEND QUERY
+  // ======================================================
+
+  const queryBooking = useMemo(() => {
+    const records =
+      (bookingsQuery.data as Array<Record<string, unknown>>) ||
+      [];
+
+    const found =
+      records.find(
+        (item) =>
+          String(item?.id) === String(id)
+      ) || null;
+
+    return found
+      ? (found as unknown as Booking)
+      : null;
+  }, [bookingsQuery.data, id]);
+
+  // ======================================================
   // FINAL BOOKING
   // ======================================================
   //
   // Prefer booking from AppContext.
-  // If AppContext does not have it, resolvedBooking
+  // If AppContext does not have it, queryBooking
   // contains the booking fetched directly from backend.
   //
 
   const booking =
-    contextBooking || resolvedBooking;
+    contextBooking || queryBooking;
+
+  /*
+   * The lookup is only considered a failure once the request has
+   * actually succeeded without returning this booking.
+   */
+  const bookingResolutionFailed =
+    !isPaymentCallback &&
+    hasSession &&
+    Boolean(id) &&
+    !contextBooking &&
+    !queryBooking &&
+    bookingsQuery.isSuccess &&
+    !bookingsQuery.isFetching;
+
+  const resolvingBooking =
+    !isPaymentCallback &&
+    hasSession &&
+    Boolean(id) &&
+    !contextBooking &&
+    !queryBooking &&
+    !bookingResolutionFailed &&
+    !bookingsQuery.isError &&
+    (bookingsQuery.isLoading ||
+      bookingsQuery.isPending ||
+      bookingsQuery.isFetching);
+
+  const verifying =
+    isPaymentCallback &&
+    hasSession &&
+    Boolean(paymentReference) &&
+    (verifyPaymentQuery.isFetching ||
+      (!verificationSuccess &&
+        !verificationMessage &&
+        !verifyPaymentQuery.isError));
 
   // ======================================================
   // RESOLVE BOOKING FROM BACKEND
@@ -2370,152 +2547,67 @@ export function PaymentPage() {
       return;
     }
 
-    // Already available from AppContext.
-    if (contextBooking) {
-      forgetInvalidBooking(id);
-      setResolvedBooking(null);
-      setResolvingBooking(false);
-      setBookingResolutionFailed(false);
+    if (!hasSession) {
+      navigate(
+        "/login/customer",
+        {
+          replace: true,
+        }
+      );
+
       return;
     }
 
-    let cancelled = false;
+    // Already available from AppContext.
+    if (contextBooking) {
+      forgetInvalidBooking(id);
+      return;
+    }
 
-    const resolveBooking = async () => {
-      try {
-        setResolvingBooking(true);
-        setBookingResolutionFailed(false);
+    /*
+     * Do not immediately remove the booking if the request
+     * itself failed. This prevents a temporary network error
+     * from deleting a valid booking from the list.
+     */
+    if (bookingsQuery.isError) {
+      console.error(
+        "BOOKING RESOLUTION ERROR:",
+        bookingsQuery.error
+      );
 
-        const token =
-          sessionStorage.getItem(
-            "servicely_token"
-          );
+      return;
+    }
 
-        if (!token) {
-          navigate(
-            "/login/customer",
-            {
-              replace: true,
-            }
-          );
+    if (!bookingsQuery.isSuccess) {
+      return;
+    }
 
-          return;
-        }
+    // ==============================================
+    // BOOKING EXISTS
+    // ==============================================
 
-        const response = await fetch(
-          `${API_URL}/bookings/my-bookings`,
-          {
-            method: "GET",
-            headers: {
-              Authorization:
-                `Bearer ${token}`,
-              Accept:
-                "application/json",
-            },
-          }
-        );
+    if (queryBooking) {
+      forgetInvalidBooking(id);
 
-        let result: any = {};
+      return;
+    }
 
-        try {
-          result = await response.json();
-        } catch {
-          throw new Error(
-            `The server returned an invalid response (${response.status}).`
-          );
-        }
+    // ==============================================
+    // BOOKING DOES NOT EXIST
+    // ==============================================
 
-        if (!response.ok) {
-          throw new Error(
-            result?.message ||
-            `Unable to load booking (${response.status}).`
-          );
-        }
-
-        const backendBookings =
-          Array.isArray(
-            result?.bookings
-          )
-            ? result.bookings
-            : [];
-
-        const foundBooking =
-          backendBookings.find(
-            (item: Booking) =>
-              String(item.id) ===
-              String(id)
-          ) || null;
-
-        if (cancelled) {
-          return;
-        }
-
-        // ==============================================
-        // BOOKING EXISTS
-        // ==============================================
-
-        if (foundBooking) {
-          forgetInvalidBooking(id);
-
-          setResolvedBooking(
-            foundBooking
-          );
-
-          setBookingResolutionFailed(
-            false
-          );
-
-          return;
-        }
-
-        // ==============================================
-        // BOOKING DOES NOT EXIST
-        // ==============================================
-
-        rememberInvalidBooking(id);
-
-        setResolvedBooking(null);
-
-        setBookingResolutionFailed(
-          true
-        );
-      } catch (error) {
-        if (cancelled) {
-          return;
-        }
-
-        console.error(
-          "BOOKING RESOLUTION ERROR:",
-          error
-        );
-
-        // Do not immediately remove the booking
-        // if the request itself failed.
-        //
-        // This prevents a temporary network error
-        // from deleting a valid booking from the list.
-
-        setBookingResolutionFailed(
-          false
-        );
-      } finally {
-        if (!cancelled) {
-          setResolvingBooking(false);
-        }
-      }
-    };
-
-    resolveBooking();
-
-    return () => {
-      cancelled = true;
-    };
+    rememberInvalidBooking(id);
   }, [
-    API_URL,
     id,
     contextBooking,
     isPaymentCallback,
+    hasSession,
     navigate,
+    bookingsQuery.isError,
+    bookingsQuery.isSuccess,
+    bookingsQuery.error,
+    bookingsQuery.dataUpdatedAt,
+    queryBooking,
   ]);
 
   // ======================================================
@@ -2530,155 +2622,112 @@ export function PaymentPage() {
       return;
     }
 
-    let cancelled = false;
-
-    const verifyPaystackPayment =
-      async () => {
-        try {
-          setVerifying(true);
-          setVerificationSuccess(false);
-          setVerificationMessage("");
-
-          // ==========================================
-          // GET AUTH TOKEN
-          // ==========================================
-
-          const token =
-            sessionStorage.getItem(
-              "servicely_token"
-            );
-
-          if (!token) {
-            navigate(
-              "/login/customer",
-              {
-                replace: true,
-              }
-            );
-
-            return;
-          }
-
-          console.log(
-            "Paystack callback reference:",
-            paymentReference
-          );
-
-          // ==========================================
-          // VERIFY PAYMENT WITH BACKEND
-          // ==========================================
-
-          const response = await fetch(
-            `${API_URL}/payments/verify/${encodeURIComponent(
-              paymentReference
-            )}`,
-            {
-              method: "GET",
-
-              headers: {
-                Authorization:
-                  `Bearer ${token}`,
-
-                Accept:
-                  "application/json",
-              },
-            }
-          );
-
-          let result: any = {};
-
-          try {
-            result =
-              await response.json();
-          } catch {
-            throw new Error(
-              `The server returned an invalid response (${response.status}).`
-            );
-          }
-
-          console.log(
-            "Payment verification response:",
-            result
-          );
-
-          if (!response.ok) {
-            throw new Error(
-              result?.message ||
-              `Unable to verify payment (${response.status}).`
-            );
-          }
-
-          if (
-            !result?.success ||
-            !result?.verified
-          ) {
-            throw new Error(
-              result?.message ||
-              "Payment could not be verified."
-            );
-          }
-
-          if (cancelled) {
-            return;
-          }
-
-          // ==========================================
-          // SUCCESS
-          // ==========================================
-
-          setVerificationSuccess(
-            true
-          );
-
-          setVerificationMessage(
-            result?.message ||
-            "Your payment has been verified successfully."
-          );
-
-          // ==========================================
-          // CLEAN CALLBACK URL
-          // ==========================================
-
-          window.history.replaceState(
-            {},
-            document.title,
-            "/payment/verify"
-          );
-        } catch (error: any) {
-          if (cancelled) {
-            return;
-          }
-
-          console.error(
-            "Payment verification error:",
-            error
-          );
-
-          setVerificationSuccess(
-            false
-          );
-
-          setVerificationMessage(
-            error?.message ||
-            "Unable to verify your payment. Please try again."
-          );
-        } finally {
-          if (!cancelled) {
-            setVerifying(false);
-          }
+    if (!hasSession) {
+      navigate(
+        "/login/customer",
+        {
+          replace: true,
         }
-      };
+      );
 
-    verifyPaystackPayment();
+      return;
+    }
 
-    return () => {
-      cancelled = true;
-    };
+    console.log(
+      "Paystack callback reference:",
+      paymentReference
+    );
+
+    // ==========================================
+    // VERIFICATION FAILED
+    // ==========================================
+
+    if (verifyPaymentQuery.isError) {
+      console.error(
+        "Payment verification error:",
+        verifyPaymentQuery.error
+      );
+
+      setVerificationSuccess(false);
+
+      setVerificationMessage(
+        (verifyPaymentQuery.error as Error | null)
+          ?.message ||
+        "Unable to verify your payment. Please try again."
+      );
+
+      return;
+    }
+
+    if (
+      !verifyPaymentQuery.isSuccess ||
+      !verifyPaymentQuery.data
+    ) {
+      return;
+    }
+
+    const result =
+      verifyPaymentQuery.data as any;
+
+    console.log(
+      "Payment verification response:",
+      result
+    );
+
+    if (
+      !result?.success ||
+      !result?.verified
+    ) {
+      setVerificationSuccess(false);
+
+      setVerificationMessage(
+        result?.message ||
+        "Payment could not be verified."
+      );
+
+      return;
+    }
+
+    // ==========================================
+    // SUCCESS
+    // ==========================================
+
+    setVerificationSuccess(true);
+
+    setVerificationMessage(
+      result?.message ||
+      "Your payment has been verified successfully."
+    );
+
+    // Keep the local booking context and the shared bookings cache in
+    // sync immediately so dashboards/bookings show "paid" without a
+    // manual refresh.
+    if (id) {
+      updateBookingStatus(id, "paid");
+    }
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.bookings.all,
+    });
+
+    // ==========================================
+    // CLEAN CALLBACK URL
+    // ==========================================
+
+    window.history.replaceState(
+      {},
+      document.title,
+      "/payment/verify"
+    );
   }, [
-    API_URL,
     isPaymentCallback,
     paymentReference,
+    hasSession,
     navigate,
+    verifyPaymentQuery.isError,
+    verifyPaymentQuery.isSuccess,
+    verifyPaymentQuery.data,
+    verifyPaymentQuery.error,
   ]);
 
   // ======================================================
@@ -2694,8 +2743,9 @@ export function PaymentPage() {
       return;
     }
 
+    let bookingId = "";
+
     try {
-      setPaying(true);
       setPaymentError("");
 
       // ==========================================
@@ -2722,7 +2772,7 @@ export function PaymentPage() {
       // REAL MONGODB BOOKING ID
       // ==========================================
 
-      const bookingId =
+      bookingId =
         String(
           booking.id || ""
         ).trim();
@@ -2771,42 +2821,9 @@ export function PaymentPage() {
       // INITIALIZE PAYSTACK PAYMENT
       // ==========================================
 
-      const response = await fetch(
-        `${API_URL}/payments/initialize`,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Authorization:
-              `Bearer ${token}`,
-
-            Accept:
-              "application/json",
-          },
-
-          body: JSON.stringify({
-            bookingId,
-          }),
-        }
-      );
-
-      // ==========================================
-      // READ RESPONSE
-      // ==========================================
-
-      let result: any = {};
-
-      try {
-        result =
-          await response.json();
-      } catch {
-        throw new Error(
-          `The server returned an invalid response (${response.status}).`
-        );
-      }
+      const result = (await initializePayment.mutateAsync({
+        bookingId,
+      })) as any;
 
       console.log(
         "Payment initialization response:",
@@ -2814,45 +2831,8 @@ export function PaymentPage() {
       );
 
       // ==========================================
-      // BOOKING DOES NOT EXIST
-      // ==========================================
-
-      if (
-        response.status === 404 &&
-        /booking/i.test(
-          String(
-            result?.message ||
-            result?.error ||
-            ""
-          )
-        )
-      ) {
-        rememberInvalidBooking(
-          bookingId
-        );
-
-        setPaymentError(
-          "This booking is no longer available."
-        );
-
-        setTimeout(() => {
-          navigate(-1);
-        }, 800);
-
-        return;
-      }
-
-      // ==========================================
       // HANDLE BACKEND ERROR
       // ==========================================
-
-      if (!response.ok) {
-        throw new Error(
-          result?.message ||
-          result?.error ||
-          `Unable to initialize payment (${response.status}).`
-        );
-      }
 
       if (!result?.success) {
         throw new Error(
@@ -2899,12 +2879,43 @@ export function PaymentPage() {
         error
       );
 
-      setPaymentError(
+      const errorData = error?.data as
+        | { message?: string; error?: string }
+        | undefined;
+
+      const apiMessage =
+        errorData?.message ||
+        errorData?.error ||
         error?.message ||
+        "";
+
+      // ==========================================
+      // BOOKING DOES NOT EXIST
+      // ==========================================
+
+      if (
+        error?.status === 404 &&
+        /booking/i.test(String(apiMessage))
+      ) {
+        rememberInvalidBooking(
+          bookingId
+        );
+
+        setPaymentError(
+          "This booking is no longer available."
+        );
+
+        setTimeout(() => {
+          navigate(-1);
+        }, 800);
+
+        return;
+      }
+
+      setPaymentError(
+        apiMessage ||
         "Unable to start payment. Please try again."
       );
-    } finally {
-      setPaying(false);
     }
   };
 
@@ -3113,10 +3124,13 @@ export function PaymentPage() {
                       <div className="mt-7 grid gap-3 sm:grid-cols-2">
                         <button
                           type="button"
-                          onClick={() =>
-                            window.location.reload()
-                          }
-                          className="flex items-center justify-center gap-2 rounded-2xl border border-ink-200 bg-white px-5 py-3.5 text-sm font-bold text-ink-800 transition hover:bg-ink-50 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
+                          onClick={() => {
+                            setVerificationSuccess(false);
+                            setVerificationMessage("");
+                            verifyPaymentQuery.refetch();
+                          }}
+                          disabled={verifyPaymentQuery.isFetching}
+                          className="flex items-center justify-center gap-2 rounded-2xl border border-ink-200 bg-white px-5 py-3.5 text-sm font-bold text-ink-800 transition hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:bg-ink-900 dark:text-ink-200 dark:hover:bg-ink-800"
                         >
                           <RefreshCcw className="h-4 w-4" />
                           Try Again
@@ -3227,17 +3241,35 @@ export function PaymentPage() {
               no longer available for payment.
             </p>
 
-            <button
-              type="button"
-              onClick={() =>
-                navigate(-1)
-              }
-              className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-900/10 transition hover:-translate-y-0.5 hover:opacity-90 dark:bg-white dark:text-ink-900"
-            >
-              <ArrowLeft className="h-4 w-4" />
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  if (id) {
+                    forgetInvalidBooking(id);
+                  }
 
-              Back to My Bookings
-            </button>
+                  bookingsQuery.refetch();
+                }}
+                disabled={bookingsQuery.isFetching}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-ink-200 px-6 py-3.5 text-sm font-bold text-ink-700 transition hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:text-ink-200 dark:hover:bg-ink-800"
+              >
+                <RefreshCcw className="h-4 w-4" />
+                Refresh
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(-1)
+                }
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-ink-900/10 transition hover:-translate-y-0.5 hover:opacity-90 dark:bg-white dark:text-ink-900"
+              >
+                <ArrowLeft className="h-4 w-4" />
+
+                Back to My Bookings
+              </button>
+            </div>
           </div>
         </div>
       </DashboardLayout>
@@ -3489,14 +3521,14 @@ export function PaymentPage() {
                 type="button"
                 onClick={handlePayment}
                 disabled={
-                  paying ||
+                  initializePayment.isPending ||
                   bookingPrice <= 0
                 }
                 className="group relative mt-6 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-primary-600 px-5 py-4 text-sm font-black text-white shadow-xl shadow-primary-600/20 transition duration-200 hover:-translate-y-0.5 hover:bg-primary-700 hover:shadow-2xl hover:shadow-primary-600/25 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
                 <span className="absolute inset-0 -translate-x-full bg-white/10 transition-transform duration-500 group-hover:translate-x-full" />
 
-                {paying ? (
+                {initializePayment.isPending ? (
                   <>
                     <Loader2 className="relative h-5 w-5 animate-spin" />
 
@@ -3546,103 +3578,85 @@ export function ReviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
 
-  const [booking, setBooking] =
-    useState<Booking | null>(null);
+  const hasSession = Boolean(
+    sessionStorage.getItem("servicely_token")
+  );
 
-  const [loadingBooking, setLoadingBooking] =
-    useState(true);
+  /*
+   * Shared customer-bookings cache. PaymentPage and BookingConfirmed
+   * use the same query key, so no extra request is made for them.
+   */
+  const bookingsQuery = useCustomerBookings({
+    enabled: Boolean(id) && hasSession,
+  });
+
+  const createReview = useCreateReview();
 
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
 
   const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   const [error, setError] = useState("");
 
   // =====================================================
-  // FETCH BOOKING
+  // BOOKING FROM CACHED QUERY
   // =====================================================
-  useEffect(() => {
+
+  const booking = useMemo<Booking | null>(() => {
+    if (!id) return null;
+
+    const records =
+      (bookingsQuery.data as Array<Record<string, unknown>>) ||
+      [];
+
+    const found = records.find(
+      (item) =>
+        String(item?.id) === String(id)
+    );
+
+    return found
+      ? (found as unknown as Booking)
+      : null;
+  }, [bookingsQuery.data, id]);
+
+  const loadingBooking =
+    Boolean(id) &&
+    hasSession &&
+    bookingsQuery.isLoading;
+
+  const bookingLookupError = useMemo(() => {
     if (!id) {
-      setError("Booking ID is missing.");
-      setLoadingBooking(false);
-      return;
+      return "Booking ID is missing.";
     }
 
-    const fetchBooking = async () => {
-      try {
-        setLoadingBooking(true);
-        setError("");
+    if (!hasSession) {
+      return "Your session has expired. Please log in again.";
+    }
 
-        const token =
-          sessionStorage.getItem("servicely_token");
+    if (bookingsQuery.isError) {
+      return (
+        (bookingsQuery.error as Error | null)
+          ?.message ||
+        "Unable to load booking."
+      );
+    }
 
-        if (!token) {
-          setError(
-            "Your session has expired. Please log in again."
-          );
-          return;
-        }
+    if (bookingsQuery.isSuccess && !booking) {
+      return "Booking could not be found.";
+    }
 
-        /*
-         * Get customer's bookings from the backend.
-         *
-         * This uses the same endpoint your existing
-         * customer bookings system uses.
-         */
-        const response = await fetch(
-          `${API_URL}/bookings/my-bookings`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+    return "";
+  }, [
+    id,
+    hasSession,
+    bookingsQuery.isError,
+    bookingsQuery.isSuccess,
+    bookingsQuery.error,
+    booking,
+  ]);
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.message ||
-            "Unable to load booking."
-          );
-        }
-
-        const bookings =
-          data.bookings || [];
-
-        const foundBooking = bookings.find(
-          (item: any) =>
-            String(item.id) === String(id)
-        );
-
-        if (!foundBooking) {
-          setError(
-            "Booking could not be found."
-          );
-          return;
-        }
-
-        setBooking(foundBooking);
-      } catch (error: any) {
-        console.error(
-          "FETCH REVIEW BOOKING ERROR:",
-          error
-        );
-
-        setError(
-          error.message ||
-          "Unable to load booking."
-        );
-      } finally {
-        setLoadingBooking(false);
-      }
-    };
-
-    fetchBooking();
-  }, [id]);
+  const displayError = error || bookingLookupError;
 
 
   // =====================================================
@@ -3667,7 +3681,6 @@ export function ReviewPage() {
     }
 
     try {
-      setSubmitting(true);
       setError("");
 
       const token =
@@ -3680,32 +3693,11 @@ export function ReviewPage() {
         return;
       }
 
-      const response = await fetch(
-        `${API_URL}/reviews/addreviews`,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-
-          body: JSON.stringify({
-            bookingId: booking.id,
-            rating,
-            comment: review.trim(),
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message ||
-          "Unable to submit review."
-        );
-      }
+      await createReview.mutateAsync({
+        bookingId: booking.id,
+        rating,
+        comment: review.trim(),
+      });
 
       setSubmitted(true);
     } catch (error: any) {
@@ -3715,11 +3707,9 @@ export function ReviewPage() {
       );
 
       setError(
-        error.message ||
+        error?.message ||
         "Unable to submit review."
       );
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -3787,7 +3777,7 @@ export function ReviewPage() {
           <div className="rounded-3xl border border-red-200 bg-white p-6 shadow-sm dark:border-red-900/40 dark:bg-ink-900 sm:p-8">
 
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-500 dark:bg-red-950/30">
-              <CheckCircle2 className="h-6 w-6" />
+              <AlertCircle className="h-6 w-6" />
             </div>
 
             <h1 className="mt-5 text-xl font-black text-ink-900 dark:text-white">
@@ -3795,17 +3785,33 @@ export function ReviewPage() {
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-ink-500 dark:text-ink-400">
-              {error ||
+              {displayError ||
                 "Booking could not be found."}
             </p>
 
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="mt-6 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white dark:bg-white dark:text-ink-900"
-            >
-              Go Back
-            </button>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              {id && hasSession && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    bookingsQuery.refetch()
+                  }
+                  disabled={bookingsQuery.isFetching}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-ink-200 px-6 py-3.5 text-sm font-bold text-ink-700 transition hover:bg-ink-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-ink-700 dark:text-ink-200 dark:hover:bg-ink-800"
+                >
+                  <RefreshCcw className="h-4 w-4" />
+                  Try Again
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white dark:bg-white dark:text-ink-900"
+              >
+                Go Back
+              </button>
+            </div>
 
           </div>
         </div>
@@ -3852,22 +3858,59 @@ export function ReviewPage() {
 
 
               {/* Booking */}
-              <div className="mt-6 rounded-2xl bg-ink-50 p-4 dark:bg-ink-950/50">
+              <div className="mt-6 overflow-hidden rounded-2xl border border-ink-100 dark:border-ink-800">
+                <div className="bg-ink-50 p-4 dark:bg-ink-950/50">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-ink-400">
+                    Service
+                  </p>
 
-                <p className="text-xs font-medium text-ink-400">
-                  Service
-                </p>
+                  <p className="mt-1 break-words font-bold text-ink-900 dark:text-white">
+                    {booking.serviceName ||
+                      "Service"}
+                  </p>
 
-                <p className="mt-1 font-bold text-ink-900 dark:text-white">
-                  {booking.serviceName ||
-                    "Service"}
-                </p>
+                  <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
+                    with{" "}
+                    <span className="font-semibold text-ink-700 dark:text-ink-200">
+                      {booking.providerName ||
+                        "Provider"}
+                    </span>
+                  </p>
+                </div>
 
-                <p className="mt-1 text-sm text-ink-500 dark:text-ink-400">
-                  {booking.providerName ||
-                    "Provider"}
-                </p>
+                <div className="grid gap-0 divide-y divide-ink-100 dark:divide-ink-800 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+                  <div className="flex items-center gap-2.5 p-3.5">
+                    <Calendar className="h-4 w-4 shrink-0 text-primary-600" />
 
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">
+                        Date
+                      </p>
+
+                      <p className="mt-0.5 truncate text-xs font-semibold text-ink-800 dark:text-ink-200">
+                        {booking.date
+                          ? formatDate(booking.date)
+                          : "Not provided"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 p-3.5">
+                    <Clock className="h-4 w-4 shrink-0 text-primary-600" />
+
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-ink-400">
+                        Time
+                      </p>
+
+                      <p className="mt-0.5 truncate text-xs font-semibold text-ink-800 dark:text-ink-200">
+                        {booking.time
+                          ? formatTime(booking.time)
+                          : "Not provided"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
 
@@ -3889,10 +3932,11 @@ export function ReviewPage() {
                           setRating(value)
                         }
                         aria-label={`${value} star`}
+                        aria-pressed={rating >= value}
                         className={[
-                          "flex h-12 w-12 items-center justify-center rounded-xl border transition",
+                          "flex h-12 w-12 items-center justify-center rounded-xl border transition-all active:scale-95",
                           rating >= value
-                            ? "border-primary-500 bg-primary-50 text-primary-500 dark:bg-primary-950/30 dark:text-primary-400"
+                            ? "border-primary-500 bg-primary-50 text-primary-500 shadow-sm dark:bg-primary-950/30 dark:text-primary-400"
                             : "border-ink-200 text-ink-300 hover:border-primary-300 hover:text-primary-400 dark:border-ink-700 dark:text-ink-600",
                         ].join(" ")}
                       >
@@ -3953,9 +3997,12 @@ export function ReviewPage() {
 
 
               {/* Error */}
-              {error && (
-                <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
-                  {error}
+              {displayError && (
+                <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span className="min-w-0 break-words">
+                    {displayError}
+                  </span>
                 </div>
               )}
 
@@ -3966,13 +4013,13 @@ export function ReviewPage() {
                 onClick={handleSubmit}
                 disabled={
                   !rating ||
-                  submitting
+                  createReview.isPending
                 }
                 className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-5 py-4 text-sm font-bold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {submitting ? (
+                {createReview.isPending ? (
                   <>
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Submitting...
                   </>
                 ) : (
@@ -3998,15 +4045,42 @@ export function ReviewPage() {
                 Your feedback has been recorded successfully.
               </p>
 
-              <button
-                type="button"
-                onClick={() =>
-                  navigate("/customer")
-                }
-                className="mt-6 rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white dark:bg-white dark:text-ink-900"
-              >
-                Back to Dashboard
-              </button>
+              <div className="mx-auto mt-4 flex w-fit items-center gap-1 rounded-full bg-warning-50 px-3 py-1.5 dark:bg-warning-600/15">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <Star
+                    key={value}
+                    className="h-4 w-4"
+                    fill={rating >= value ? "currentColor" : "none"}
+                    color={rating >= value ? "#f79009" : "#d4d4d8"}
+                  />
+                ))}
+
+                <span className="ml-1 text-xs font-bold text-warning-700 dark:text-warning-200">
+                  {rating}.0
+                </span>
+              </div>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/customer/bookings")
+                  }
+                  className="rounded-2xl border border-ink-200 px-6 py-3.5 text-sm font-bold text-ink-700 transition hover:bg-ink-50 dark:border-ink-700 dark:text-ink-200 dark:hover:bg-ink-800"
+                >
+                  View My Bookings
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/customer")
+                  }
+                  className="rounded-2xl bg-ink-900 px-6 py-3.5 text-sm font-bold text-white dark:bg-white dark:text-ink-900"
+                >
+                  Back to Dashboard
+                </button>
+              </div>
 
             </div>
           )}

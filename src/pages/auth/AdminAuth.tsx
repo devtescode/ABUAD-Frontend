@@ -1,28 +1,83 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useRef, useState, type FormEvent } from "react";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  Activity,
+  AlertCircle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
   Eye,
   EyeOff,
-  ShieldCheck,
-  Mail,
-  Lock,
-  User,
   Loader2,
-  AlertCircle,
-  CheckCircle2,
-  Activity,
-  Lock as LockIcon,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  User,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
-import { cn } from "@/components/ui";
-
-// const API_URL = "http://localhost:5000";
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "http://localhost:5000";
+import { Button, cn } from "@/components/ui";
+import { Logo } from "@/components/shared";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  queryKeys,
+  useAdminExists,
+  useAdminLogin,
+  useAdminRegister,
+  useQueryClient,
+} from "@/hooks/queries";
 
 type AuthMode = "login" | "register";
+
+type AdminFieldErrors = {
+  name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+};
+
+const adminFeatures: Array<{ icon: LucideIcon; text: string }> = [
+  {
+    icon: ShieldCheck,
+    text: "Administrator-only access, verified on every request",
+  },
+  {
+    icon: Activity,
+    text: "Monitor providers, bookings, and platform activity",
+  },
+  {
+    icon: Lock,
+    text: "Separate, encrypted admin sessions",
+  },
+];
+
+const fieldErrorClass =
+  "border-danger-500/60 focus:border-danger-500 focus:ring-danger-500/10 dark:border-danger-500/40";
+
+// ─── Inline Field Error ─────────────────────────────────────────────────────
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  return (
+    <AnimatePresence initial={false}>
+      {message && (
+        <motion.p
+          id={id}
+          role="alert"
+          initial={{ opacity: 0, y: -2 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -2 }}
+          transition={{ duration: 0.15 }}
+          className="mt-1.5 flex items-start gap-1.5 text-xs font-medium text-danger-600 dark:text-danger-200"
+        >
+          <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>{message}</span>
+        </motion.p>
+      )}
+    </AnimatePresence>
+  );
+}
 
 // ─── Admin Field Primitive ──────────────────────────────────────────────────
 
@@ -35,6 +90,8 @@ function AdminField({
   onChange,
   placeholder,
   autoComplete,
+  error,
+  hint,
   toggle,
 }: {
   id: string;
@@ -42,42 +99,58 @@ function AdminField({
   icon: LucideIcon;
   type?: string;
   value: string;
-  onChange: (v: string) => void;
+  onChange: (value: string) => void;
   placeholder?: string;
   autoComplete?: string;
+  error?: string;
+  hint?: string;
   toggle?: {
     shown: boolean;
     onToggle: () => void;
   };
 }) {
+  const describedBy =
+    [error && `${id}-error`, hint && `${id}-hint`]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
   return (
     <div>
       <label
         htmlFor={id}
-        className="mb-2 block text-sm font-medium text-slate-700 dark:text-ink-300"
+        className="mb-2 block text-sm font-semibold text-slate-700 dark:text-ink-300"
       >
         {label}
       </label>
 
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400 dark:text-ink-500" />
+      <div className="group relative">
+        <Icon
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 transition-colors",
+            error
+              ? "text-danger-500"
+              : "text-slate-400 group-focus-within:text-brand-600 dark:text-ink-500 dark:group-focus-within:text-brand-400"
+          )}
+        />
 
         <input
           id={id}
           type={
-            toggle
-              ? toggle.shown
-                ? "text"
-                : "password"
-              : type
+            toggle ? (toggle.shown ? "text" : "password") : type
           }
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
           className={cn(
-            "w-full h-11 rounded-xl border border-slate-200 bg-white pl-11 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 sm:text-sm dark:border-ink-700 dark:bg-ink-800 dark:text-ink-50 dark:placeholder:text-ink-500 dark:focus:border-emerald-400",
-            toggle ? "pr-12" : "pr-4"
+            "h-12 w-full rounded-xl border bg-white pl-11 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-4 sm:text-sm dark:bg-ink-800 dark:text-ink-50 dark:placeholder:text-ink-500",
+            toggle ? "pr-12" : "pr-4",
+            error
+              ? fieldErrorClass
+              : "border-slate-200 focus:border-brand-500 focus:ring-brand-500/10 dark:border-ink-700 dark:focus:border-brand-400 dark:focus:ring-brand-400/10"
           )}
         />
 
@@ -86,11 +159,10 @@ function AdminField({
             type="button"
             onClick={toggle.onToggle}
             aria-label={
-              toggle.shown
-                ? "Hide password"
-                : "Show password"
+              toggle.shown ? "Hide password" : "Show password"
             }
-            className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-ink-200"
+            aria-pressed={toggle.shown}
+            className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 dark:hover:bg-ink-700 dark:hover:text-ink-200"
           >
             {toggle.shown ? (
               <EyeOff className="h-[18px] w-[18px]" />
@@ -100,6 +172,143 @@ function AdminField({
           </button>
         )}
       </div>
+
+      <FieldError id={`${id}-error`} message={error} />
+
+      {hint && (
+        <p
+          id={`${id}-hint`}
+          className="mt-1.5 text-xs text-slate-400 dark:text-ink-500"
+        >
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Animated Form Message ──────────────────────────────────────────────────
+
+function FormMessage({
+  tone,
+  message,
+  onRetry,
+  retrying,
+}: {
+  tone: "error" | "success";
+  message?: string;
+  onRetry?: () => void;
+  retrying?: boolean;
+}) {
+  return (
+    <AnimatePresence initial={false}>
+      {message && (
+        <motion.div
+          initial={{ opacity: 0, height: 0, y: -4 }}
+          animate={{ opacity: 1, height: "auto", y: 0 }}
+          exit={{ opacity: 0, height: 0, y: -4 }}
+          transition={{ duration: 0.2 }}
+          role={tone === "error" ? "alert" : "status"}
+          aria-live="polite"
+          className="overflow-hidden"
+        >
+          <div
+            className={cn(
+              "flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm",
+              tone === "error"
+                ? "border-danger-200 bg-danger-50 text-danger-700 dark:border-danger-500/25 dark:bg-danger-500/10 dark:text-danger-200"
+                : "border-success-200 bg-success-50 text-success-700 dark:border-success-600/25 dark:bg-success-600/10 dark:text-success-200"
+            )}
+          >
+            {tone === "error" ? (
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            ) : (
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            )}
+
+            <div className="min-w-0 flex-1">
+              <p>{message}</p>
+
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  disabled={retrying}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-danger-200 bg-white/70 px-2.5 py-1 text-xs font-semibold text-danger-700 transition hover:bg-white disabled:opacity-60 dark:border-danger-500/30 dark:bg-danger-500/10 dark:text-danger-200 dark:hover:bg-danger-500/20"
+                >
+                  {retrying && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  )}
+                  {retrying ? "Retrying..." : "Try again"}
+                </button>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// ─── Admin Existence Check Screen ───────────────────────────────────────────
+
+function AdminCheckScreen() {
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-brand-950 px-4">
+      <div
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-500 via-brand-800 to-brand-950"
+        aria-hidden="true"
+      />
+
+      <div
+        className="pointer-events-none absolute inset-0"
+        aria-hidden="true"
+      >
+        <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+        <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-brand-950/60 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.10)_1px,transparent_1px)] [background-size:28px_28px]" />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35 }}
+        className="relative z-10 w-full max-w-sm rounded-3xl border border-white/15 bg-white/10 p-8 text-center backdrop-blur-xl"
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.05, duration: 0.3 }}
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/20 bg-white/10"
+        >
+          <ShieldCheck className="h-8 w-8 text-brand-200" />
+        </motion.div>
+
+        <p className="mt-5 text-sm font-semibold text-white">
+          Verifying administrator access
+        </p>
+
+        <p className="mt-1 text-xs text-brand-200/80">
+          Secure connection · Servicely
+        </p>
+
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-brand-100">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Checking administrator access...
+        </div>
+
+        <div className="mt-6 h-1 overflow-hidden rounded-full bg-white/10">
+          <motion.div
+            className="h-full w-1/2 rounded-full bg-gradient-to-r from-brand-300 to-sky-400"
+            animate={{ x: ["-100%", "200%"] }}
+            transition={{
+              repeat: Infinity,
+              duration: 1.4,
+              ease: "easeInOut",
+            }}
+          />
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -108,13 +317,27 @@ function AdminField({
 
 export default function AdminAuth() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
-  // Prevent the initialization effect from running more than once
-  const initialized = useRef(false);
+  // Resolve the "already signed in" redirect once, on mount.
+  const [hadAdminSession] = useState(() =>
+    Boolean(sessionStorage.getItem("servicely_admin_token"))
+  );
+
+  const adminExistsQuery = useAdminExists({
+    enabled: !hadAdminSession,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+
+  const registerMutation = useAdminRegister();
+  const loginMutation = useAdminLogin();
+
+  const modeTimer = useRef<number | null>(null);
 
   const [mode, setMode] = useState<AuthMode>("login");
-  const [checkingAdmin, setCheckingAdmin] = useState(true);
-  const [adminExists, setAdminExists] = useState<boolean | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -125,224 +348,208 @@ export default function AdminAuth() {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
 
-  const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] =
+    useState<AdminFieldErrors>({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const exists = adminExistsQuery.data
+    ? Boolean(adminExistsQuery.data.exists)
+    : undefined;
+
+  const isRegister = mode === "register";
+  const loading = isRegister
+    ? registerMutation.isPending
+    : loginMutation.isPending;
+
+  if (hadAdminSession) {
+    return <Navigate to="/admin" replace />;
+  }
+
+  if (adminExistsQuery.isLoading) {
+    return <AdminCheckScreen />;
+  }
+
   /*
-   * CHECK ADMIN
+   * ONE-TIME INITIALISATION GUARD
    *
-   * This runs only once when the page loads.
+   * The backend decides whether the page opens in "login" or "register"
+   * mode. Apply that decision exactly once so later refetches — or the
+   * admin manually switching modes — never override their choice.
    */
-  useEffect(() => {
-    if (initialized.current) return;
+  if (!initialized && typeof exists === "boolean") {
+    setInitialized(true);
+    setMode(exists ? "login" : "register");
+  }
 
-    initialized.current = true;
+  const existsError = adminExistsQuery.isError
+    ? adminExistsQuery.error?.message ||
+      "Unable to connect to the server."
+    : "";
 
-    const checkAdmin = async () => {
-      try {
-        setCheckingAdmin(true);
-        setError("");
+  const clearFieldError = (key: keyof AdminFieldErrors) => {
+    setFieldErrors((previous) => {
+      if (!previous[key]) return previous;
 
-        // Check whether an admin is already logged in
-        const adminToken = sessionStorage.getItem(
-          "servicely_admin_token"
-        );
+      const next = { ...previous };
+      delete next[key];
+      return next;
+    });
 
-        if (adminToken) {
-          navigate("/admin", {
-            replace: true,
-          });
+    if (error) setError("");
+  };
 
-          return;
-        }
+  const switchMode = (nextMode: AuthMode) => {
+    if (loading || nextMode === mode) return;
 
-        // Ask backend whether an admin account exists
-        const response = await fetch(
-          `${API_URL}/admin/exists`
-        );
+    if (modeTimer.current !== null) {
+      window.clearTimeout(modeTimer.current);
+      modeTimer.current = null;
+    }
 
-        const data = await response.json();
+    // A manual choice is final: a late existence refetch must not
+    // override it.
+    setInitialized(true);
+    setMode(nextMode);
+    setError("");
+    setSuccess("");
+    setFieldErrors({});
+    setPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  };
 
-        if (!response.ok) {
-          throw new Error(
-            data?.message ||
-            "Unable to check admin status."
-          );
-        }
+  const validateRegister = (): AdminFieldErrors => {
+    const nextErrors: AdminFieldErrors = {};
 
-        const exists = Boolean(data?.exists);
+    if (!name.trim()) {
+      nextErrors.name = "Please enter your full name.";
+    }
 
-        setAdminExists(exists);
+    if (!email.trim()) {
+      nextErrors.email = "Please enter your email.";
+    }
 
-        if (exists) {
-          // Admin already exists
-          setMode("login");
-        } else {
-          // No admin exists
-          setMode("register");
-        }
-      } catch (err: any) {
-        console.error("Admin check error:", err);
+    if (!password) {
+      nextErrors.password = "Please enter a password.";
+    } else if (password.length < 6) {
+      nextErrors.password =
+        "Password must be at least 6 characters.";
+    }
 
-        setError(
-          err?.message ||
-          "Unable to connect to the server."
-        );
-      } finally {
-        setCheckingAdmin(false);
-      }
-    };
+    if (password !== confirmPassword) {
+      nextErrors.confirmPassword = "Passwords do not match.";
+    }
 
-    checkAdmin();
-  }, []); // IMPORTANT: empty dependency array
+    return nextErrors;
+  };
 
+  const validateLogin = (): AdminFieldErrors => {
+    const nextErrors: AdminFieldErrors = {};
+
+    if (!email.trim()) {
+      nextErrors.email = "Please enter your email.";
+    }
+
+    if (!password) {
+      nextErrors.password = "Please enter your password.";
+    }
+
+    return nextErrors;
+  };
 
   /*
    * REGISTER ADMIN
    */
   const handleRegister = async (
-    e: React.FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>
   ) => {
-    e.preventDefault();
+    event.preventDefault();
+
+    if (loading) return;
 
     setError("");
     setSuccess("");
 
-    if (!name.trim()) {
-      setError("Please enter your full name.");
-      return;
-    }
+    const nextErrors = validateRegister();
+    setFieldErrors(nextErrors);
 
-    if (!email.trim()) {
-      setError("Please enter your email.");
-      return;
-    }
-
-    if (!password) {
-      setError("Please enter a password.");
-      return;
-    }
-
-    if (password.length < 6) {
-      setError(
-        "Password must be at least 6 characters."
-      );
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
+    if (Object.keys(nextErrors).length > 0) return;
 
     try {
-      setLoading(true);
-
-      const response = await fetch(
-        `${API_URL}/admin/register`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: name.trim(),
-            email: email.trim(),
-            password,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-          "Unable to create admin account."
-        );
-      }
+      await registerMutation.mutateAsync({
+        name: name.trim(),
+        email: email.trim(),
+        password,
+      });
 
       /*
        * DO NOT SAVE TOKEN HERE.
        *
        * Registration should take the admin to login.
        */
+      queryClient.setQueryData<{ exists?: boolean }>(
+        queryKeys.admin.exists,
+        { exists: true }
+      );
+
       setPassword("");
       setConfirmPassword("");
-
-      setAdminExists(true);
+      setShowPassword(false);
+      setShowConfirmPassword(false);
 
       setSuccess(
         "Admin account created successfully. Please login."
       );
 
       // Change to login after registration
-      setTimeout(() => {
+      modeTimer.current = window.setTimeout(() => {
         setMode("login");
         setSuccess("");
+        modeTimer.current = null;
       }, 1200);
-    } catch (err: any) {
-      console.error("Admin registration error:", err);
+    } catch (registerError) {
+      console.error(
+        "Admin registration error:",
+        registerError
+      );
 
       setError(
-        err?.message ||
-        "Something went wrong while creating the account."
+        registerError instanceof Error
+          ? registerError.message
+          : "Something went wrong while creating the account."
       );
-    } finally {
-      setLoading(false);
     }
   };
-
 
   /*
    * LOGIN ADMIN
    */
   const handleLogin = async (
-    e: React.FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>
   ) => {
-    e.preventDefault();
+    event.preventDefault();
+
+    if (loading) return;
 
     setError("");
     setSuccess("");
 
-    if (!email.trim()) {
-      setError("Please enter your email.");
-      return;
-    }
+    const nextErrors = validateLogin();
+    setFieldErrors(nextErrors);
 
-    if (!password) {
-      setError("Please enter your password.");
-      return;
-    }
+    if (Object.keys(nextErrors).length > 0) return;
 
     try {
-      setLoading(true);
+      const data = await loginMutation.mutateAsync({
+        email: email.trim(),
+        password,
+      });
 
-      const response = await fetch(
-        `${API_URL}/admin/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email: email.trim(),
-            password,
-          }),
-        }
-      );
+      const token = data?.token;
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data?.message ||
-          "Invalid admin credentials."
-        );
-      }
-
-      if (!data?.token) {
+      if (!token) {
         throw new Error(
           "Login successful but no token was returned."
         );
@@ -354,13 +561,15 @@ export default function AdminAuth() {
        */
       sessionStorage.setItem(
         "servicely_admin_token",
-        data.token
+        token
       );
 
-      if (data.admin) {
+      const admin = data?.admin;
+
+      if (admin) {
         sessionStorage.setItem(
           "servicely_admin",
-          JSON.stringify(data.admin)
+          JSON.stringify(admin)
         );
       }
 
@@ -370,409 +579,436 @@ export default function AdminAuth() {
       navigate("/admin", {
         replace: true,
       });
-    } catch (err: any) {
-      console.error("Admin login error:", err);
+    } catch (loginError) {
+      console.error("Admin login error:", loginError);
 
       setError(
-        err?.message ||
-        "Something went wrong while logging in."
+        loginError instanceof Error
+          ? loginError.message
+          : "Something went wrong while logging in."
       );
-    } finally {
-      setLoading(false);
     }
   };
 
-
-  /*
-   * LOADING SCREEN
-   */
-  if (checkingAdmin) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-        <div className="flex flex-col items-center gap-4">
-
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
-            <ShieldCheck className="w-7 h-7 text-emerald-400" />
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
-
-            <p className="text-sm text-slate-400">
-              Checking administrator access...
-            </p>
-          </div>
-
-        </div>
-      </div>
-    );
-  }
-
-
   return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-ink-950 lg:grid lg:grid-cols-2">
-
+    <div className="relative min-h-screen bg-[#F8FAFC] dark:bg-ink-950 lg:grid lg:grid-cols-2">
       {/* ── Left security panel ── */}
-      <aside className="relative hidden overflow-hidden bg-slate-900 lg:flex lg:flex-col lg:justify-between lg:p-12">
+      <aside className="relative hidden overflow-hidden bg-brand-950 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:justify-between lg:p-12 xl:p-16">
+        {/* Gradient wash */}
+        <div
+          className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand-500 via-brand-700 to-brand-950"
+          aria-hidden="true"
+        />
 
         {/* Decorative shapes */}
         <div
           className="pointer-events-none absolute inset-0"
           aria-hidden="true"
         >
-          <div className="absolute -right-24 -top-28 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
-          <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-emerald-400/5 blur-3xl" />
-          <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px]" />
+          <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+          <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-brand-950/60 blur-3xl" />
+          <div className="absolute right-10 top-1/3 h-56 w-56 rounded-full bg-brand-300/20 blur-3xl" />
+          <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.10)_1px,transparent_1px)] [background-size:28px_28px]" />
         </div>
 
-        {/* Brand */}
-        <div className="relative z-10 flex items-center gap-3">
-
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 border border-emerald-400/20">
-            <ShieldCheck className="w-5 h-5 text-emerald-400" />
-          </span>
-
-          <div>
-            <p className="text-lg font-bold leading-tight text-white">
-              Servicely
-            </p>
-
-            <p className="text-xs text-slate-400">
-              Administrator Portal
-            </p>
-          </div>
-
-        </div>
-
-
-        {/* Security copy */}
-        <div className="relative z-10">
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 backdrop-blur"
+        <div className="no-scrollbar relative z-10 flex h-full flex-col justify-between gap-10 overflow-y-auto">
+          {/* Brand */}
+          <Link
+            to="/"
+            className="flex w-fit items-center gap-3 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-4 focus-visible:ring-offset-brand-700"
+            aria-label="Servicely home"
           >
-            <LockIcon className="h-3.5 w-3.5" />
-            Restricted access
-          </motion.div>
-
-          <motion.h2
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.08, duration: 0.4 }}
-            className="max-w-lg text-3xl font-bold leading-tight text-white"
-          >
-            The secure control room
-            <br />
-            for the Servicely marketplace.
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.14, duration: 0.4 }}
-            className="mt-4 max-w-md text-sm leading-6 text-slate-400"
-          >
-            Sign in to verify providers, monitor
-            bookings and payouts, and keep the ABUAD
-            campus marketplace running smoothly.
-          </motion.p>
-
-          <ul className="mt-8 space-y-3.5">
-
-            <motion.li
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.22, duration: 0.4 }}
-              className="flex items-center gap-3"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-              </span>
-
-              <span className="text-sm font-medium text-slate-300">
-                Administrator-only access, verified at every request
-              </span>
-            </motion.li>
-
-            <motion.li
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3, duration: 0.4 }}
-              className="flex items-center gap-3"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
-                <Activity className="h-3.5 w-3.5 text-emerald-400" />
-              </span>
-
-              <span className="text-sm font-medium text-slate-300">
-                Monitor providers, bookings, and platform activity
-              </span>
-            </motion.li>
-
-            <motion.li
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.38, duration: 0.4 }}
-              className="flex items-center gap-3"
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15">
-                <LockIcon className="h-3.5 w-3.5 text-emerald-400" />
-              </span>
-
-              <span className="text-sm font-medium text-slate-300">
-                Encrypted sessions, stored separately from students
-              </span>
-            </motion.li>
-
-          </ul>
-
-        </div>
-
-        <p className="relative z-10 text-xs text-slate-500">
-          Authorized administrators only
-        </p>
-
-      </aside>
-
-
-      {/* ── Right form panel ── */}
-      <main className="flex min-h-screen flex-col items-center justify-center px-4 py-8 sm:px-8 lg:min-h-0 lg:py-12">
-
-        <div className="w-full max-w-md">
-
-          {/* Compact mobile brand header */}
-          <div className="mb-6 flex items-center justify-center gap-3 lg:hidden">
-
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600/10 border border-emerald-500/20">
-              <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-soft">
+              <ShieldCheck className="h-6 w-6 text-brand-600" />
             </span>
 
-            <div className="text-center">
-              <p className="text-lg font-bold leading-tight text-slate-900 dark:text-white">
+            <span>
+              <span className="block text-xl font-bold tracking-tight text-white">
                 Servicely
-              </p>
+              </span>
 
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <span className="block text-xs font-medium text-brand-200">
                 Administrator Portal
-              </p>
-            </div>
+              </span>
+            </span>
+          </Link>
 
+          {/* Security copy */}
+          <div className="max-w-lg">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/90 backdrop-blur"
+            >
+              <Lock className="h-3.5 w-3.5" />
+              Restricted access
+            </motion.div>
+
+            <motion.h2
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.08, duration: 0.4 }}
+              className="text-balance text-3xl font-bold leading-tight tracking-tight text-white xl:text-4xl"
+            >
+              The secure control room
+              <br />
+              for the Servicely marketplace.
+            </motion.h2>
+
+            <motion.p
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.14, duration: 0.4 }}
+              className="mt-4 max-w-md text-sm leading-6 text-brand-100"
+            >
+              Verify providers, monitor bookings and payouts,
+              and keep the ABUAD campus marketplace running
+              smoothly.
+            </motion.p>
+
+            <ul className="mt-8 space-y-3">
+              {adminFeatures.map((feature, index) => {
+                const Icon = feature.icon;
+
+                return (
+                  <motion.li
+                    key={feature.text}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{
+                      delay: 0.22 + index * 0.08,
+                      duration: 0.4,
+                    }}
+                    className="flex items-center gap-3"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white">
+                      <Icon className="h-4 w-4" />
+                    </span>
+
+                    <span className="text-sm font-medium text-white/90">
+                      {feature.text}
+                    </span>
+                  </motion.li>
+                );
+              })}
+            </ul>
+
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.48, duration: 0.4 }}
+              className="mt-8 flex items-start gap-3 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-sm"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-brand-100">
+                <Sparkles className="h-4 w-4" />
+              </span>
+
+              <p className="text-xs leading-5 text-brand-100">
+                Admin sessions are kept separate from student
+                accounts, with every privileged request
+                verified by the API.
+              </p>
+            </motion.div>
           </div>
 
+          {/* Trust footer */}
+          <div className="flex items-center justify-between gap-4 text-xs text-brand-200">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Authorized administrators only
+            </span>
 
-          {/* CARD */}
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
-            className="rounded-2xl border border-slate-200/70 bg-white p-6 shadow-xl sm:p-8 dark:border-ink-800 dark:bg-ink-900"
+            <span>ABUAD · Servicely</span>
+          </div>
+        </div>
+      </aside>
+
+      {/* ── Right form panel ── */}
+      <main className="relative flex min-h-screen flex-col px-4 pb-8 pt-5 sm:px-8 lg:min-h-0 lg:px-10 lg:py-10 xl:px-14">
+        {/* Top bar */}
+        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3">
+          <div className="lg:hidden">
+            <Logo />
+          </div>
+
+          <Link
+            to="/"
+            className="hidden items-center gap-1.5 rounded-lg text-sm font-medium text-slate-500 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-2 dark:text-ink-400 dark:hover:text-ink-50 lg:inline-flex"
           >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Servicely
+          </Link>
 
-            {/* HEADER */}
-            <div className="mb-6">
-
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-ink-50">
-                {mode === "register"
-                  ? "Create Admin Account"
-                  : "Admin Login"}
-              </h1>
-
-              <p className="mt-2 text-sm text-slate-500 dark:text-ink-400">
-                {mode === "register"
-                  ? "Create the administrator account for Servicely."
-                  : "Sign in to access the Servicely admin dashboard."}
-              </p>
-
-            </div>
-
-
-            {/* FIRST ADMIN NOTICE */}
-            {mode === "register" && (
-              <div className="mb-5 flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4 dark:border-emerald-500/20 dark:bg-emerald-500/10">
-
-                <ShieldCheck className="w-5 h-5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-
-                <div>
-
-                  <p className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
-                    First administrator
-                  </p>
-
-                  <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300/80">
-                    No administrator account exists yet.
-                    Create the first admin account below.
-                  </p>
-
-                </div>
-
-              </div>
-            )}
-
-
-            {/* ERROR */}
-            {error && (
-              <div
-                role="alert"
-                aria-live="polite"
-                className="mb-5 flex gap-3 rounded-xl border border-red-100 bg-red-50 p-3 dark:border-red-500/25 dark:bg-red-500/10"
-              >
-
-                <AlertCircle className="w-5 h-5 shrink-0 text-red-500" />
-
-                <p className="text-sm text-red-700 dark:text-red-300">
-                  {error}
-                </p>
-
-              </div>
-            )}
-
-
-            {/* SUCCESS */}
-            {success && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="mb-5 flex gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-3 dark:border-emerald-500/20 dark:bg-emerald-500/10"
-              >
-
-                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-
-                <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                  {success}
-                </p>
-
-              </div>
-            )}
-
-
-            {/* FORM */}
-            <form
-              onSubmit={
-                mode === "register"
-                  ? handleRegister
-                  : handleLogin
-              }
-              className="space-y-5"
-            >
-
-              {/* NAME */}
-              {mode === "register" && (
-                <AdminField
-                  id="admin-name"
-                  label="Full Name"
-                  icon={User}
-                  value={name}
-                  onChange={setName}
-                  placeholder="Enter your full name"
-                  autoComplete="name"
-                />
-              )}
-
-
-              {/* EMAIL */}
-              <AdminField
-                id="admin-email"
-                label="Email Address"
-                icon={Mail}
-                type="email"
-                value={email}
-                onChange={setEmail}
-                placeholder="admin@example.com"
-                autoComplete="email"
-              />
-
-
-              {/* PASSWORD */}
-              <AdminField
-                id="admin-password"
-                label="Password"
-                icon={Lock}
-                value={password}
-                onChange={setPassword}
-                placeholder="Enter your password"
-                autoComplete={
-                  mode === "register"
-                    ? "new-password"
-                    : "current-password"
-                }
-                toggle={{
-                  shown: showPassword,
-                  onToggle: () =>
-                    setShowPassword((previous) => !previous),
-                }}
-              />
-
-
-              {/* CONFIRM PASSWORD */}
-              {mode === "register" && (
-                <AdminField
-                  id="admin-confirm-password"
-                  label="Confirm Password"
-                  icon={Lock}
-                  value={confirmPassword}
-                  onChange={setConfirmPassword}
-                  placeholder="Confirm your password"
-                  autoComplete="new-password"
-                  toggle={{
-                    shown: showConfirmPassword,
-                    onToggle: () =>
-                      setShowConfirmPassword(
-                        (previous) => !previous
-                      ),
-                  }}
-                />
-              )}
-
-
-              {/* SUBMIT */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm flex items-center justify-center gap-2 transition active:scale-[0.98] dark:bg-emerald-600 dark:hover:bg-emerald-500"
-              >
-
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-
-                    {mode === "register"
-                      ? "Creating Account..."
-                      : "Logging In..."}
-                  </>
-                ) : mode === "register" ? (
-                  "Create Admin Account"
-                ) : (
-                  "Login to Dashboard"
-                )}
-
-              </button>
-
-            </form>
-
-
-            {/* FOOTER */}
-            <div className="mt-6 pt-6 border-t border-slate-100 text-center dark:border-ink-800">
-
-              <p className="text-xs text-slate-400 dark:text-ink-500">
-                Servicely Administrator Portal
-              </p>
-
-            </div>
-
-          </motion.div>
-
-
-          <p className="mt-6 text-center text-xs text-slate-500 dark:text-ink-500">
-            Authorized administrators only
-          </p>
-
+          <ThemeToggle />
         </div>
 
-      </main>
+        <div className="flex flex-1 items-center justify-center py-8 sm:py-10">
+          <div className="w-full max-w-md">
+            <motion.section
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-[0_30px_80px_-40px_rgba(30,26,77,0.45)] backdrop-blur dark:border-ink-800 dark:bg-ink-900/95"
+            >
+              {/* Accent line */}
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-400 to-sky-400"
+                aria-hidden="true"
+              />
 
+              <div className="p-6 sm:p-8">
+                {/* HEADER */}
+                <div className="mb-6">
+                  <span className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-brand-100 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700 dark:border-brand-900/60 dark:bg-brand-950/60 dark:text-brand-300">
+                    <ShieldCheck className="h-3 w-3" />
+                    Administrator access
+                  </span>
+
+                  <h1 className="text-balance text-2xl font-bold tracking-tight text-slate-900 dark:text-ink-50 sm:text-[1.7rem]">
+                    {isRegister
+                      ? "Create admin account"
+                      : "Welcome back"}
+                  </h1>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-ink-400">
+                    {isRegister
+                      ? "Set up the administrator account for the Servicely marketplace."
+                      : "Sign in to the Servicely administrator dashboard."}
+                  </p>
+                </div>
+
+                {/* MODE SWITCH */}
+                <div
+                  className="mb-5 grid grid-cols-2 gap-1 rounded-xl border border-slate-200/80 bg-slate-100/70 p-1 dark:border-ink-800 dark:bg-ink-950/60"
+                  role="group"
+                  aria-label="Administrator authentication mode"
+                >
+                  {(["login", "register"] as const).map(
+                    (value) => {
+                      const active = mode === value;
+                      const registerBlocked =
+                        value === "register" && exists === true;
+
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={active}
+                          disabled={loading || registerBlocked}
+                          onClick={() => switchMode(value)}
+                          title={
+                            registerBlocked
+                              ? "An administrator account already exists."
+                              : undefined
+                          }
+                          className={cn(
+                            "rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60",
+                            active
+                              ? "bg-white text-slate-900 shadow-sm dark:bg-ink-800 dark:text-ink-50"
+                              : "text-slate-500 hover:text-slate-800 dark:text-ink-400 dark:hover:text-ink-100",
+                            (loading || registerBlocked) &&
+                              "cursor-not-allowed opacity-50"
+                          )}
+                        >
+                          {value === "login"
+                            ? "Sign in"
+                            : "Create account"}
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+
+                {/* FIRST ADMIN NOTICE */}
+                <AnimatePresence initial={false}>
+                  {isRegister && exists === false && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="mb-5 flex gap-3 rounded-xl border border-brand-100 bg-brand-50 p-4 dark:border-brand-900/60 dark:bg-brand-950/40">
+                        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-600 dark:text-brand-300" />
+
+                        <div>
+                          <p className="text-sm font-semibold text-brand-900 dark:text-brand-200">
+                            First administrator
+                          </p>
+
+                          <p className="mt-1 text-xs leading-5 text-brand-700 dark:text-brand-300/80">
+                            No administrator account exists yet.
+                            Create the first admin account below.
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* MESSAGES */}
+                <div className="space-y-3">
+                  <FormMessage
+                    tone="error"
+                    message={existsError || undefined}
+                    onRetry={() => {
+                      void adminExistsQuery.refetch();
+                    }}
+                    retrying={adminExistsQuery.isFetching}
+                  />
+
+                  <FormMessage
+                    tone="error"
+                    message={error || undefined}
+                  />
+
+                  <FormMessage
+                    tone="success"
+                    message={success || undefined}
+                  />
+                </div>
+
+                {/* FORM */}
+                <form
+                  onSubmit={
+                    isRegister ? handleRegister : handleLogin
+                  }
+                  className="mt-5 space-y-4"
+                  noValidate
+                  aria-busy={loading}
+                >
+                  {/* NAME */}
+                  {isRegister && (
+                    <AdminField
+                      id="admin-name"
+                      label="Full Name"
+                      icon={User}
+                      value={name}
+                      onChange={(value) => {
+                        setName(value);
+                        clearFieldError("name");
+                      }}
+                      placeholder="Enter your full name"
+                      autoComplete="name"
+                      error={fieldErrors.name}
+                    />
+                  )}
+
+                  {/* EMAIL */}
+                  <AdminField
+                    id="admin-email"
+                    label="Email Address"
+                    icon={Mail}
+                    type="email"
+                    value={email}
+                    onChange={(value) => {
+                      setEmail(value);
+                      clearFieldError("email");
+                    }}
+                    placeholder="admin@example.com"
+                    autoComplete="email"
+                    error={fieldErrors.email}
+                  />
+
+                  {/* PASSWORD */}
+                  <AdminField
+                    id="admin-password"
+                    label="Password"
+                    icon={Lock}
+                    value={password}
+                    onChange={(value) => {
+                      setPassword(value);
+                      clearFieldError("password");
+                    }}
+                    placeholder={
+                      isRegister
+                        ? "Create a password"
+                        : "Enter your password"
+                    }
+                    autoComplete={
+                      isRegister
+                        ? "new-password"
+                        : "current-password"
+                    }
+                    error={fieldErrors.password}
+                    hint={
+                      isRegister
+                        ? "Use at least 6 characters."
+                        : undefined
+                    }
+                    toggle={{
+                      shown: showPassword,
+                      onToggle: () =>
+                        setShowPassword(
+                          (previous) => !previous
+                        ),
+                    }}
+                  />
+
+                  {/* CONFIRM PASSWORD */}
+                  {isRegister && (
+                    <AdminField
+                      id="admin-confirm-password"
+                      label="Confirm Password"
+                      icon={Lock}
+                      value={confirmPassword}
+                      onChange={(value) => {
+                        setConfirmPassword(value);
+                        clearFieldError("confirmPassword");
+                      }}
+                      placeholder="Confirm your password"
+                      autoComplete="new-password"
+                      error={fieldErrors.confirmPassword}
+                      toggle={{
+                        shown: showConfirmPassword,
+                        onToggle: () =>
+                          setShowConfirmPassword(
+                            (previous) => !previous
+                          ),
+                      }}
+                    />
+                  )}
+
+                  {/* SUBMIT */}
+                  <div className="pt-1">
+                    <Button
+                      type="submit"
+                      size="lg"
+                      loading={loading}
+                      icon={
+                        isRegister ? UserPlus : ArrowRight
+                      }
+                      className="w-full"
+                    >
+                      {loading
+                        ? isRegister
+                          ? "Creating Account..."
+                          : "Logging In..."
+                        : isRegister
+                          ? "Create Admin Account"
+                          : "Login to Dashboard"}
+                    </Button>
+                  </div>
+                </form>
+
+                {/* FOOTER */}
+                <div className="mt-6 flex items-center justify-center gap-1.5 border-t border-slate-100 pt-5 text-[11px] font-medium text-slate-400 dark:border-ink-800 dark:text-ink-500">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Servicely Administrator Portal · Separate admin
+                  sessions
+                </div>
+              </div>
+            </motion.section>
+
+            <p className="mt-6 text-center text-[11px] leading-5 text-slate-400 dark:text-ink-500">
+              Authorized administrators only · Sessions expire when
+              the tab closes.
+            </p>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

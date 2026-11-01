@@ -2,60 +2,156 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, BookingProvider, isTokenExpired, useAuth } from '@/context/AppContext';
 import { queryClient } from '@/lib/queryClient';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
-import { HomePage } from '@/pages/public/HomePage';
-import { ServicesPage } from '@/pages/public/ServicesPage';
-import ProviderProfilePage from '@/pages/provider/ProviderProfilePage';
-import { ProvidersPage, HowItWorksPage, AboutPage } from '@/pages/public/StaticPages';
-import { SignupRolePage, SignupPage, LoginPage, RoleLoginPage, ForgotPasswordPage } from '@/pages/auth/AuthPages';
-import {
-  CustomerProfile,
-  CustomerSettings,
-} from '@/pages/customer/CustomerDashboard';
 
-
-import { CustomerBrowse } from '@/pages/customer/CustomerBrowse';
-import { CustomerSaved } from '@/pages/customer/CustomerSaved';
-import { CustomerBookings } from '@/pages/customer/CustomerBookings';
-import { CustomersDashboard } from '@/pages/customer/CustomersDashboard';
-import { CustomerReviews } from '@/pages/customer/CustomerReviews';
-
-
-
-import {
-  ProviderOnboarding,
-  ProviderEarnings,
-  ProviderSettings,
-} from '@/pages/provider/ProviderDashboard';
-import { ProvidersDashboard} from '@/pages/provider/ProvidersDashboard';
-import { ProviderAddService } from '@/pages/provider/ProviderAddService';
-import { ProviderPortfolio } from '@/pages/provider/ProviderPortfolio';
-import { ProviderServices } from '@/pages/provider/ProviderServices';
-import { ProviderProfile } from '@/pages/provider/ProviderProfile';
-import { ProviderAvailability } from '@/pages/provider/ProviderAvailability';
-import { ProviderAccount } from '@/pages/provider/ProviderAccount';
-import { ProviderRequests } from '@/pages/provider/ProviderRequests';
-import { ProviderBookings } from '@/pages/provider/ProviderBookings';
-import { ProviderReviews } from '@/pages/provider/ProviderReviews';
-
-import { BookingFlow, BookingConfirmed, PaymentPage, ReviewPage } from '@/pages/booking/BookingFlow';
-import {
-  AdminDashboard,
-  AdminCategories,
-  AdminPayments,
-  AdminDisputes,
-  AdminFeatured,
-  AdminAnalytics,
-  AdminSettings,
-} from '@/pages/admin/AdminDashboard';
-import AdminAuth from './pages/auth/AdminAuth';
-import { AdminUsers } from './pages/admin/AdminUsers';
-import { AdminVerification } from './pages/admin/AdminVerification';
-import { AdminProviders } from './pages/admin/Provider';
-import { AdminProviderProfile } from './pages/admin/AdminProviderProfile';
-import { AdminBookings } from './pages/admin/AdminBookings';
-import { AdminReviews } from './pages/admin/AdminReviews';
+/**
+ * Route-level code splitting keeps the public landing page fast and only
+ * downloads a dashboard bundle when the user actually visits it.
+ */
+const HomePage = lazy(() =>
+  import('@/pages/public/HomePage').then((m) => ({ default: m.HomePage }))
+);
+const ServicesPage = lazy(() =>
+  import('@/pages/public/ServicesPage').then((m) => ({ default: m.ServicesPage }))
+);
+const ProviderProfilePage = lazy(() => import('@/pages/provider/ProviderProfilePage'));
+const ProvidersPage = lazy(() =>
+  import('@/pages/public/StaticPages').then((m) => ({ default: m.ProvidersPage }))
+);
+const HowItWorksPage = lazy(() =>
+  import('@/pages/public/StaticPages').then((m) => ({ default: m.HowItWorksPage }))
+);
+const AboutPage = lazy(() =>
+  import('@/pages/public/StaticPages').then((m) => ({ default: m.AboutPage }))
+);
+const SignupRolePage = lazy(() =>
+  import('@/pages/auth/AuthPages').then((m) => ({ default: m.SignupRolePage }))
+);
+const SignupPage = lazy(() =>
+  import('@/pages/auth/AuthPages').then((m) => ({ default: m.SignupPage }))
+);
+const LoginPage = lazy(() =>
+  import('@/pages/auth/AuthPages').then((m) => ({ default: m.LoginPage }))
+);
+const RoleLoginPage = lazy(() =>
+  import('@/pages/auth/AuthPages').then((m) => ({ default: m.RoleLoginPage }))
+);
+const ForgotPasswordPage = lazy(() =>
+  import('@/pages/auth/AuthPages').then((m) => ({ default: m.ForgotPasswordPage }))
+);
+const CustomerProfile = lazy(() =>
+  import('@/pages/customer/CustomerDashboard').then((m) => ({ default: m.CustomerProfile }))
+);
+const CustomerSettings = lazy(() =>
+  import('@/pages/customer/CustomerDashboard').then((m) => ({ default: m.CustomerSettings }))
+);
+const CustomerBrowse = lazy(() =>
+  import('@/pages/customer/CustomerBrowse').then((m) => ({ default: m.CustomerBrowse }))
+);
+const CustomerSaved = lazy(() =>
+  import('@/pages/customer/CustomerSaved').then((m) => ({ default: m.CustomerSaved }))
+);
+const CustomerBookings = lazy(() =>
+  import('@/pages/customer/CustomerBookings').then((m) => ({ default: m.CustomerBookings }))
+);
+const CustomersDashboard = lazy(() =>
+  import('@/pages/customer/CustomersDashboard').then((m) => ({ default: m.CustomersDashboard }))
+);
+const CustomerReviews = lazy(() =>
+  import('@/pages/customer/CustomerReviews').then((m) => ({ default: m.CustomerReviews }))
+);
+const ProviderOnboarding = lazy(() =>
+  import('@/pages/provider/ProviderDashboard').then((m) => ({ default: m.ProviderOnboarding }))
+);
+const ProviderEarnings = lazy(() =>
+  import('@/pages/provider/ProviderDashboard').then((m) => ({ default: m.ProviderEarnings }))
+);
+const ProviderSettings = lazy(() =>
+  import('@/pages/provider/ProviderDashboard').then((m) => ({ default: m.ProviderSettings }))
+);
+const ProvidersDashboard = lazy(() =>
+  import('@/pages/provider/ProvidersDashboard').then((m) => ({ default: m.ProvidersDashboard }))
+);
+const ProviderAddService = lazy(() =>
+  import('@/pages/provider/ProviderAddService').then((m) => ({ default: m.ProviderAddService }))
+);
+const ProviderPortfolio = lazy(() =>
+  import('@/pages/provider/ProviderPortfolio').then((m) => ({ default: m.ProviderPortfolio }))
+);
+const ProviderServices = lazy(() =>
+  import('@/pages/provider/ProviderServices').then((m) => ({ default: m.ProviderServices }))
+);
+const ProviderProfile = lazy(() =>
+  import('@/pages/provider/ProviderProfile').then((m) => ({ default: m.ProviderProfile }))
+);
+const ProviderAvailability = lazy(() =>
+  import('@/pages/provider/ProviderAvailability').then((m) => ({ default: m.ProviderAvailability }))
+);
+const ProviderAccount = lazy(() =>
+  import('@/pages/provider/ProviderAccount').then((m) => ({ default: m.ProviderAccount }))
+);
+const ProviderRequests = lazy(() =>
+  import('@/pages/provider/ProviderRequests').then((m) => ({ default: m.ProviderRequests }))
+);
+const ProviderBookings = lazy(() =>
+  import('@/pages/provider/ProviderBookings').then((m) => ({ default: m.ProviderBookings }))
+);
+const ProviderReviews = lazy(() =>
+  import('@/pages/provider/ProviderReviews').then((m) => ({ default: m.ProviderReviews }))
+);
+const BookingFlow = lazy(() =>
+  import('@/pages/booking/BookingFlow').then((m) => ({ default: m.BookingFlow }))
+);
+const BookingConfirmed = lazy(() =>
+  import('@/pages/booking/BookingFlow').then((m) => ({ default: m.BookingConfirmed }))
+);
+const PaymentPage = lazy(() =>
+  import('@/pages/booking/BookingFlow').then((m) => ({ default: m.PaymentPage }))
+);
+const ReviewPage = lazy(() =>
+  import('@/pages/booking/BookingFlow').then((m) => ({ default: m.ReviewPage }))
+);
+const AdminDashboard = lazy(() =>
+  import('@/pages/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+);
+const AdminCategories = lazy(() =>
+  import('@/pages/admin/AdminDashboard').then((m) => ({ default: m.AdminCategories }))
+);
+const AdminPayments = lazy(() =>
+  import('@/pages/admin/AdminDashboard').then((m) => ({ default: m.AdminPayments }))
+);
+const AdminDisputes = lazy(() =>
+  import('@/pages/admin/AdminDashboard').then((m) => ({ default: m.AdminDisputes }))
+);
+const AdminFeatured = lazy(() =>
+  import('@/pages/admin/AdminDashboard').then((m) => ({ default: m.AdminFeatured }))
+);
+const AdminAnalytics = lazy(() =>
+  import('@/pages/admin/AdminDashboard').then((m) => ({ default: m.AdminAnalytics }))
+);
+const AdminSettings = lazy(() =>
+  import('@/pages/admin/AdminDashboard').then((m) => ({ default: m.AdminSettings }))
+);
+const AdminAuth = lazy(() => import('@/pages/auth/AdminAuth'));
+const AdminUsers = lazy(() =>
+  import('@/pages/admin/AdminUsers').then((m) => ({ default: m.AdminUsers }))
+);
+const AdminVerification = lazy(() =>
+  import('@/pages/admin/AdminVerification').then((m) => ({ default: m.AdminVerification }))
+);
+const AdminProviders = lazy(() =>
+  import('@/pages/admin/Provider').then((m) => ({ default: m.AdminProviders }))
+);
+const AdminProviderProfile = lazy(() =>
+  import('@/pages/admin/AdminProviderProfile').then((m) => ({ default: m.AdminProviderProfile }))
+);
+const AdminBookings = lazy(() =>
+  import('@/pages/admin/AdminBookings').then((m) => ({ default: m.AdminBookings }))
+);
+const AdminReviews = lazy(() =>
+  import('@/pages/admin/AdminReviews').then((m) => ({ default: m.AdminReviews }))
+);
 
 // function ProtectedRoute({ role, children }: { role: 'customer' | 'provider' | 'admin'; children: React.ReactNode }) {
 //   const { user } = useAuth();
@@ -71,6 +167,7 @@ function ProtectedRoute({
   children: React.ReactNode;
 }) {
   const [adminSessionExpired, setAdminSessionExpired] = useState(false);
+  const { user } = useAuth();
   const adminToken = role === "admin"
     ? sessionStorage.getItem("servicely_admin_token")
     : null;
@@ -116,8 +213,6 @@ function ProtectedRoute({
   }
 
   // CUSTOMER / PROVIDER AUTH
-  const { user } = useAuth();
-
   if (!user) {
     return (
       <Navigate
@@ -140,9 +235,23 @@ function ProtectedRoute({
 }
 
 
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center bg-slate-50 dark:bg-ink-950">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-600 dark:border-ink-800 dark:border-t-brand-400" />
+        <p className="text-sm font-medium text-slate-500 dark:text-ink-400">
+          Loading your workspace…
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function AppRoutes() {
   return (
-    <Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
       {/* Public */}
       <Route path="/" element={<HomePage />} />
       <Route path="/services" element={<ServicesPage />} />
@@ -210,7 +319,8 @@ function AppRoutes() {
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }
 
