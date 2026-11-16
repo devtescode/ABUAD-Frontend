@@ -376,13 +376,13 @@ export function DashboardLayout({
           </div>
 
           <div className="flex items-center gap-1.5">
-            <Link
+            {/* <Link
               to="/"
               className="btn-ghost btn-sm hidden items-center gap-1.5 xl:inline-flex"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               Visit site
-            </Link>
+            </Link> */}
             <ThemeToggle />
 
             <div ref={userMenuRef} className="relative">
@@ -430,7 +430,7 @@ export function DashboardLayout({
                       </div>
                     </div>
                     <div className="p-1.5">
-                      <Link
+                      {/* <Link
                         role="menuitem"
                         to="/"
                         onClick={() => setUserMenuOpen(false)}
@@ -438,7 +438,7 @@ export function DashboardLayout({
                       >
                         <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         Visit site
-                      </Link>
+                      </Link> */}
                       <button
                         role="menuitem"
                         type="button"
