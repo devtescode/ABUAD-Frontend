@@ -331,8 +331,11 @@ const csvHeaders = [
 function exportTransactionsCsv(transactions: ProviderEarningsTransaction[]) {
   if (transactions.length === 0) return;
 
-  const escape = (value: unknown) =>
-    `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const escape = (value: unknown) => {
+    let text = String(value ?? '');
+    if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  };
 
   const rows = transactions.map((transaction) =>
     [
@@ -370,7 +373,7 @@ function exportTransactionsCsv(transactions: ProviderEarningsTransaction[]) {
   anchor.click();
   anchor.remove();
 
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /* =========================================================
@@ -932,85 +935,87 @@ export function ProviderEarnings() {
             ) : (
               <>
                 {/* Desktop rows */}
-                <div className="mt-4 hidden lg:block">
-                  <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)] items-center gap-4 rounded-xl bg-slate-50/80 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:bg-ink-800/40 dark:text-ink-500">
-                    <span>Service / customer</span>
-                    <span>Date</span>
-                    <span className="text-right">Gross</span>
-                    <span className="text-right">Fee</span>
-                    <span className="text-right">Net</span>
-                    <span>Status</span>
-                  </div>
+                <div className="mt-4 hidden overflow-x-auto lg:block">
+                  <div className="min-w-[820px]">
+                    <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)] items-center gap-4 rounded-xl bg-slate-50/80 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:bg-ink-800/40 dark:text-ink-500">
+                      <span>Service / customer</span>
+                      <span>Date</span>
+                      <span className="text-right">Gross</span>
+                      <span className="text-right">Fee</span>
+                      <span className="text-right">Net</span>
+                      <span>Status</span>
+                    </div>
 
-                  <div className="divide-y divide-slate-100 dark:divide-ink-800">
-                    {filteredTransactions.map((transaction) => {
-                      const reference = transaction.paymentReference?.trim();
-                      const channel = formatChannel(
-                        transaction.paymentChannel
-                      );
+                    <div className="divide-y divide-slate-100 dark:divide-ink-800">
+                      {filteredTransactions.map((transaction) => {
+                        const reference = transaction.paymentReference?.trim();
+                        const channel = formatChannel(
+                          transaction.paymentChannel
+                        );
 
-                      return (
-                        <div
-                          key={transaction.id}
-                          className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)] items-center gap-4 px-4 py-3.5 transition-colors hover:bg-slate-50/70 dark:hover:bg-ink-800/30"
-                        >
-                          <div className="min-w-0">
-                            <p
-                              className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50"
-                              title={transaction.serviceName}
-                            >
-                              {transaction.serviceName || 'Service'}
-                            </p>
-                            <p
-                              className="mt-0.5 truncate text-xs text-slate-500 dark:text-ink-400"
-                              title={transaction.customerName}
-                            >
-                              {transaction.customerName || 'Customer'}
-                            </p>
-                            {reference && (
+                        return (
+                          <div
+                            key={transaction.id}
+                            className="grid grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,0.9fr)] items-center gap-4 px-4 py-3.5 transition-colors hover:bg-slate-50/70 dark:hover:bg-ink-800/30"
+                          >
+                            <div className="min-w-0">
                               <p
-                                className="mt-0.5 truncate font-mono text-[10px] text-slate-400 dark:text-ink-500"
-                                title={reference}
+                                className="truncate text-sm font-semibold text-slate-900 dark:text-ink-50"
+                                title={transaction.serviceName}
                               >
-                                Ref {reference}
+                                {transaction.serviceName || 'Service'}
                               </p>
-                            )}
-                          </div>
+                              <p
+                                className="mt-0.5 truncate text-xs text-slate-500 dark:text-ink-400"
+                                title={transaction.customerName}
+                              >
+                                {transaction.customerName || 'Customer'}
+                              </p>
+                              {reference && (
+                                <p
+                                  className="mt-0.5 truncate font-mono text-[10px] text-slate-400 dark:text-ink-500"
+                                  title={reference}
+                                >
+                                  Ref {reference}
+                                </p>
+                              )}
+                            </div>
 
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-700 dark:text-ink-300">
-                              {formatTransactionDate(transaction)}
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-700 dark:text-ink-300">
+                                {formatTransactionDate(transaction)}
+                              </p>
+                              <p className="mt-0.5 truncate text-[11px] text-slate-400 dark:text-ink-500">
+                                {[transaction.time, channel]
+                                  .filter(Boolean)
+                                  .join(' · ') || '—'}
+                              </p>
+                            </div>
+
+                            <p className="truncate text-right text-sm tabular-nums text-slate-600 dark:text-ink-300" title={naira(transaction.grossAmount)}>
+                              {naira(transaction.grossAmount)}
                             </p>
-                            <p className="mt-0.5 truncate text-[11px] text-slate-400 dark:text-ink-500">
-                              {[transaction.time, channel]
-                                .filter(Boolean)
-                                .join(' · ') || '—'}
+
+                            <p className="truncate text-right text-sm tabular-nums text-rose-600 dark:text-rose-300" title={naira(transaction.fee)}>
+                              {amount(transaction.fee) > 0
+                                ? `-${naira(transaction.fee)}`
+                                : naira(0)}
                             </p>
+
+                            <p className="truncate text-right text-sm font-bold tabular-nums text-success-600 dark:text-success-200" title={naira(transaction.netAmount)}>
+                              {naira(transaction.netAmount)}
+                            </p>
+
+                            <div className="min-w-0">
+                              <TransactionStatusBadge
+                                status={transaction.status}
+                                fallback={transaction.paymentStatus}
+                              />
+                            </div>
                           </div>
-
-                          <p className="text-right text-sm tabular-nums text-slate-600 dark:text-ink-300">
-                            {naira(transaction.grossAmount)}
-                          </p>
-
-                          <p className="text-right text-sm tabular-nums text-rose-600 dark:text-rose-300">
-                            {amount(transaction.fee) > 0
-                              ? `-${naira(transaction.fee)}`
-                              : naira(0)}
-                          </p>
-
-                          <p className="text-right text-sm font-bold tabular-nums text-success-600 dark:text-success-200">
-                            {naira(transaction.netAmount)}
-                          </p>
-
-                          <div className="min-w-0">
-                            <TransactionStatusBadge
-                              status={transaction.status}
-                              fallback={transaction.paymentStatus}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
