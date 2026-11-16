@@ -1,12 +1,5 @@
 
 import { Home, Search, Heart, Calendar, Star, User, Settings} from 'lucide-react';
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { DashboardLayout, DashboardHeader, StatCard } from '@/components/DashboardLayout';
-import { ProviderCard, StatusBadge } from '@/components/shared';
-import { useAuth, useBookings } from '@/context/AppContext';
-import { providers, formatNaira } from '@/data/mockData';
 
 export const customerNavItems = [
   { label: 'Overview', icon: Home, path: '/customer' },

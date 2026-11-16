@@ -24,7 +24,6 @@ import {
   ChevronRight,
   RefreshCw,
   Search,
-  Sparkles,
   X,
 } from "lucide-react";
 

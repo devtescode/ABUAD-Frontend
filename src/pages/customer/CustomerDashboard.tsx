@@ -9,7 +9,6 @@ import {
   Lock,
   LogOut,
   Mail,
-  MapPin,
   MessageSquare,
   Moon,
   Palette,
@@ -25,7 +24,7 @@ import {
 import { customerNavItems } from '@/data/customerNavItems';
 import { useAuth } from '@/context/AppContext';
 import { useTheme } from '@/context/ThemeContext';
-import { Avatar, Badge, Button, Card, cn } from '@/components/ui';
+import { Badge, Button, Card, cn } from '@/components/ui';
 
 /* =========================================================
    SHARED SETTINGS PIECES

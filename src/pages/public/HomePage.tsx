@@ -9,8 +9,6 @@ import {
   CreditCard,
   Lock,
   MessageSquareText,
-  PartyPopper,
-  PenLine,
   Search,
   Sparkles,
   Star,

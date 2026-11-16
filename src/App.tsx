@@ -65,7 +65,7 @@ const ProviderOnboarding = lazy(() =>
   import('@/pages/provider/ProviderDashboard').then((m) => ({ default: m.ProviderOnboarding }))
 );
 const ProviderEarnings = lazy(() =>
-  import('@/pages/provider/ProviderDashboard').then((m) => ({ default: m.ProviderEarnings }))
+  import('@/pages/provider/ProviderEarnings').then((m) => ({ default: m.ProviderEarnings }))
 );
 const ProviderSettings = lazy(() =>
   import('@/pages/provider/ProviderDashboard').then((m) => ({ default: m.ProviderSettings }))

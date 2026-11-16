@@ -1,4 +1,4 @@
-import { Home, Package, Plus, Image, Calendar, Inbox, ClipboardList, DollarSign, Star, User, Settings, DollarSign as Money, ArrowRight, Trash2, Edit, Eye } from 'lucide-react';
+import { Home, Package, Plus, Image, Calendar, Inbox, ClipboardList, DollarSign, Star, User, Settings, DollarSign as Money } from 'lucide-react';
 
 export const providerNavItems = [
   { label: 'Overview', icon: Home, path: '/provider' },

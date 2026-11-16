@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
+  AlertCircle,
   ArrowRight,
   Bell,
   Calendar,
@@ -10,26 +11,28 @@ import {
   ClipboardList,
   Clock,
   DollarSign,
+  Eye,
+  EyeOff,
   Home,
   Image,
   Inbox,
+  KeyRound,
   Landmark,
-  Lock,
   Package,
   Plus,
-  Receipt,
+  RefreshCw,
   Settings,
   ShieldCheck,
   Star,
-  TrendingUp,
   User,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
-import { DashboardLayout, DashboardHeader, StatCard } from '@/components/DashboardLayout';
-import { Badge, Button, Card, cn } from '@/components/ui';
+import { DashboardLayout, DashboardHeader } from '@/components/DashboardLayout';
+import { Badge, Button, Card, Skeleton, cn } from '@/components/ui';
 import { Logo } from '@/components/shared';
-import { formatNaira, sampleBookings } from '@/data/mockData';
+import { useChangeProviderPassword, useProviderAccount } from '@/hooks/queries';
+import { getApiErrorMessage } from '@/lib/api';
 
 const navItems = [
   { label: 'Overview', icon: Home, path: '/provider' },
@@ -53,15 +56,24 @@ const serviceCategoryOptions = ['Photography', 'Videography', 'Graphic Design', 
 function ToggleSwitch({
   label,
   defaultChecked = false,
+  checked,
+  onChange,
 }: {
   label: string;
   defaultChecked?: boolean;
+  checked?: boolean;
+  onChange?: (checked: boolean) => void;
 }) {
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    onChange?.(event.target.checked);
+  };
+
   return (
     <span className="relative inline-flex h-6 w-11 shrink-0 items-center">
       <input
         type="checkbox"
-        defaultChecked={defaultChecked}
+        {...(checked === undefined ? { defaultChecked } : { checked })}
+        onChange={handleChange}
         aria-label={label}
         className="peer sr-only"
       />
@@ -432,76 +444,76 @@ export function ProviderOnboarding() {
   );
 }
 
-export function ProviderEarnings() {
-  const transactions = sampleBookings.filter((b) =>
-    ['paid', 'completed', 'reviewed'].includes(b.status)
-  );
+// export function ProviderEarnings() {
+//   const transactions = sampleBookings.filter((b) =>
+//     ['paid', 'completed', 'reviewed'].includes(b.status)
+//   );
 
-  return (
-    <DashboardLayout role="provider" navItems={navItems}>
-      <DashboardHeader title="Earnings" subtitle="Track your income and payouts" />
+//   return (
+//     <DashboardLayout role="provider" navItems={navItems}>
+//       <DashboardHeader title="Earnings" subtitle="Track your income and payouts" />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Earnings" value="₦845,000" icon={DollarSign} color="primary" />
-        <StatCard label="This Month" value="₦120,000" icon={TrendingUp} color="sky" trend="+12%" />
-        <StatCard label="Pending Payout" value="₦45,000" icon={Clock} color="accent" />
-        <StatCard label="Commission Paid" value="₦84,500" icon={DollarSign} color="rose" />
-      </div>
+//       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+//         <StatCard label="Total Earnings" value="₦845,000" icon={DollarSign} color="primary" />
+//         <StatCard label="This Month" value="₦120,000" icon={TrendingUp} color="sky" trend="+12%" />
+//         <StatCard label="Pending Payout" value="₦45,000" icon={Clock} color="accent" />
+//         <StatCard label="Commission Paid" value="₦84,500" icon={DollarSign} color="rose" />
+//       </div>
 
-      <Card className="mt-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
-              <Receipt className="h-5 w-5" />
-            </span>
-            <div>
-              <h2 className="font-semibold text-slate-900 dark:text-ink-50">
-                Recent Transactions
-              </h2>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-400">
-                Your latest payouts, shown after commission
-              </p>
-            </div>
-          </div>
-          <Badge tone="neutral">{transactions.length}</Badge>
-        </div>
+//       <Card className="mt-6">
+//         <div className="flex items-start justify-between gap-3">
+//           <div className="flex items-start gap-3">
+//             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+//               <Receipt className="h-5 w-5" />
+//             </span>
+//             <div>
+//               <h2 className="font-semibold text-slate-900 dark:text-ink-50">
+//                 Recent Transactions
+//               </h2>
+//               <p className="mt-0.5 text-xs text-slate-500 dark:text-ink-400">
+//                 Your latest payouts, shown after commission
+//               </p>
+//             </div>
+//           </div>
+//           <Badge tone="neutral">{transactions.length}</Badge>
+//         </div>
 
-        <div className="mt-4 divide-y divide-slate-100 dark:divide-ink-800">
-          {transactions.map((b) => (
-            <div
-              key={b.id}
-              className="flex flex-col gap-2 rounded-lg py-3 transition-colors hover:bg-slate-50/80 dark:hover:bg-ink-800/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-2"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-900 dark:text-ink-50">
-                  {b.serviceName}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-400 dark:text-ink-500">{b.date}</p>
-              </div>
-              <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
-                <p className="text-sm font-bold text-brand-600 dark:text-brand-300">
-                  +{formatNaira(b.price * 0.9)}
-                </p>
-                <p className="mt-0.5 text-xs text-slate-400 dark:text-ink-500 sm:mt-0">
-                  Fee: {formatNaira(b.price * 0.1)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+//         <div className="mt-4 divide-y divide-slate-100 dark:divide-ink-800">
+//           {transactions.map((b) => (
+//             <div
+//               key={b.id}
+//               className="flex flex-col gap-2 rounded-lg py-3 transition-colors hover:bg-slate-50/80 dark:hover:bg-ink-800/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-2"
+//             >
+//               <div className="min-w-0">
+//                 <p className="truncate text-sm font-medium text-slate-900 dark:text-ink-50">
+//                   {b.serviceName}
+//                 </p>
+//                 <p className="mt-0.5 text-xs text-slate-400 dark:text-ink-500">{b.date}</p>
+//               </div>
+//               <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
+//                 <p className="text-sm font-bold text-brand-600 dark:text-brand-300">
+//                   +{formatNaira(b.price * 0.9)}
+//                 </p>
+//                 <p className="mt-0.5 text-xs text-slate-400 dark:text-ink-500 sm:mt-0">
+//                   Fee: {formatNaira(b.price * 0.1)}
+//                 </p>
+//               </div>
+//             </div>
+//           ))}
+//         </div>
 
-        <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-5 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500 dark:text-ink-400">
-            Payouts are sent to your registered bank account.
-          </p>
-          <Button className="w-full sm:w-auto" icon={Wallet}>
-            Request Payout
-          </Button>
-        </div>
-      </Card>
-    </DashboardLayout>
-  );
-}
+//         <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-5 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-between">
+//           <p className="text-xs text-slate-500 dark:text-ink-400">
+//             Payouts are sent to your registered bank account.
+//           </p>
+//           <Button className="w-full sm:w-auto" icon={Wallet}>
+//             Request Payout
+//           </Button>
+//         </div>
+//       </Card>
+//     </DashboardLayout>
+//   );
+// }
 
 const notificationItems = [
   {
@@ -548,7 +560,304 @@ function SettingsCardHeader({
   );
 }
 
+const NOTIFICATION_STORAGE_KEY = 'servicely_provider_notification_prefs';
+
+type NotificationPreferences = Record<string, boolean>;
+
+function asText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+function asBoolean(value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.toLowerCase() === 'true';
+  return Boolean(value);
+}
+
+function maskAccountNumber(accountNumber: string): string {
+  if (!accountNumber) return '';
+  if (accountNumber.length <= 4) return accountNumber;
+  return `${'•'.repeat(accountNumber.length - 4)}${accountNumber.slice(-4)}`;
+}
+
+function loadNotificationPreferences(): NotificationPreferences {
+  const defaults = notificationItems.reduce<NotificationPreferences>((prefs, item) => {
+    prefs[item.label] = true;
+    return prefs;
+  }, {});
+
+  if (typeof window === 'undefined') return defaults;
+
+  try {
+    const stored = window.localStorage.getItem(NOTIFICATION_STORAGE_KEY);
+    if (!stored) return defaults;
+
+    const parsed = JSON.parse(stored) as Record<string, unknown>;
+    Object.keys(defaults).forEach((key) => {
+      if (typeof parsed[key] === 'boolean') defaults[key] = parsed[key] as boolean;
+    });
+  } catch {
+    /* Ignore unreadable or corrupt storage. */
+  }
+
+  return defaults;
+}
+
+type PasswordFieldKey = 'current' | 'next' | 'confirm';
+
+type PasswordStrength = {
+  label: 'Weak' | 'Fair' | 'Strong';
+  filled: number;
+  barClass: string;
+  textClass: string;
+};
+
+function getPasswordStrength(password: string): PasswordStrength | null {
+  if (!password) return null;
+
+  let score = 0;
+  if (password.length >= 8) score += 1;
+  if (password.length >= 12) score += 1;
+  if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score += 1;
+  if (/\d/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+  if (score <= 2) {
+    return {
+      label: 'Weak',
+      filled: 1,
+      barClass: 'bg-rose-500',
+      textClass: 'text-rose-600 dark:text-rose-400',
+    };
+  }
+
+  if (score <= 3) {
+    return {
+      label: 'Fair',
+      filled: 2,
+      barClass: 'bg-amber-500',
+      textClass: 'text-amber-600 dark:text-amber-400',
+    };
+  }
+
+  return {
+    label: 'Strong',
+    filled: 3,
+    barClass: 'bg-success-500',
+    textClass: 'text-success-600 dark:text-success-400',
+  };
+}
+
+function PasswordField({
+  id,
+  label,
+  value,
+  onChange,
+  autoComplete,
+  error,
+  visible,
+  onToggleVisibility,
+  disabled = false,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  autoComplete: string;
+  error?: string;
+  visible: boolean;
+  onToggleVisibility: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          type={visible ? 'text' : 'password'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          autoComplete={autoComplete}
+          disabled={disabled}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={cn(
+            'input pr-14',
+            error &&
+              'border-danger-300 focus:border-danger-500 focus:ring-danger-500/10 dark:border-danger-500/50'
+          )}
+        />
+        <button
+          type="button"
+          onClick={onToggleVisibility}
+          aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          aria-pressed={visible}
+          disabled={disabled}
+          className="absolute right-0.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition-colors hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-brand-600/60 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:text-ink-200"
+        >
+          {visible ? (
+            <EyeOff className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <Eye className="h-4 w-4" aria-hidden="true" />
+          )}
+        </button>
+      </div>
+      {error && (
+        <p
+          id={`${id}-error`}
+          className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-danger-600 dark:text-danger-300"
+        >
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function ProviderSettings() {
+  const accountQuery = useProviderAccount();
+  const changePassword = useChangeProviderPassword();
+
+  const [notificationPrefs, setNotificationPrefs] =
+    useState<NotificationPreferences>(loadNotificationPreferences);
+
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordVisibility, setPasswordVisibility] = useState<
+    Record<PasswordFieldKey, boolean>
+  >({ current: false, next: false, confirm: false });
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<PasswordFieldKey, string>>
+  >({});
+  const [formError, setFormError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        NOTIFICATION_STORAGE_KEY,
+        JSON.stringify(notificationPrefs)
+      );
+    } catch {
+      /* Storage may be unavailable (private mode / quota). */
+    }
+  }, [notificationPrefs]);
+
+  const account = accountQuery.data?.account;
+  const bankName = asText(account?.bankName);
+  const accountName = asText(account?.accountName);
+  const accountNumber = asText(account?.accountNumber);
+  const isVerified = asBoolean(account?.isVerified);
+  const hasSubaccount = asBoolean(account?.hasSubaccount);
+  const hasPayoutAccount = hasSubaccount || Boolean(bankName) || Boolean(accountNumber);
+
+  const passwordStrength = getPasswordStrength(newPassword);
+
+  const toggleNotification = (label: string, checked: boolean) => {
+    setNotificationPrefs((current) => ({ ...current, [label]: checked }));
+  };
+
+  const togglePasswordVisibility = (field: PasswordFieldKey) => {
+    setPasswordVisibility((current) => ({ ...current, [field]: !current[field] }));
+  };
+
+  const resetPasswordForm = () => {
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordVisibility({ current: false, next: false, confirm: false });
+    setFieldErrors({});
+    setFormError('');
+    setPasswordSuccess('');
+    changePassword.reset();
+  };
+
+  const closePasswordForm = () => {
+    setShowPasswordForm(false);
+    resetPasswordForm();
+  };
+
+  const openPasswordForm = () => {
+    resetPasswordForm();
+    setShowPasswordForm(true);
+  };
+
+  const updatePasswordField = (field: PasswordFieldKey, value: string) => {
+    if (field === 'current') setCurrentPassword(value);
+    if (field === 'next') setNewPassword(value);
+    if (field === 'confirm') setConfirmPassword(value);
+
+    setFormError('');
+    setPasswordSuccess('');
+    setFieldErrors((current) => {
+      if (!current[field]) return current;
+      return { ...current, [field]: undefined };
+    });
+  };
+
+  const handlePasswordSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    setFormError('');
+    setPasswordSuccess('');
+
+    const errors: Partial<Record<PasswordFieldKey, string>> = {};
+
+    if (!currentPassword) {
+      errors.current = 'Enter your current password.';
+    }
+
+    if (!newPassword) {
+      errors.next = 'Enter a new password.';
+    } else if (newPassword.length < 8) {
+      errors.next = 'Your new password must be at least 8 characters.';
+    } else if (newPassword === currentPassword) {
+      errors.next = 'Choose a password different from your current one.';
+    }
+
+    if (!confirmPassword) {
+      errors.confirm = 'Confirm your new password.';
+    } else if (newPassword !== confirmPassword) {
+      errors.confirm = 'Passwords do not match.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    setFieldErrors({});
+
+    changePassword.mutate(
+      { currentPassword, newPassword, confirmPassword },
+      {
+        onSuccess: () => {
+          setCurrentPassword('');
+          setNewPassword('');
+          setConfirmPassword('');
+          setPasswordVisibility({ current: false, next: false, confirm: false });
+          setFieldErrors({});
+          setFormError('');
+          setPasswordSuccess(
+            'Your password has been updated. Use it the next time you sign in.'
+          );
+        },
+        onError: (error) => {
+          setPasswordSuccess('');
+          setFormError(getApiErrorMessage(error));
+        },
+      }
+    );
+  };
+
   return (
     <DashboardLayout role="provider" navItems={navItems}>
       <DashboardHeader title="Settings" subtitle="Manage your account preferences" />
@@ -582,7 +891,11 @@ export function ProviderSettings() {
                     </span>
                   </span>
                 </span>
-                <ToggleSwitch label={item.label} defaultChecked />
+                <ToggleSwitch
+                  label={item.label}
+                  checked={notificationPrefs[item.label] ?? true}
+                  onChange={(checked) => toggleNotification(item.label, checked)}
+                />
               </label>
             ))}
           </div>
@@ -595,17 +908,108 @@ export function ProviderSettings() {
             description="Where your earnings are sent."
           />
           <div className="mt-5">
-            <label className="label" htmlFor="bank-account">Bank Account</label>
-            <input
-              id="bank-account"
-              className="input"
-              placeholder="Enter account number"
-              inputMode="numeric"
-              autoComplete="off"
-            />
-            <p className="mt-2 text-xs text-slate-500 dark:text-ink-400">
-              Used for all payouts after a booking is completed.
-            </p>
+            {accountQuery.isLoading ? (
+              <div className="space-y-3" aria-busy="true" aria-label="Loading payout details">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-11 w-full rounded-xl" />
+              </div>
+            ) : accountQuery.isError ? (
+              <div
+                role="alert"
+                className="flex flex-col gap-3 rounded-xl border border-danger-200 bg-danger-50/70 p-4 text-sm text-danger-700 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-200 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="leading-5">
+                    {getApiErrorMessage(accountQuery.error)}
+                  </span>
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  icon={RefreshCw}
+                  loading={accountQuery.isFetching}
+                  onClick={() => void accountQuery.refetch()}
+                  className="w-full shrink-0 sm:w-auto"
+                >
+                  Try again
+                </Button>
+              </div>
+            ) : hasPayoutAccount ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-slate-200/70 bg-slate-50 p-4 dark:border-ink-800 dark:bg-ink-800/50">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-ink-50">
+                      <Landmark
+                        className="h-4 w-4 shrink-0 text-slate-400 dark:text-ink-500"
+                        aria-hidden="true"
+                      />
+                      {bankName || 'Bank account'}
+                    </p>
+                    <Badge
+                      tone={isVerified ? 'success' : 'warning'}
+                      icon={isVerified ? CheckCircle2 : Clock}
+                    >
+                      {isVerified ? 'Verified' : 'Pending'}
+                    </Badge>
+                  </div>
+                  <dl className="mt-3 space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-slate-500 dark:text-ink-400">Account name</dt>
+                      <dd className="truncate font-medium text-slate-800 dark:text-ink-200">
+                        {accountName || '—'}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-slate-500 dark:text-ink-400">Account number</dt>
+                      <dd className="font-mono tracking-widest text-slate-800 dark:text-ink-200">
+                        {maskAccountNumber(accountNumber) || '—'}
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-slate-500 dark:text-ink-400">
+                    Earnings from completed bookings are paid into this account.
+                  </p>
+                  <Link
+                    to="/provider/add-account"
+                    className="btn-outline inline-flex h-11 w-full shrink-0 items-center justify-center whitespace-nowrap sm:w-auto"
+                  >
+                    Manage account
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/70 p-4 dark:border-ink-700 dark:bg-ink-800/30">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lavender text-brand-600 dark:bg-brand-950 dark:text-brand-300"
+                  >
+                    <Landmark className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-ink-50">
+                      No payout account connected
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-ink-400">
+                      Connect a Nigerian bank account so your earnings from completed
+                      bookings can be paid out.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  to="/provider/add-account"
+                  className="btn-primary inline-flex h-11 w-full items-center justify-center whitespace-nowrap sm:w-auto"
+                >
+                  Connect payout account
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Link>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -615,13 +1019,137 @@ export function ProviderSettings() {
             title="Security"
             description="Keep your account protected."
           />
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500 dark:text-ink-400">
-              Update the password you use to sign in.
-            </p>
-            <Button variant="outline" icon={Lock} className="w-full sm:w-auto">
-              Change Password
-            </Button>
+          <div className="mt-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-slate-500 dark:text-ink-400">
+                Update the password you use to sign in.
+              </p>
+              <Button
+                type="button"
+                variant={showPasswordForm ? 'ghost' : 'outline'}
+                icon={showPasswordForm ? undefined : KeyRound}
+                onClick={showPasswordForm ? closePasswordForm : openPasswordForm}
+                disabled={changePassword.isPending}
+                className="w-full sm:w-auto"
+              >
+                {showPasswordForm ? 'Cancel' : 'Change Password'}
+              </Button>
+            </div>
+
+            {showPasswordForm && (
+              <form
+                onSubmit={handlePasswordSubmit}
+                aria-busy={changePassword.isPending}
+                className="mt-5 space-y-4 border-t border-slate-100 pt-5 dark:border-ink-800"
+              >
+                {formError && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2.5 rounded-xl border border-danger-200 bg-danger-50/70 p-3.5 text-sm text-danger-700 dark:border-danger-500/20 dark:bg-danger-500/10 dark:text-danger-200"
+                  >
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <p className="leading-5">{formError}</p>
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div
+                    role="status"
+                    className="flex items-start gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-sm text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200"
+                  >
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <p className="leading-5">{passwordSuccess}</p>
+                  </div>
+                )}
+
+                <PasswordField
+                  id="current-password"
+                  label="Current password"
+                  value={currentPassword}
+                  onChange={(value) => updatePasswordField('current', value)}
+                  autoComplete="current-password"
+                  error={fieldErrors.current}
+                  visible={passwordVisibility.current}
+                  onToggleVisibility={() => togglePasswordVisibility('current')}
+                  disabled={changePassword.isPending}
+                />
+
+                <PasswordField
+                  id="new-password"
+                  label="New password"
+                  value={newPassword}
+                  onChange={(value) => updatePasswordField('next', value)}
+                  autoComplete="new-password"
+                  error={fieldErrors.next}
+                  visible={passwordVisibility.next}
+                  onToggleVisibility={() => togglePasswordVisibility('next')}
+                  disabled={changePassword.isPending}
+                />
+
+                {newPassword && passwordStrength && (
+                  <div className="space-y-1.5" aria-live="polite">
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="font-medium text-slate-500 dark:text-ink-400">
+                        Password strength
+                      </span>
+                      <span className={cn('font-semibold', passwordStrength.textClass)}>
+                        {passwordStrength.label}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5">
+                      {[1, 2, 3].map((bar) => (
+                        <span
+                          key={bar}
+                          aria-hidden="true"
+                          className={cn(
+                            'h-1.5 flex-1 rounded-full transition-colors',
+                            bar <= passwordStrength.filled
+                              ? passwordStrength.barClass
+                              : 'bg-slate-200 dark:bg-ink-700'
+                          )}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-[11px] leading-4 text-slate-500 dark:text-ink-400">
+                      Mix upper and lower case letters, numbers, and symbols for a stronger
+                      password.
+                    </p>
+                  </div>
+                )}
+
+                <PasswordField
+                  id="confirm-password"
+                  label="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(value) => updatePasswordField('confirm', value)}
+                  autoComplete="new-password"
+                  error={fieldErrors.confirm}
+                  visible={passwordVisibility.confirm}
+                  onToggleVisibility={() => togglePasswordVisibility('confirm')}
+                  disabled={changePassword.isPending}
+                />
+
+                <div className="flex flex-col-reverse gap-3 border-t border-slate-100 pt-4 dark:border-ink-800 sm:flex-row sm:items-center sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closePasswordForm}
+                    disabled={changePassword.isPending}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    icon={KeyRound}
+                    loading={changePassword.isPending}
+                    className="w-full sm:w-auto"
+                  >
+                    {changePassword.isPending ? 'Updating…' : 'Update password'}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </Card>
       </div>

@@ -922,28 +922,6 @@ export default function ProviderProfilePage() {
      AVERAGE SERVICE PRICE
   ========================================================= */
 
-  const averageServicePrice =
-    useMemo(() => {
-      if (!activeServices.length) {
-        return 0;
-      }
-
-      const total =
-        activeServices.reduce(
-          (sum, service) =>
-            sum +
-            Number(
-              service.price || 0
-            ),
-          0
-        );
-
-      return (
-        total /
-        activeServices.length
-      );
-    }, [activeServices]);
-
   const [selectedServiceImage, setSelectedServiceImage] = useState<{
     image: string;
     title: string;

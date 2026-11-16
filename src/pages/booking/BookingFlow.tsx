@@ -585,11 +585,6 @@ export function BookingFlow() {
       provider?.availability &&
       provider.availability.length > 0
     ) {
-      const available = isAvailableDay(
-        value,
-        provider.availability
-      );
-
       setData((previous) => ({
         ...previous,
         date: value,

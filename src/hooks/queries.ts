@@ -107,6 +107,63 @@ export interface AdminReviewsResponse {
   reviews?: Array<Record<string, unknown>>;
 }
 
+export interface ProviderEarningsSummary {
+  currency: string;
+  totalEarnings: number;
+  grossEarnings: number;
+  commissionPaid: number;
+  thisMonth: number;
+  lastMonth: number;
+  monthlyGrowth: number;
+  pendingPayout: number;
+  availableBalance: number;
+  paidBookings: number;
+  completedBookings: number;
+  averageEarning: number;
+}
+
+export interface ProviderEarningsPayout {
+  hasAccount: boolean;
+  isVerified: boolean;
+  bankName: string;
+  accountName: string;
+  accountNumberMasked: string;
+}
+
+export interface ProviderEarningsTrendPoint {
+  month: string;
+  label: string;
+  earnings: number;
+  commission: number;
+}
+
+export interface ProviderEarningsTransaction {
+  id: string;
+  serviceName: string;
+  customerName: string;
+  date: string;
+  time: string;
+  grossAmount: number;
+  fee: number;
+  netAmount: number;
+  status: string;
+  paymentStatus: string;
+  paymentReference?: string | null;
+  paymentChannel?: string | null;
+  paidAt?: string;
+  createdAt?: string;
+}
+
+export interface ProviderEarningsResponse {
+  success?: boolean;
+  message?: string;
+  generatedAt?: string;
+  summary: ProviderEarningsSummary;
+  payout: ProviderEarningsPayout;
+  trend: ProviderEarningsTrendPoint[];
+  transactions: ProviderEarningsTransaction[];
+}
+
 /* =========================================================
    QUERY KEYS
 ========================================================= */
@@ -147,6 +204,10 @@ export const queryKeys = {
     all: ['provider-account'] as const,
     account: ['provider-account', 'account'] as const,
     banks: ['provider-account', 'banks'] as const,
+  },
+  earnings: {
+    all: ['earnings'] as const,
+    provider: ['earnings', 'provider'] as const,
   },
   admin: {
     all: ['admin'] as const,
@@ -400,14 +461,20 @@ export function useCompleteBooking() {
       ),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.bookings.all });
+      client.invalidateQueries({ queryKey: queryKeys.earnings.all });
     },
   });
 }
 
 export function useInitializePayment() {
+  const client = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
       apiSend<Record<string, unknown>>('/payments/initialize', 'POST', payload),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: queryKeys.earnings.all });
+    },
   });
 }
 
@@ -722,6 +789,46 @@ export function useRefreshPaystackStatus() {
       }),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.providerAccount.all });
+    },
+  });
+}
+
+/* =========================================================
+   PROVIDER EARNINGS
+========================================================= */
+
+export function useProviderEarnings(options: QueryOptions<ProviderEarningsResponse> = {}) {
+  return useQuery({
+    queryKey: queryKeys.earnings.provider,
+    queryFn: ({ signal }) =>
+      apiGet<ProviderEarningsResponse>('/bookings/provider-earnings', {
+        auth: 'user',
+        signal,
+      }),
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    ...options,
+    enabled: userEnabled(options.enabled ?? true),
+  });
+}
+
+export function useChangeProviderPassword() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+    }) =>
+      apiSend<{ success?: boolean; message?: string }>(
+        '/usercreative/provider/change-password',
+        'POST',
+        payload
+      ),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: ['provider-account'] });
     },
   });
 }
