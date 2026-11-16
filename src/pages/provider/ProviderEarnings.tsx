@@ -1053,31 +1053,31 @@ export function ProviderEarnings() {
                         </div>
 
                         <div className="mt-3 grid grid-cols-3 gap-2 rounded-xl bg-slate-50/80 px-3 py-2.5 dark:bg-ink-800/40">
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
                               Gross
                             </p>
-                            <p className="mt-0.5 text-xs font-semibold tabular-nums text-slate-700 dark:text-ink-300">
+                            <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-slate-700 dark:text-ink-300" title={naira(transaction.grossAmount)}>
                               {naira(transaction.grossAmount)}
                             </p>
                           </div>
 
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
                               Fee
                             </p>
-                            <p className="mt-0.5 text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-300">
+                            <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-rose-600 dark:text-rose-300" title={naira(transaction.fee)}>
                               {amount(transaction.fee) > 0
                                 ? `-${naira(transaction.fee)}`
                                 : naira(0)}
                             </p>
                           </div>
 
-                          <div className="text-right">
+                          <div className="min-w-0 text-right">
                             <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-ink-500">
                               Net
                             </p>
-                            <p className="mt-0.5 text-sm font-bold tabular-nums text-success-600 dark:text-success-200">
+                            <p className="mt-0.5 truncate text-sm font-bold tabular-nums text-success-600 dark:text-success-200" title={naira(transaction.netAmount)}>
                               {naira(transaction.netAmount)}
                             </p>
                           </div>
