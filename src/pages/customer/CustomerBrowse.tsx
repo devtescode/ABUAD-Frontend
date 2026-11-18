@@ -568,7 +568,6 @@ export function CustomerBrowse() {
                 onChange={setSearch}
                 onSubmit={submitSearch}
                 onSelectTrending={applyTrendingSearch}
-                // trending={TRENDING}
                 className="mt-8"
               />
             </div>
