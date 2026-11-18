@@ -1469,66 +1469,7 @@ export default function ProviderProfilePage() {
             </section>
           )}
 
-        {/* =================================================
-            MOBILE STICKY ACTIONS
-        ================================================= */}
-
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/95 px-4 py-3 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl dark:border-ink-800 dark:bg-ink-900/95 xl:hidden">
-          <div className="mx-auto flex max-w-xl items-center gap-2.5">
-            {activeServices.length > 0 ? (
-              <Link
-                to={`/book/${provider._id}`}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-extrabold text-primary-950 shadow-md transition hover:bg-primary-400 active:scale-[0.99]"
-              >
-                Book now
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <div className="flex-1 rounded-xl bg-ink-50 px-4 py-3 text-center text-xs font-semibold text-ink-500 dark:bg-ink-800 dark:text-ink-400">
-                Booking unavailable
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={handleSaveProvider}
-              disabled={savingProvider}
-              aria-pressed={isSaved}
-              aria-label={
-                isSaved
-                  ? "Remove provider from saved list"
-                  : "Save provider"
-              }
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border transition disabled:cursor-not-allowed disabled:opacity-70 ${isSaved
-                ? "border-red-200 bg-red-50 text-red-500 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300"
-                : "border-ink-200 bg-white text-ink-600 hover:border-primary-200 hover:text-primary-600 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-primary-800 dark:hover:text-primary-300"
-                }`}
-            >
-              {savingProvider ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Heart
-                  className={`h-5 w-5 ${isSaved ? "fill-current" : ""
-                    }`}
-                />
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleShare}
-              disabled={sharing}
-              aria-label="Share provider profile"
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-ink-200 bg-white text-ink-600 transition hover:border-primary-200 hover:text-primary-600 disabled:opacity-60 dark:border-ink-700 dark:bg-ink-800 dark:text-ink-300 dark:hover:border-primary-800 dark:hover:text-primary-300"
-            >
-              {sharing ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Share2 className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
+ 
       </div>
 
     </DashboardLayout>
