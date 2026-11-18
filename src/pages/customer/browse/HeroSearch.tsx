@@ -39,6 +39,7 @@ export function HeroSearch({
             className="h-5 w-5 shrink-0 text-[#59625E]"
             aria-hidden="true"
           />
+
           <input
             id="browse-hero-search"
             type="search"
@@ -48,8 +49,9 @@ export function HeroSearch({
             aria-label="Search services, categories or providers"
             enterKeyHint="search"
             autoComplete="off"
-            className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-[#0E1A17] placeholder:text-[#59625E] outline-none"
+            className="h-11 min-w-0 flex-1 appearance-none border-0 bg-transparent p-0 text-[15px] text-[#0E1A17] outline-none ring-0 shadow-none placeholder:text-[#59625E] focus:border-0 focus:outline-none focus:ring-0 focus:ring-offset-0 focus:shadow-none focus-visible:outline-none focus-visible:ring-0"
           />
+
         </div>
         <button
           type="submit"
