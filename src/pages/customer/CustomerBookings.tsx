@@ -293,7 +293,9 @@ export function CustomerBookings() {
 
     if (filter === "paid") {
       return validBookings.filter(
-        (booking) => booking.paymentStatus === "paid"
+        (booking) =>
+          booking.paymentStatus === "paid" &&
+          booking.bookingStatus !== "completed"
       );
     }
 
@@ -350,7 +352,9 @@ export function CustomerBookings() {
       ).length,
 
       paid: validBookings.filter(
-        (booking) => booking.paymentStatus === "paid"
+        (booking) =>
+          booking.paymentStatus === "paid" &&
+          booking.bookingStatus !== "completed"
       ).length,
 
       completed: validBookings.filter(
@@ -1376,7 +1380,7 @@ function BookingSkeleton() {
 function bookingAccent(status: string) {
   const accents: Record<string, string> = {
     pending: "bg-warning-400",
-    accepted: "bg-sky-400",
+    accepted: "bg-lime-400",
     payment_pending: "bg-warning-400",
     paid: "bg-success-500",
     completed: "bg-brand-500",

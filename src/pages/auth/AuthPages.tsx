@@ -293,10 +293,10 @@ function AuthShell({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35 }}
             >
-              <Card className="relative overflow-hidden border-slate-200/80 p-6 shadow-[0_24px_70px_-40px_rgba(30,26,77,0.45)] dark:border-ink-800 sm:p-8">
+              <Card className="relative overflow-hidden border-slate-200/80 p-6 shadow-[0_24px_70px_-40px_rgba(14,43,37,0.35)] dark:border-ink-800 sm:p-8">
                 {/* Accent line */}
                 <div
-                  className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-400 to-sky-400"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-400 to-lime-400"
                   aria-hidden="true"
                 />
 
@@ -453,8 +453,8 @@ const passwordStrength = [
   },
   {
     label: 'Good',
-    bar: 'bg-sky-500',
-    text: 'text-sky-600 dark:text-sky-400',
+    bar: 'bg-lime-500',
+    text: 'text-lime-600 dark:text-lime-400',
   },
   {
     label: 'Strong',
@@ -1101,7 +1101,7 @@ export function SignupPage() {
           className={cn(
             'flex items-center gap-3 rounded-xl border p-3',
             isProvider
-              ? 'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/30'
+              ? 'border-lime-200 bg-lime-50 dark:border-lime-900 dark:bg-lime-950/30'
               : 'border-brand-200 bg-lavender dark:border-brand-900 dark:bg-brand-950/40'
           )}
         >
@@ -1109,7 +1109,7 @@ export function SignupPage() {
             className={cn(
               'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
               isProvider
-                ? 'bg-sky-100 text-sky-600 dark:bg-sky-900/50 dark:text-sky-400'
+                ? 'bg-lime-100 text-lime-600 dark:bg-lime-900/50 dark:text-lime-400'
                 : 'bg-brand-100 text-brand-600 dark:bg-brand-900/50 dark:text-brand-300'
             )}
           >

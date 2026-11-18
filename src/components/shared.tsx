@@ -283,7 +283,7 @@ export function Footer() {
 
 const statusStyles: Record<string, string> = {
   pending: 'bg-warning-50 text-warning-700 dark:bg-warning-600/15 dark:text-warning-200',
-  accepted: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200',
+  accepted: 'bg-lime-50 text-lime-700 dark:bg-lime-500/15 dark:text-lime-200',
   payment_pending: 'bg-warning-50 text-warning-700 dark:bg-warning-600/15 dark:text-warning-200',
   paid: 'bg-success-50 text-success-700 dark:bg-success-600/15 dark:text-success-200',
   completed: 'bg-brand-50 text-brand-700 dark:bg-brand-950/70 dark:text-brand-300',

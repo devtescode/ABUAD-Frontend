@@ -864,7 +864,7 @@ export function ProviderEarnings() {
                         onClick={() => setFilter(tab.value)}
                         aria-pressed={active}
                         className={cn(
-                          'flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition',
+                          'flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition sm:min-h-0',
                           active
                             ? 'bg-brand-600 text-white shadow-sm'
                             : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-ink-800 dark:text-ink-300 dark:hover:bg-ink-700'

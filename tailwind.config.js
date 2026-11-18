@@ -5,24 +5,39 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Servicely brand — indigo/purple
+        // Servicely brand — deep forest green, anchored on #0E2B25
+        // brand-600 is the primary shade used for buttons, active states and accents.
         brand: {
-          50: '#f1f0ff',
-          100: '#e5e2fd',
-          200: '#cdc8fa',
-          300: '#a9a1f5',
-          400: '#877aec',
-          500: '#6a5ce8',
-          600: '#5145e5',
-          700: '#4437ca',
-          800: '#382fa3',
-          900: '#302b80',
-          950: '#1e1a4d',
+          50: '#EAF4F0',
+          100: '#CFE8DC',
+          200: '#A1D0B9',
+          300: '#72B494',
+          400: '#459670',
+          500: '#26714F',
+          600: '#0E2B25',
+          700: '#0B241F',
+          800: '#081B17',
+          900: '#051310',
+          950: '#020B09',
         },
-        // Soft lavender surface
+        // Soft sage surface — replaces the old lavender/purple surface
         lavender: {
-          DEFAULT: '#f3f1ff',
-          dark: '#262342',
+          DEFAULT: '#EDF5F0',
+          dark: '#12352C',
+        },
+        // Fresh lime accent — pairs beautifully with the deep forest green
+        lime: {
+          50: '#F6FCE7',
+          100: '#ECF8CE',
+          200: '#D9F09F',
+          300: '#C6F36B',
+          400: '#AEE051',
+          500: '#8FC338',
+          600: '#6F9C2E',
+          700: '#567829',
+          800: '#435D24',
+          900: '#374B20',
+          950: '#1D2910',
         },
         // Legacy palettes (kept for compatibility with existing pages)
         primary: {
@@ -99,10 +114,10 @@ export default {
         xs: '0 1px 2px rgba(16, 24, 40, 0.04)',
         card: '0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.08)',
         'card-hover': '0 12px 24px -12px rgba(16, 24, 40, 0.18), 0 4px 8px -4px rgba(16, 24, 40, 0.08)',
-        soft: '0 8px 24px -6px rgba(81, 69, 229, 0.16)',
+        soft: '0 8px 24px -6px rgba(14, 43, 37, 0.18)',
         elevated: '0 20px 40px -24px rgba(16, 24, 40, 0.28), 0 8px 16px -12px rgba(16, 24, 40, 0.12)',
         popover: '0 16px 32px -12px rgba(16, 24, 40, 0.22), 0 4px 8px -4px rgba(16, 24, 40, 0.1)',
-        glow: '0 0 0 4px rgba(81, 69, 229, 0.12)',
+        glow: '0 0 0 4px rgba(198, 243, 107, 0.20)',
       },
       borderRadius: {
         '4xl': '2rem',

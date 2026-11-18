@@ -117,7 +117,7 @@ export const categories: Category[] = [
     icon: Video,
     description: 'Cinematic video production for any occasion.',
     image: 'https://images.pexels.com/photos/313567/pexels-photo-313567.jpeg?auto=compress&cs=tinysrgb&w=800',
-    color: 'from-sky-400 to-blue-600',
+    color: 'from-lime-400 to-brand-600',
   },
   {
     id: '3',

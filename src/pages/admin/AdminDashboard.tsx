@@ -98,7 +98,7 @@ const activityFeed = [
     text: 'Payment received ₦45,000',
     time: '1 hour ago',
     icon: Wallet,
-    tone: 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300',
+    tone: 'bg-lime-50 text-lime-600 dark:bg-lime-500/15 dark:text-lime-300',
   },
   {
     text: 'New review submitted',

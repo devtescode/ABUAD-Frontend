@@ -2939,7 +2939,7 @@ export function PaymentPage() {
           <div className="pointer-events-none absolute inset-0 overflow-hidden">
             <div className="absolute left-1/2 top-10 h-72 w-72 -translate-x-1/2 rounded-full bg-primary-500/10 blur-3xl" />
 
-            <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
+            <div className="absolute bottom-0 right-0 h-64 w-64 rounded-full bg-brand-500/10 blur-3xl" />
           </div>
 
           <div className="relative w-full max-w-lg">
@@ -2948,7 +2948,7 @@ export function PaymentPage() {
             <div className="overflow-hidden rounded-[2rem] border border-ink-100 bg-white shadow-2xl shadow-ink-900/5 dark:border-ink-800 dark:bg-ink-900">
 
               {/* TOP ACCENT */}
-              <div className="h-1.5 bg-gradient-to-r from-primary-500 via-primary-600 to-blue-600" />
+              <div className="h-1.5 bg-gradient-to-r from-primary-500 via-primary-600 to-brand-600" />
 
               <div className="p-7 text-center sm:p-10">
 
@@ -3286,7 +3286,7 @@ export function PaymentPage() {
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute -left-20 top-10 h-72 w-72 rounded-full bg-primary-500/5 blur-3xl" />
 
-          <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-blue-500/5 blur-3xl" />
+          <div className="absolute -right-20 top-40 h-80 w-80 rounded-full bg-brand-500/5 blur-3xl" />
         </div>
 
         <div className="relative mx-auto max-w-3xl">
@@ -3307,7 +3307,7 @@ export function PaymentPage() {
           <div className="overflow-hidden rounded-[2rem] border border-ink-100 bg-white shadow-2xl shadow-ink-900/5 dark:border-ink-800 dark:bg-ink-900">
 
             {/* TOP ACCENT */}
-            <div className="h-1.5 bg-gradient-to-r from-primary-500 via-primary-600 to-blue-600" />
+            <div className="h-1.5 bg-gradient-to-r from-primary-500 via-primary-600 to-brand-600" />
 
             <div className="p-5 sm:p-8 lg:p-10">
 

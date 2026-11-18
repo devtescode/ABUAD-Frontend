@@ -510,7 +510,7 @@ export function DashboardHeader({
 const statColors = {
   primary: 'bg-primary-50 text-primary-600 dark:bg-primary-950/50 dark:text-primary-300',
   accent: 'bg-accent-50 text-accent-600 dark:bg-accent-900/40 dark:text-accent-300',
-  sky: 'bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-300',
+  sky: 'bg-lime-50 text-lime-600 dark:bg-lime-500/15 dark:text-lime-300',
   rose: 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300',
   brand: 'bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-300',
   success: 'bg-success-50 text-success-600 dark:bg-success-600/15 dark:text-success-200',

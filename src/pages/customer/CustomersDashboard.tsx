@@ -387,7 +387,7 @@ function NextBookingCard({
 
   return (
     <article className="card h-full overflow-hidden">
-      <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-400 to-indigo-400" />
+      <div className="h-1 w-full bg-gradient-to-r from-brand-500 via-brand-400 to-lime-400" />
 
       <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-4">
@@ -702,7 +702,7 @@ export function CustomersDashboard() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-indigo-900 p-5 text-white shadow-soft sm:p-8"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-5 text-white shadow-soft sm:p-8"
         aria-label={`Welcome, ${firstName}`}
       >
         {/* Decorative elements */}

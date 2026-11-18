@@ -171,7 +171,7 @@ const badgeTones = {
     'bg-warning-50 text-warning-700 dark:bg-warning-600/15 dark:text-warning-200',
   danger:
     'bg-danger-50 text-danger-700 dark:bg-danger-500/15 dark:text-danger-200',
-  info: 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200',
+  info: 'bg-lime-50 text-lime-700 dark:bg-lime-500/15 dark:text-lime-200',
   neutral:
     'bg-slate-100 text-slate-600 dark:bg-ink-800 dark:text-ink-300',
 };
@@ -346,6 +346,7 @@ export function EmptyState({
 }) {
   return (
     <div
+      role="status"
       className={cn(
         'flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/70 px-6 py-12 text-center shadow-xs dark:border-ink-700 dark:bg-ink-900/40 sm:px-10 sm:py-16',
         className

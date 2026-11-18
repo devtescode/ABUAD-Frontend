@@ -545,7 +545,7 @@ export function ProviderReviews() {
           ) : (
             <section
               aria-label="Rating summary"
-              className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-indigo-900 p-5 text-white shadow-soft sm:p-8"
+              className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-brand-900 p-5 text-white shadow-soft sm:p-8"
             >
               <div
                 aria-hidden="true"

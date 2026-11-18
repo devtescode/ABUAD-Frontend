@@ -299,7 +299,7 @@ function AdminCheckScreen() {
 
         <div className="mt-6 h-1 overflow-hidden rounded-full bg-white/10">
           <motion.div
-            className="h-full w-1/2 rounded-full bg-gradient-to-r from-brand-300 to-sky-400"
+            className="h-full w-1/2 rounded-full bg-gradient-to-r from-brand-300 to-lime-400"
             animate={{ x: ["-100%", "200%"] }}
             transition={{
               repeat: Infinity,
@@ -749,11 +749,11 @@ export default function AdminAuth() {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35 }}
-              className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-[0_30px_80px_-40px_rgba(30,26,77,0.45)] backdrop-blur dark:border-ink-800 dark:bg-ink-900/95"
+              className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-[0_30px_80px_-40px_rgba(14,43,37,0.35)] backdrop-blur dark:border-ink-800 dark:bg-ink-900/95"
             >
               {/* Accent line */}
               <div
-                className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-400 to-sky-400"
+                className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 via-brand-400 to-lime-400"
                 aria-hidden="true"
               />
 
