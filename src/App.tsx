@@ -4,6 +4,7 @@ import { AuthProvider, BookingProvider, isTokenExpired, useAuth } from '@/contex
 import { queryClient } from '@/lib/queryClient';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { FrostedGlassLoader } from '@/components/FrostedGlassLoader';
 
 /**
  * Route-level code splitting keeps the public landing page fast and only
@@ -234,23 +235,9 @@ function ProtectedRoute({
   return <>{children}</>;
 }
 
-
-function RouteFallback() {
-  return (
-    <div className="flex min-h-[70vh] items-center justify-center bg-slate-50 dark:bg-ink-950">
-      <div className="flex flex-col items-center gap-4">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-100 border-t-brand-600 dark:border-ink-800 dark:border-t-brand-400" />
-        <p className="text-sm font-medium text-slate-500 dark:text-ink-400">
-          Loading your workspace…
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function AppRoutes() {
   return (
-    <Suspense fallback={<RouteFallback />}>
+    <Suspense fallback={<FrostedGlassLoader />}>
       <Routes>
       {/* Public */}
       <Route path="/" element={<HomePage />} />

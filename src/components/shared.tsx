@@ -59,165 +59,181 @@ export function PublicNavbar() {
   }, [open]);
 
   return (
-    <header
-      className={`sticky top-0 z-50 w-full border-b bg-white/85 backdrop-blur-md transition-shadow duration-300 dark:bg-ink-950/85 ${
-        scrolled
-          ? 'border-slate-200/80 shadow-sm dark:border-ink-800'
-          : 'border-slate-200/60 dark:border-ink-800/70'
-      }`}
-    >
-      <nav
-        aria-label="Primary"
-        className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6"
+    <>
+      <header
+        className={`fixed inset-x-0 top-0 z-50 w-full border-b bg-white/85 backdrop-blur-md transition-shadow duration-300 dark:bg-ink-950/85 ${
+          scrolled
+            ? 'border-slate-200/80 shadow-sm dark:border-ink-800'
+            : 'border-slate-200/60 dark:border-ink-800/70'
+        }`}
       >
-        <Logo />
-
-        <div className="hidden items-center gap-0.5 lg:flex">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              end={link.to === '/'}
-              className={({ isActive }) =>
-                `relative rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-600/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
-                  isActive
-                    ? 'bg-lavender text-brand-700 dark:bg-ink-800 dark:text-ink-50'
-                    : 'text-slate-500 hover:bg-lavender hover:text-brand-700 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-50'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {link.label}
-                  {isActive && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-brand-600 dark:bg-brand-400"
-                    />
-                  )}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
-
-        <div className="hidden items-center gap-2 lg:flex">
-          <ThemeToggle />
-          {user ? (
-            <>
-              <Link to={`/${user.role}`} className="btn-outline btn-sm">
-                <LayoutDashboard className="h-3.5 w-3.5" aria-hidden="true" />
-                Dashboard
-              </Link>
-              <button type="button" onClick={logout} className="btn-ghost btn-sm">
-                Logout
-              </button>
-            </>
-          ) : (
-            <Link to="/login" className="btn-ghost">
-              Login
-            </Link>
-          )}
-          <Link to={user ? '/services' : '/signup'} className="btn-primary">
-            Get Started
-          </Link>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-700 transition-colors hover:bg-lavender focus-visible:ring-2 focus-visible:ring-brand-600/60 dark:text-ink-300 dark:hover:bg-ink-800 lg:hidden"
-          aria-label={open ? 'Close menu' : 'Open menu'}
-          aria-expanded={open}
-          aria-controls="public-mobile-nav"
+        <nav
+          aria-label="Primary"
+          className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6"
         >
-          {open ? (
-            <X className="h-5 w-5" aria-hidden="true" />
-          ) : (
-            <Menu className="h-5 w-5" aria-hidden="true" />
-          )}
-        </button>
-      </nav>
+          <Logo />
 
+          <div className="hidden items-center gap-0.5 lg:flex">
+            {navLinks.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                end={link.to === '/'}
+                className={({ isActive }) =>
+                  `relative rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-600/60 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
+                    isActive
+                      ? 'bg-lavender text-brand-700 dark:bg-ink-800 dark:text-ink-50'
+                      : 'text-slate-500 hover:bg-lavender hover:text-brand-700 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-50'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {link.label}
+                    {isActive && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full bg-brand-600 dark:bg-brand-400"
+                      />
+                    )}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+
+          <div className="hidden items-center gap-2 lg:flex">
+            <ThemeToggle />
+            {user ? (
+              <>
+                <Link to={`/${user.role}`} className="btn-outline btn-sm">
+                  <LayoutDashboard className="h-3.5 w-3.5" aria-hidden="true" />
+                  Dashboard
+                </Link>
+                <button type="button" onClick={logout} className="btn-ghost btn-sm">
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="btn-ghost">
+                Login
+              </Link>
+            )}
+            <Link to={user ? '/services' : '/signup'} className="btn-primary">
+              Get Started
+            </Link>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-700 transition-colors hover:bg-lavender focus-visible:ring-2 focus-visible:ring-brand-600/60 dark:text-ink-300 dark:hover:bg-ink-800 lg:hidden"
+            aria-label={open ? 'Close menu' : 'Open menu'}
+            aria-expanded={open}
+            aria-controls="public-mobile-nav"
+          >
+            {open ? (
+              <X className="h-5 w-5" aria-hidden="true" />
+            ) : (
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            )}
+          </button>
+        </nav>
+
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              id="public-mobile-nav"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="safe-bottom absolute left-0 right-0 top-full max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-b border-slate-200/70 bg-white shadow-lg dark:border-ink-800 dark:bg-ink-950 lg:hidden"
+            >
+              <nav aria-label="Mobile" className="space-y-1 px-4 py-3">
+                {navLinks.map((link) => (
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    end={link.to === '/'}
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) =>
+                      `block rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-600/60 ${
+                        isActive
+                          ? 'bg-lavender text-brand-700 dark:bg-ink-800 dark:text-ink-50'
+                          : 'text-slate-600 hover:bg-lavender hover:text-brand-700 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-50'
+                      }`
+                    }
+                  >
+                    {link.label}
+                  </NavLink>
+                ))}
+
+                <div className="mt-2 space-y-2 border-t border-slate-100 pt-3 dark:border-ink-800">
+                  <div className="px-1">
+                    <ThemeToggle />
+                  </div>
+                  {user ? (
+                    <>
+                      <Link
+                        to={`/${user.role}`}
+                        onClick={() => setOpen(false)}
+                        className="btn-outline w-full"
+                      >
+                        <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                        Dashboard
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          logout();
+                          setOpen(false);
+                          navigate('/');
+                        }}
+                        className="btn-ghost w-full"
+                      >
+                        Logout
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <Link
+                        to="/login"
+                        onClick={() => setOpen(false)}
+                        className="btn-outline w-full"
+                      >
+                        Login
+                      </Link>
+                      <Link
+                        to="/signup"
+                        onClick={() => setOpen(false)}
+                        className="btn-primary w-full"
+                      >
+                        Get Started
+                      </Link>
+                    </>
+                  )}
+                </div>
+              </nav>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+      <div className="h-16" aria-hidden="true" />
       <AnimatePresence>
         {open && (
           <motion.div
-            id="public-mobile-nav"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="safe-bottom overflow-hidden border-t border-slate-200/70 bg-white dark:border-ink-800 dark:bg-ink-950 lg:hidden"
-          >
-            <nav aria-label="Mobile" className="space-y-1 px-4 py-3">
-              {navLinks.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  end={link.to === '/'}
-                  onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    `block rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-brand-600/60 ${
-                      isActive
-                        ? 'bg-lavender text-brand-700 dark:bg-ink-800 dark:text-ink-50'
-                        : 'text-slate-600 hover:bg-lavender hover:text-brand-700 dark:text-ink-400 dark:hover:bg-ink-800 dark:hover:text-ink-50'
-                    }`
-                  }
-                >
-                  {link.label}
-                </NavLink>
-              ))}
-
-              <div className="mt-2 space-y-2 border-t border-slate-100 pt-3 dark:border-ink-800">
-                <div className="px-1">
-                  <ThemeToggle />
-                </div>
-                {user ? (
-                  <>
-                    <Link
-                      to={`/${user.role}`}
-                      onClick={() => setOpen(false)}
-                      className="btn-outline w-full"
-                    >
-                      <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-                      Dashboard
-                    </Link>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        logout();
-                        setOpen(false);
-                        navigate('/');
-                      }}
-                      className="btn-ghost w-full"
-                    >
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <Link
-                      to="/login"
-                      onClick={() => setOpen(false)}
-                      className="btn-outline w-full"
-                    >
-                      Login
-                    </Link>
-                    <Link
-                      to="/signup"
-                      onClick={() => setOpen(false)}
-                      className="btn-primary w-full"
-                    >
-                      Get Started
-                    </Link>
-                  </>
-                )}
-              </div>
-            </nav>
-          </motion.div>
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+            className="fixed inset-x-0 bottom-0 top-16 z-40 bg-slate-900/30 backdrop-blur-md dark:bg-ink-950/60 lg:hidden"
+          />
         )}
       </AnimatePresence>
-    </header>
+    </>
   );
 }
 

@@ -275,7 +275,7 @@ export function DashboardLayout({
       </aside>
 
       {/* Mobile header */}
-      <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/70 bg-white/90 px-4 backdrop-blur-md dark:border-ink-800 dark:bg-ink-950/90 lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/70 bg-white/90 px-4 backdrop-blur-md dark:border-ink-800 dark:bg-ink-950/90 lg:hidden">
         <Logo />
         <div className="flex items-center gap-1">
           <ThemeToggle />
@@ -302,7 +302,7 @@ export function DashboardLayout({
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
               aria-hidden="true"
-              className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm dark:bg-ink-950/70 lg:hidden"
+              className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-md dark:bg-ink-950/70 lg:hidden"
             />
             <motion.aside
               ref={drawerRef}
@@ -363,7 +363,7 @@ export function DashboardLayout({
       </AnimatePresence>
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="pt-16 lg:pl-64 lg:pt-0">
         {/* Desktop topbar */}
         <header className="sticky top-0 z-30 hidden h-16 items-center justify-between gap-4 border-b border-slate-200/70 bg-white/80 px-8 backdrop-blur-md dark:border-ink-800 dark:bg-ink-950/80 lg:flex">
           <div className="min-w-0">

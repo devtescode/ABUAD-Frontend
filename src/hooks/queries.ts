@@ -871,6 +871,8 @@ export function useUpdateProviderProfile() {
    ADMIN
 ========================================================= */
 
+const ADMIN_REFETCH_INTERVAL = 15_000;
+
 export function useAdminExists(options: QueryOptions<{ exists?: boolean }> = {}) {
   return useQuery({
     queryKey: queryKeys.admin.exists,
@@ -899,6 +901,8 @@ export function useAdminLogin() {
 }
 
 export function useAdminRegister() {
+  const client = useQueryClient();
+
   return useMutation({
     mutationFn: (payload: { name: string; email: string; password: string }) =>
       apiSend<{ success?: boolean; message?: string }>(
@@ -907,6 +911,9 @@ export function useAdminRegister() {
         payload,
         { auth: 'none' }
       ),
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: queryKeys.admin.exists });
+    },
   });
 }
 
@@ -920,6 +927,11 @@ export function useAdminUsers(options: QueryOptions<Array<Record<string, unknown
       );
       return Array.isArray(data?.users) ? data.users : [];
     },
+    staleTime: 10_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     ...options,
     enabled: adminEnabled(options.enabled ?? true),
   });
@@ -935,6 +947,11 @@ export function useAdminProviders(options: QueryOptions<Array<Record<string, unk
       );
       return Array.isArray(data?.providers) ? data.providers : [];
     },
+    staleTime: 10_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     ...options,
     enabled: adminEnabled(options.enabled ?? true),
   });
@@ -948,6 +965,11 @@ export function useAdminProvider(id?: string, options: QueryOptions<ProviderProf
         `/admin/providers/${encodeURIComponent(id || '')}`,
         { auth: 'admin', signal }
       ),
+    staleTime: 10_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     ...options,
     enabled: adminEnabled(Boolean(id)) && (options.enabled ?? true),
   });
@@ -963,6 +985,11 @@ export function useAdminBookings(options: QueryOptions<Array<Record<string, unkn
       });
       return Array.isArray(data?.bookings) ? data.bookings : [];
     },
+    staleTime: 10_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     ...options,
     enabled: adminEnabled(options.enabled ?? true),
   });
@@ -990,6 +1017,11 @@ export function useAdminVerification(
       const list = candidates.find(Array.isArray);
       return Array.isArray(list) ? (list as Array<Record<string, unknown>>) : [];
     },
+    staleTime: 10_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     ...options,
     enabled: adminEnabled(options.enabled ?? true),
   });
@@ -1005,6 +1037,11 @@ export function useAdminReviews(options: QueryOptions<Array<Record<string, unkno
       });
       return Array.isArray(data?.reviews) ? data.reviews : [];
     },
+    staleTime: 10_000,
+    refetchInterval: ADMIN_REFETCH_INTERVAL,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     ...options,
     enabled: adminEnabled(options.enabled ?? true),
   });
@@ -1019,8 +1056,10 @@ export function useAdminProviderStatus() {
         `/admin/providers/${encodeURIComponent(id)}/${suspend ? 'suspend' : 'unsuspend'}`,
         'PATCH'
       ),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       client.invalidateQueries({ queryKey: queryKeys.admin.providers });
+      client.invalidateQueries({ queryKey: queryKeys.admin.provider(variables.id) });
+      client.invalidateQueries({ queryKey: queryKeys.admin.users });
       client.invalidateQueries({ queryKey: ['admin', 'verification'] });
       client.invalidateQueries({ queryKey: queryKeys.providers.all });
     },
@@ -1038,8 +1077,10 @@ export function useAdminVerificationAction() {
         `/verification/providers/${encodeURIComponent(id)}/${action}`,
         'PATCH'
       ),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       client.invalidateQueries({ queryKey: queryKeys.admin.providers });
+      client.invalidateQueries({ queryKey: queryKeys.admin.provider(variables.id) });
+      client.invalidateQueries({ queryKey: queryKeys.admin.users });
       client.invalidateQueries({ queryKey: ['admin', 'verification'] });
       client.invalidateQueries({ queryKey: queryKeys.providers.all });
     },
