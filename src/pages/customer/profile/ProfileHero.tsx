@@ -58,7 +58,7 @@ export function ProfileHero({
   const photoStatus = hasNewPhoto
     ? 'New photo selected'
     : hasAvatar
-      ? 'Photo on file'
+      ? 'Photo Uploaded'
       : 'No photo yet';
 
   useEffect(() => {

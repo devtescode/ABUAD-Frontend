@@ -30,12 +30,12 @@ export function ProfileStrength(props: {
     return (
         <Card className="p-5 sm:p-6">
             <div className="flex items-start gap-3">
-                <span
+                {/* <span
                     aria-hidden="true"
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lavender text-brand-600 ring-1 ring-brand-100 dark:bg-brand-950/70 dark:text-lime-300 dark:ring-brand-900/60"
                 >
                     <Sparkles className="h-5 w-5" />
-                </span>
+                </span> */}
                 <div className="min-w-0">
                     <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-ink-50 sm:text-lg">
                         Profile strength
