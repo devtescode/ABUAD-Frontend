@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSavedProviders, useToggleSavedProvider, useUpdateProviderProfile } from '@/hooks/queries';
+import { useSavedProviders, useToggleSavedProvider, useUpdateProviderProfile, useUpdateCustomerProfile } from '@/hooks/queries';
 import { USER_KEY, USER_TOKEN_KEY, apiSend } from '@/lib/api';
 
 import type { UserRole, Booking } from '@/data/mockData';
@@ -94,6 +94,8 @@ interface AuthContextType {
     profileData: UpdateProfileData
   ) => Promise<any>;
 
+  updateCustomerProfile: (profileData: UpdateProfileData) => Promise<any>;
+
   logout: () => void;
 }
 
@@ -112,6 +114,7 @@ export function AuthProvider({
 }) {
   const queryClient = useQueryClient();
   const updateProfileMutation = useUpdateProviderProfile();
+  const updateCustomerProfileMutation = useUpdateCustomerProfile();
 
   // const [user, setUser] = useState<User | null>(() => {
   //   try {
@@ -512,6 +515,36 @@ export function AuthProvider({
       );
     }
   };
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // UPDATE CUSTOMER PROFILE
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const updateCustomerProfile = async (profileData: UpdateProfileData) => {
+    try {
+      const data = await updateCustomerProfileMutation.mutateAsync(profileData);
+
+      if (!data?.user) {
+        throw new Error(
+          'Profile was updated, but the backend did not return the updated user.'
+        );
+      }
+
+      const updatedUser = data.user as User;
+
+      setUser(updatedUser);
+      sessionStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+
+      return data;
+    } catch (error: any) {
+      console.error('Customer profile update error:', error);
+
+      throw new Error(
+        error?.message || 'Unable to update your profile. Please try again.'
+      );
+    }
+  };
+
   // ───────────────────────────────────────────────────────────────────────────
   // LOGOUT
   // ───────────────────────────────────────────────────────────────────────────
@@ -534,6 +567,7 @@ export function AuthProvider({
         signup,
         updateUser,
         updateProfile,
+        updateCustomerProfile,
         logout,
       }}
     >

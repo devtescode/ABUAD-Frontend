@@ -42,7 +42,7 @@ const ForgotPasswordPage = lazy(() =>
   import('@/pages/auth/AuthPages').then((m) => ({ default: m.ForgotPasswordPage }))
 );
 const CustomerProfile = lazy(() =>
-  import('@/pages/customer/CustomerDashboard').then((m) => ({ default: m.CustomerProfile }))
+  import('@/pages/customer/CustomerProfile').then((m) => ({ default: m.CustomerProfile }))
 );
 const CustomerSettings = lazy(() =>
   import('@/pages/customer/CustomerDashboard').then((m) => ({ default: m.CustomerSettings }))

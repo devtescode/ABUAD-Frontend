@@ -194,6 +194,10 @@ export const queryKeys = {
     myProviderProfile: ['reviews', 'my-provider-profile'] as const,
     provider: (id: string) => ['reviews', 'provider', id] as const,
   },
+  customerProfile: {
+    all: ['customer', 'profile'] as const,
+    me: ['customer', 'profile', 'me'] as const,
+  },
   portfolio: {
     all: ['portfolio'] as const,
     mine: ['portfolio', 'mine'] as const,
@@ -863,6 +867,28 @@ export function useUpdateProviderProfile() {
     onSuccess: () => {
       client.invalidateQueries({ queryKey: queryKeys.reviews.myProviderProfile });
       client.invalidateQueries({ queryKey: queryKeys.providers.all });
+    },
+  });
+}
+
+export function useUpdateCustomerProfile() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ name, about, location, avatar }: UpdateProfilePayload) => {
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('about', about);
+      formData.append('location', location);
+      if (avatar instanceof File) formData.append('avatar', avatar);
+      return apiSend<{ success?: boolean; message?: string; user?: unknown }>(
+        '/usercreative/customer/profile',
+        'PUT',
+        formData
+      );
+    },
+    onSuccess: () => {
+      client.invalidateQueries({ queryKey: queryKeys.customerProfile.all });
     },
   });
 }

@@ -1,4 +1,9 @@
-import { useRef, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -357,6 +362,49 @@ export default function AdminAuth() {
     ? Boolean(adminExistsQuery.data.exists)
     : undefined;
 
+  /*
+   * Registration is valid only when the API positively reports that no
+   * administrator exists. Network errors and unknown state must keep the
+   * Create account option inactive.
+   */
+  const registerUnavailable =
+    exists !== false || adminExistsQuery.isError;
+
+  /*
+   * A failed existence check — including a failed Retry — must not leave
+   * the Create account tab active. Declared before the early returns so
+   * the hook order stays stable across every render.
+   */
+  useEffect(() => {
+    const checkFailed =
+      adminExistsQuery.isError ||
+      (exists === undefined &&
+        !adminExistsQuery.isLoading &&
+        !adminExistsQuery.isFetching);
+
+    if (mode !== "register" || !checkFailed) return;
+
+    if (modeTimer.current !== null) {
+      window.clearTimeout(modeTimer.current);
+      modeTimer.current = null;
+    }
+
+    setMode("login");
+    setFieldErrors({});
+    setError("");
+    setSuccess("");
+    setPassword("");
+    setConfirmPassword("");
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  }, [
+    mode,
+    exists,
+    adminExistsQuery.isError,
+    adminExistsQuery.isLoading,
+    adminExistsQuery.isFetching,
+  ]);
+
   const isRegister = mode === "register";
   const loading = isRegister
     ? registerMutation.isPending
@@ -377,7 +425,11 @@ export default function AdminAuth() {
    * mode. Apply that decision exactly once so later refetches — or the
    * admin manually switching modes — never override their choice.
    */
-  if (!initialized && typeof exists === "boolean") {
+  if (
+    !initialized &&
+    typeof exists === "boolean" &&
+    !adminExistsQuery.isError
+  ) {
     setInitialized(true);
     setMode(exists ? "login" : "register");
   }
@@ -401,6 +453,7 @@ export default function AdminAuth() {
 
   const switchMode = (nextMode: AuthMode) => {
     if (loading || nextMode === mode) return;
+    if (nextMode === "register" && registerUnavailable) return;
 
     if (modeTimer.current !== null) {
       window.clearTimeout(modeTimer.current);
@@ -467,7 +520,7 @@ export default function AdminAuth() {
   ) => {
     event.preventDefault();
 
-    if (loading) return;
+    if (loading || registerUnavailable) return;
 
     setError("");
     setSuccess("");
@@ -788,7 +841,7 @@ export default function AdminAuth() {
                     (value) => {
                       const active = mode === value;
                       const registerBlocked =
-                        value === "register" && exists === true;
+                        value === "register" && registerUnavailable;
 
                       return (
                         <button
@@ -799,7 +852,9 @@ export default function AdminAuth() {
                           onClick={() => switchMode(value)}
                           title={
                             registerBlocked
-                              ? "An administrator account already exists."
+                              ? exists === true
+                                ? "An administrator account already exists."
+                                : "Administrator availability could not be verified. Check your connection and use Try again."
                               : undefined
                           }
                           className={cn(
@@ -822,7 +877,7 @@ export default function AdminAuth() {
 
                 {/* FIRST ADMIN NOTICE */}
                 <AnimatePresence initial={false}>
-                  {isRegister && exists === false && (
+                  {isRegister && !registerUnavailable && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
